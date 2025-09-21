@@ -1,99 +1,116 @@
 "use client";
 
-import { Layout, Menu } from "antd";
+import { useState } from "react";
+import { useRouter } from "next/navigation";
 import {
-  LayoutDashboard,
+  Home,
   FileText,
+  Plus,
+  History,
   Settings,
   LogOut,
-  Church,
+  BarChart2,
+  PieChart,
+  TrendingUp,
+  Menu,
+  X,
 } from "lucide-react";
-import { useRouter, usePathname } from "next/navigation";
-import { useEffect, useState } from "react";
+import Image from "next/image";
+import { Button } from "antd";
 
-const { Header, Sider, Content } = Layout;
+const menuItems = [
+  { name: "Dashboard", icon: <Home className="w-5 h-5" />, path: "/dashboard" },
+  { name: "Reports", icon: <FileText className="w-5 h-5" />, path: "/reports" },
+  { name: "Add Submission", icon: <Plus className="w-5 h-5" />, path: "/add-submission" },
+  { name: "History", icon: <History className="w-5 h-5" />, path: "/history" },
+  { name: "Analytics", icon: <BarChart2 className="w-5 h-5" />, path: "/analytics" },
+  { name: "Trends", icon: <TrendingUp className="w-5 h-5" />, path: "/trends" },
+  { name: "Settings", icon: <Settings className="w-5 h-5" />, path: "/settings" },
+];
 
-export default function DashboardLayout({ children }: { children: React.ReactNode }) {
+export default function Layout({ children }: { children: React.ReactNode }) {
+  const [sidebarOpen, setSidebarOpen] = useState(false);
   const router = useRouter();
-  const pathname = usePathname();
-  const [assembly, setAssembly] = useState<string | null>(null);
-
-  useEffect(() => {
-    const asm = localStorage.getItem("assembly");
-    if (!asm) {
-      router.push("/"); // if no login, redirect
-    } else {
-      setAssembly(asm);
-    }
-  }, [router]);
 
   const handleLogout = () => {
     localStorage.removeItem("assembly");
-    router.push("/");
+    router.push("/login");
   };
 
-  const menuItems = [
-    {
-      key: "/dashboard",
-      icon: <LayoutDashboard size={18} />,
-      label: "Dashboard",
-      onClick: () => router.push("/dashboard"),
-    },
-    {
-      key: "/dashboard/reports",
-      icon: <FileText size={18} />,
-      label: "Reports",
-      onClick: () => router.push("/dashboard/reports"),
-    },
-    {
-      key: "/dashboard/settings",
-      icon: <Settings size={18} />,
-      label: "Settings",
-      onClick: () => router.push("/dashboard/settings"),
-    },
-    {
-      key: "logout",
-      icon: <LogOut size={18} />,
-      label: "Logout",
-      onClick: handleLogout,
-    },
-  ];
-
   return (
-    <Layout style={{ minHeight: "100vh" }}>
+    <div className="h-screen w-screen flex bg-gray-50 overflow-hidden">
       {/* Sidebar */}
-      <Sider
-        width={220}
-        className="bg-gradient-to-b from-indigo-700 to-blue-800 text-white"
+      <div
+        className={`fixed inset-y-0 left-0 transform ${
+          sidebarOpen ? "translate-x-0" : "-translate-x-full"
+        } md:translate-x-0 md:relative transition-transform duration-200 ease-in-out bg-primary text-white w-64 flex flex-col`}
       >
-        <div className="flex items-center gap-2 px-4 py-5 border-b border-indigo-600">
-          <Church size={28} className="text-white" />
-          <span className="font-semibold text-white text-sm leading-tight">
-            GOFAMINT <br /> {assembly} Assembly
-          </span>
+        {/* Logo */}
+        <div className="flex items-center gap-2 p-4 border-b border-white/20">
+          <Image
+            src="/images/Gofamint_logo.png"
+            alt="GOFAMINT Logo"
+            width={40}
+            height={40}
+            className="rounded-full"
+          />
+          <span className="font-semibold text-lg">GOFAMINT</span>
         </div>
 
-        <Menu
-          mode="inline"
-          theme="dark"
-          selectedKeys={[pathname]}
-          items={menuItems}
-          className="mt-4"
-        />
-      </Sider>
+        {/* Menu */}
+        <nav className="flex-1 overflow-y-auto p-4 space-y-2">
+          {menuItems.map((item) => (
+            <button
+              key={item.name}
+              onClick={() => router.push(item.path)}
+              className="flex items-center gap-3 w-full px-3 py-2 rounded-lg hover:bg-white/10 transition"
+            >
+              {item.icon}
+              <span>{item.name}</span>
+            </button>
+          ))}
+        </nav>
 
-      {/* Main Layout */}
-      <Layout>
+        {/* Logout */}
+        <div className="p-4 border-t border-white/20">
+          <button
+            onClick={handleLogout}
+            className="flex items-center gap-3 w-full px-3 py-2 rounded-lg hover:bg-white/10 transition"
+          >
+            <LogOut className="w-5 h-5" />
+            <span>Logout</span>
+          </button>
+        </div>
+      </div>
+
+      {/* Main Content */}
+      <div className="flex-1 flex flex-col overflow-hidden">
         {/* Header */}
-        <Header className="bg-white shadow-sm px-6 flex items-center justify-between">
-          <h2 className="font-semibold text-gray-700">
-            {assembly} Dashboard
-          </h2>
-        </Header>
+        <header className="flex items-center justify-between bg-white border-b px-4 py-3 shadow-sm">
+          <div className="flex items-center gap-2">
+            {/* Mobile Menu Button */}
+            <button
+              className="md:hidden text-primary"
+              onClick={() => setSidebarOpen(!sidebarOpen)}
+            >
+              {sidebarOpen ? <X className="w-6 h-6" /> : <Menu className="w-6 h-6" />}
+            </button>
+            <h1 className="font-semibold text-lg text-primary">GOFAMINT Finance</h1>
+          </div>
+          <div className="flex items-center gap-3">
+            <Button
+              type="primary"
+              className="rounded-lg"
+              onClick={handleLogout}
+            >
+              Logout
+            </Button>
+          </div>
+        </header>
 
-        {/* Content */}
-        <Content className="p-6 bg-gray-50">{children}</Content>
-      </Layout>
-    </Layout>
+        {/* Page Content */}
+        <main className="flex-1 overflow-y-auto p-4 md:p-6">{children}</main>
+      </div>
+    </div>
   );
 }
