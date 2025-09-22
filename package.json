@@ -9,8 +9,11 @@
     "lint": "eslint"
   },
   "dependencies": {
+    "@prisma/client": "^6.16.2",
+    "@silevis/reactgrid": "^4.1.17",
     "antd": "^5.27.4",
     "bcrypt": "^6.0.0",
+    "chart.js": "^4.5.0",
     "dayjs": "^1.11.18",
     "framer-motion": "^12.23.16",
     "jspreadsheet-ce": "^5.0.4",
@@ -21,7 +24,9 @@
     "next-auth": "^4.24.11",
     "number-to-words": "^1.2.4",
     "react": "^18.3.1",
-    "react-dom": "^18.3.1"
+    "react-chartjs-2": "^5.3.0",
+    "react-dom": "^18.3.1",
+    "xlsx": "^0.16.1"
   },
   "devDependencies": {
     "@types/node": "^20",
@@ -31,6 +36,7 @@
     "eslint": "^8.57.1",
     "eslint-config-next": "14.2.32",
     "postcss": "^8.5.6",
+    "prisma": "^6.16.2",
     "tailwindcss": "^3.4.15",
     "typescript": "^5"
   }

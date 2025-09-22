@@ -3,6 +3,7 @@ import type { Metadata } from "next";
 import "antd/dist/reset.css";
 import "./globals.css";
 import { ConfigProvider } from "antd";
+import { AuthProvider } from "@/context/AuthContext";
 
 export const metadata: Metadata = {
   title: "GOFAMINT Akowonjo District - Finance App",
@@ -39,7 +40,7 @@ export default function RootLayout({
             },
           }}
         >
-          {children}
+          <AuthProvider>{children}</AuthProvider>
         </ConfigProvider>
       </body>
     </html>

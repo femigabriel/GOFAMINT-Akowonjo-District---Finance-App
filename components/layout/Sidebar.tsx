@@ -37,7 +37,7 @@ export default function Sidebar({ onItemClick }: SidebarProps) {
 
   const handleLogout = () => {
     localStorage.removeItem("assembly");
-    router.push("/login");
+    router.push("/");
   };
 
   const renderMenu = () => (
@@ -88,7 +88,7 @@ export default function Sidebar({ onItemClick }: SidebarProps) {
     <>
       {/* Desktop Sidebar */}
       <aside
-        className={`hidden md:flex bg-[#ffff] text-black flex-col h-screen transition-all duration-300 ${
+        className={`hidden md:flex bg-[#ffff] shadow-md text-black flex-col h-screen transition-all duration-300 ${
           isCollapsed ? "w-20" : "w-64"
         }`}
       >
