@@ -9,6 +9,7 @@ import { assemblies } from "@/lib/assemblies";
 interface AuthContextType {
   assembly: string | null;
   isAuthenticated: boolean;
+  loading: boolean; // Add loading state
   login: (assembly: string, password: string) => Promise<void>;
   logout: () => void;
 }
@@ -18,6 +19,7 @@ const AuthContext = createContext<AuthContextType | undefined>(undefined);
 export function AuthProvider({ children }: { children: ReactNode }) {
   const [assembly, setAssembly] = useState<string | null>(null);
   const [isAuthenticated, setIsAuthenticated] = useState(false);
+  const [loading, setLoading] = useState(true); // Initialize as true
   const router = useRouter();
 
   // Check for stored assembly on mount
@@ -26,11 +28,15 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     if (storedAssembly && assemblies.includes(storedAssembly)) {
       setAssembly(storedAssembly);
       setIsAuthenticated(true);
+    } else {
+      localStorage.removeItem("assembly"); // Clear invalid assembly
     }
+    setLoading(false); // Set loading to false after checking
   }, []);
 
   const login = async (assembly: string, password: string) => {
     try {
+      setLoading(true);
       const response = await fetch("/api/login", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
@@ -48,19 +54,22 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       }
     } catch (error) {
       message.error("An error occurred. Please try again.");
+    } finally {
+      setLoading(false);
     }
   };
 
   const logout = () => {
     localStorage.removeItem("assembly");
+    localStorage.removeItem("admin"); // Clear admin as well
     setAssembly(null);
     setIsAuthenticated(false);
     message.success("Logged out successfully");
-    router.push("/");
+    router.push("/login");
   };
 
   return (
-    <AuthContext.Provider value={{ assembly, isAuthenticated, login, logout }}>
+    <AuthContext.Provider value={{ assembly, isAuthenticated, loading, login, logout }}>
       {children}
     </AuthContext.Provider>
   );

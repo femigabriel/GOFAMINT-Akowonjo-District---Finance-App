@@ -1,36 +1,23 @@
+// app/login/page.tsx
 "use client";
 
 import { useState } from "react";
 import { Form, Select, Input, Button, message } from "antd";
 import { Lock, Church, UserCog } from "lucide-react";
 import Image from "next/image";
-// import { assemblies } from "@/lib/assemblies";
-import { useRouter } from "next/navigation";
 import { assemblies } from "@/lib/assemblies";
+import { useAuth } from "@/context/AuthContext";
 
 const { Option } = Select;
 
 export default function LoginPage() {
   const [loading, setLoading] = useState(false);
   const [isAdmin, setIsAdmin] = useState(false);
-  const router = useRouter();
+  const { login } = useAuth();
 
-  const onAssemblyLogin = async (values: {
-    assembly: string;
-    password: string;
-  }) => {
+  const onAssemblyLogin = async (values: { assembly: string; password: string }) => {
     setLoading(true);
-    try {
-      if (values.assembly.toLowerCase() === values.password.toLowerCase()) {
-        localStorage.setItem("assembly", values.assembly);
-        message.success(`Welcome, ${values.assembly} Assembly`);
-        router.push("/dashboard");
-      } else {
-        message.error("Invalid assembly or password");
-      }
-    } catch (error) {
-      message.error("An error occurred. Please try again.");
-    }
+    await login(values.assembly, values.password);
     setLoading(false);
   };
 
@@ -43,7 +30,7 @@ export default function LoginPage() {
       ) {
         localStorage.setItem("admin", "true");
         message.success("Admin login successful!");
-        router.push("/admin/dashboard");
+        window.location.href = "/admin/dashboard"; // Use window.location for admin redirect
       } else {
         message.error("Invalid admin credentials");
       }
@@ -56,7 +43,6 @@ export default function LoginPage() {
   return (
     <div className="h-screen w-screen flex items-center justify-center bg-gradient-to-br from-primary via-background to-secondary/20 p-4 sm:p-6 overflow-hidden">
       <div className="w-full max-w-md sm:max-w-lg bg-white rounded-2xl shadow-card p-6 sm:p-8 md:p-10">
-        {/* Header with Logo */}
         <div className="flex flex-col items-center mb-6">
           <div className="relative">
             <Image
@@ -81,7 +67,6 @@ export default function LoginPage() {
           </p>
         </div>
 
-        {/* Login Form */}
         {!isAdmin ? (
           <Form
             name="assembly-login"
@@ -89,7 +74,6 @@ export default function LoginPage() {
             onFinish={onAssemblyLogin}
             className="space-y-4"
           >
-            {/* Assembly Dropdown */}
             <Form.Item
               label={
                 <span className="flex items-center gap-2 text-primary font-semibold">
@@ -98,9 +82,7 @@ export default function LoginPage() {
                 </span>
               }
               name="assembly"
-              rules={[
-                { required: true, message: "Please select your assembly" },
-              ]}
+              rules={[{ required: true, message: "Please select your assembly" }]}
             >
               <Select
                 placeholder="Select your assembly"
@@ -119,7 +101,6 @@ export default function LoginPage() {
               </Select>
             </Form.Item>
 
-            {/* Password Input */}
             <Form.Item
               label={
                 <span className="flex items-center gap-2 text-primary font-semibold">
@@ -132,12 +113,11 @@ export default function LoginPage() {
             >
               <Input.Password
                 size="large"
-                placeholder="Enter assembly name"
+                placeholder="Enter password"
                 className="rounded-lg"
               />
             </Form.Item>
 
-            {/* Submit Button */}
             <Form.Item>
               <Button
                 type="primary"
@@ -157,7 +137,6 @@ export default function LoginPage() {
             onFinish={onAdminLogin}
             className="space-y-4"
           >
-            {/* Admin Email */}
             <Form.Item
               label={
                 <span className="flex items-center gap-2 text-primary font-semibold">
@@ -171,7 +150,6 @@ export default function LoginPage() {
               <Input size="large" placeholder="Enter admin email" />
             </Form.Item>
 
-            {/* Admin Password */}
             <Form.Item
               label={
                 <span className="flex items-center gap-2 text-primary font-semibold">
@@ -180,14 +158,11 @@ export default function LoginPage() {
                 </span>
               }
               name="password"
-              rules={[
-                { required: true, message: "Please enter your password" },
-              ]}
+              rules={[{ required: true, message: "Please enter your password" }]}
             >
               <Input.Password size="large" placeholder="Enter password" />
             </Form.Item>
 
-            {/* Submit Button */}
             <Form.Item>
               <Button
                 type="primary"
@@ -202,7 +177,6 @@ export default function LoginPage() {
           </Form>
         )}
 
-        {/* Switch Mode */}
         <div className="text-center mt-4 sm:mt-6">
           {!isAdmin ? (
             <p className="text-gray-500 text-xs sm:text-sm">
