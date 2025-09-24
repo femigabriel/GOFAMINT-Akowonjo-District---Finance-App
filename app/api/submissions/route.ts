@@ -69,7 +69,8 @@ export async function GET(req: NextRequest) {
     await dbConnect("gof-akowonjo");
 
     // Extract query parameters
-    const { searchParams } = new URL(req.url);
+    // const { searchParams } = new URL(req.url);
+    const { searchParams } = req.nextUrl;
     const start = searchParams.get("start");
     const end = searchParams.get("end");
     const assembly = searchParams.get("assembly");
