@@ -56,7 +56,7 @@ export default function Sidebar({ onItemClick }: SidebarProps) {
               isCollapsed ? "justify-center" : "justify-start"
             } ${
               isActive
-                ? "bg-blue-200 text-primary font-bold"
+                ? "bg-blue-200 text-primary font-bold "
                 : "text-black hover:bg-blue-100"
             }`}
           >

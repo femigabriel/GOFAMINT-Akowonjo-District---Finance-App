@@ -251,31 +251,14 @@ export default function DashboardPage() {
   };
 
   return (
-    <MainLayout activeItem="dashboard">
-      {/* Header */}
-      <div className="flex flex-col md:flex-row justify-between items-start md:items-center mb-6 gap-4">
-        <div>
-          <Title level={2} className="text-primary mb-1">
-            Welcome, {assembly || "Assembly"}
-          </Title>
-          <Text className="text-gray-500 text-lg">{dayjs().format("dddd, MMMM D, YYYY")}</Text>
-        </div>
-
-        <div className="flex flex-col sm:flex-row gap-3 w-full md:w-auto">
-          <div className="flex items-center gap-2 bg-blue-50 px-4 py-2 rounded-lg border border-blue-100">
-            <Calendar className="w-4 h-4 text-primary" />
-            <Text className="text-gray-700">Date Range:</Text>
-            <RangePicker
-              value={dateRange}
-              onChange={onRangeChange}
-              format="MMM D, YYYY"
-              className="border-none bg-transparent w-full sm:w-auto"
-              size="small"
-              suffixIcon={null}
-            />
-          </div>
-        </div>
-      </div>
+    <MainLayout
+    activeItem="dashboard"
+    showHeader
+    assembly={assembly}
+    dateRange={dateRange}
+    onRangeChange={onRangeChange}
+    >
+    
 
       {/* Quick Stats Cards */}
       <Row gutter={[16, 16]} className="mb-6">
