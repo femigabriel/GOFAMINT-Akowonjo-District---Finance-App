@@ -32,4 +32,4 @@ declare module "jspreadsheet-ce" {
 
   const jspreadsheet: (el: HTMLElement, options: SpreadsheetOptions) => any;
   export default jspreadsheet;
-}6q q 
+}
