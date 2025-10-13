@@ -49,10 +49,10 @@ export default function DashboardHeader({
       path: "/reports",
     },
     {
-      key: "add-submission",
+      key: "submissions",
       label: "Add Submission",
       icon: <Plus size={18} />,
-      path: "/add-submission",
+      path: "/submissions",
     },
     {
       key: "history",
