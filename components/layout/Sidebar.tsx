@@ -13,19 +13,19 @@ import {
   LogOut,
   ChevronLeft,
   ChevronRight,
-  Menu,
   X,
 } from "lucide-react";
 
 interface SidebarProps {
   onItemClick?: (item: string) => void;
+  isMobileOpen?: boolean;
+  onCloseMobile?: () => void;
 }
 
-export default function Sidebar({ onItemClick }: SidebarProps) {
+export default function Sidebar({ onItemClick, isMobileOpen, onCloseMobile }: SidebarProps) {
   const router = useRouter();
   const pathname = usePathname();
   const [isCollapsed, setIsCollapsed] = useState(false);
-  const [isMobileOpen, setIsMobileOpen] = useState(false);
 
   const menuItems = [
     { key: "dashboard", label: "Dashboard", icon: <Home size={20} />, path: "/dashboard" },
@@ -50,13 +50,13 @@ export default function Sidebar({ onItemClick }: SidebarProps) {
             onClick={() => {
               onItemClick?.(item.key);
               router.push(item.path);
-              setIsMobileOpen(false); // close drawer on mobile
+              onCloseMobile?.();
             }}
             className={`flex items-center w-full px-4 py-2 rounded-lg mb-2 transition-colors ${
               isCollapsed ? "justify-center" : "justify-start"
             } ${
               isActive
-                ? "bg-blue-200 text-primary font-bold "
+                ? "bg-blue-200 text-primary font-bold"
                 : "text-black hover:bg-blue-100"
             }`}
           >
@@ -88,11 +88,10 @@ export default function Sidebar({ onItemClick }: SidebarProps) {
     <>
       {/* Desktop Sidebar */}
       <aside
-        className={`hidden md:flex bg-[#ffff] shadow-md text-black flex-col h-screen transition-all duration-300 ${
+        className={`hidden md:flex bg-white shadow-md text-black flex-col h-screen transition-all duration-300 ${
           isCollapsed ? "w-20" : "w-64"
         }`}
       >
-        {/* Logo + Toggle */}
         <div className="flex items-center justify-between p-4 border-b border-gray-200">
           <div className={`flex items-center gap-2 ${isCollapsed ? "justify-center w-full" : ""}`}>
             <Image
@@ -102,9 +101,7 @@ export default function Sidebar({ onItemClick }: SidebarProps) {
               height={36}
               className="rounded-full"
             />
-            {!isCollapsed && (
-              <span className="text-black font-semibold text-sm">GOFAMINT Finance</span>
-            )}
+            {!isCollapsed && <span className="font-semibold text-sm">GOFAMINT Finance</span>}
           </div>
           <button
             className="hidden md:flex items-center justify-center text-black"
@@ -118,47 +115,31 @@ export default function Sidebar({ onItemClick }: SidebarProps) {
         {renderLogout()}
       </aside>
 
-      {/* Mobile Drawer */}
-      <div className="md:hidden">
-        {/* Hamburger trigger */}
-        <button
-          onClick={() => setIsMobileOpen(true)}
-          className="p-2 m-2 rounded-md bg-blue-600 text-white"
-        >
-          <Menu size={22} />
-        </button>
-
-        {isMobileOpen && (
-          <div className="fixed inset-0 z-50 flex">
-            {/* Overlay */}
-            <div
-              className="flex-1 bg-black/50"
-              onClick={() => setIsMobileOpen(false)}
-            />
-
-            {/* Drawer */}
-            <div className="w-64 bg-white h-full flex flex-col shadow-lg">
-              <div className="flex items-center justify-between p-4 border-b border-gray-200">
-                <Image
-                  src="/images/Gofamint_logo.png"
-                  alt="GOFAMINT Logo"
-                  width={32}
-                  height={32}
-                  className="rounded-full"
-                />
-                <button
-                  onClick={() => setIsMobileOpen(false)}
-                  className="p-1 text-gray-600"
-                >
-                  <X size={20} />
-                </button>
-              </div>
-              {renderMenu()}
-              {renderLogout()}
+      {/* Mobile Drawer (triggered externally) */}
+      {isMobileOpen && (
+        <div className="fixed inset-0 z-50 flex">
+          <div
+            className="flex-1 bg-black/50"
+            onClick={onCloseMobile}
+          />
+          <div className="w-64 bg-white h-full flex flex-col shadow-lg animate-slideIn">
+            <div className="flex items-center justify-between p-4 border-b border-gray-200">
+              <Image
+                src="/images/Gofamint_logo.png"
+                alt="GOFAMINT Logo"
+                width={32}
+                height={32}
+                className="rounded-full"
+              />
+              <button onClick={onCloseMobile} className="p-1 text-gray-600">
+                <X size={20} />
+              </button>
             </div>
+            {renderMenu()}
+            {renderLogout()}
           </div>
-        )}
-      </div>
+        </div>
+      )}
     </>
   );
 }

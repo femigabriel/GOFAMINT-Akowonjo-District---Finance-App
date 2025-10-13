@@ -1,12 +1,30 @@
 "use client";
 
 import { useState, useEffect } from "react";
-import { Button, Card, message, Typography, Spin, Table, DatePicker } from "antd";
-import { PlusOutlined } from "@ant-design/icons";
+import {
+  Button,
+  Card,
+  message,
+  Typography,
+  Spin,
+  Table,
+  DatePicker,
+  Empty,
+  Tag,
+  Dropdown,
+} from "antd";
+import {
+  PlusOutlined,
+  ReloadOutlined,
+  CalendarOutlined,
+  HistoryOutlined,
+  DownOutlined,
+} from "@ant-design/icons";
 import { motion } from "framer-motion";
 import { useRouter } from "next/navigation";
 import { useAuth } from "@/context/AuthContext";
 import dayjs from "dayjs";
+import type { MenuProps } from "antd";
 
 const { Title, Text } = Typography;
 const { MonthPicker } = DatePicker;
@@ -24,51 +42,89 @@ interface Submission {
 }
 
 const tableColumns = [
-  { title: "Week", dataIndex: "week", key: "week" },
-  { title: "Date", dataIndex: "date", key: "date" },
+  {
+    title: "Week",
+    dataIndex: "week",
+    key: "week",
+    render: (week: string) => <Tag color="blue">{week}</Tag>,
+  },
+  {
+    title: "Date",
+    dataIndex: "date",
+    key: "date",
+    render: (date: string) => dayjs(date).format("DD MMM YYYY"),
+  },
   {
     title: "Tithe (₦)",
     dataIndex: "tithe",
     key: "tithe",
     render: (value: number) =>
-      value.toLocaleString("en-NG", { style: "currency", currency: "NGN" }),
+      value.toLocaleString("en-NG", {
+        minimumFractionDigits: 2,
+        maximumFractionDigits: 2,
+      }),
   },
   {
     title: "General Offering (₦)",
     dataIndex: "offeringGeneral",
     key: "offeringGeneral",
     render: (value: number) =>
-      value.toLocaleString("en-NG", { style: "currency", currency: "NGN" }),
+      value.toLocaleString("en-NG", {
+        minimumFractionDigits: 2,
+        maximumFractionDigits: 2,
+      }),
   },
   {
     title: "Special Offering (₦)",
     dataIndex: "offeringSpecial",
     key: "offeringSpecial",
     render: (value: number) =>
-      value.toLocaleString("en-NG", { style: "currency", currency: "NGN" }),
+      value.toLocaleString("en-NG", {
+        minimumFractionDigits: 2,
+        maximumFractionDigits: 2,
+      }),
   },
   {
     title: "Welfare (₦)",
     dataIndex: "welfare",
     key: "welfare",
     render: (value: number) =>
-      value.toLocaleString("en-NG", { style: "currency", currency: "NGN" }),
+      value.toLocaleString("en-NG", {
+        minimumFractionDigits: 2,
+        maximumFractionDigits: 2,
+      }),
   },
   {
     title: "Missionary Fund (₦)",
     dataIndex: "missionaryFund",
     key: "missionaryFund",
     render: (value: number) =>
-      value.toLocaleString("en-NG", { style: "currency", currency: "NGN" }),
+      value.toLocaleString("en-NG", {
+        minimumFractionDigits: 2,
+        maximumFractionDigits: 2,
+      }),
   },
   {
     title: "Total (₦)",
     dataIndex: "total",
     key: "total",
-    render: (value: number) =>
-      value.toLocaleString("en-NG", { style: "currency", currency: "NGN" }),
+    render: (value: number) => (
+      <Text strong className="text-green-600">
+        {value.toLocaleString("en-NG", {
+          style: "currency",
+          currency: "NGN",
+          minimumFractionDigits: 2,
+          maximumFractionDigits: 2,
+        })}
+      </Text>
+    ),
   },
-  { title: "Remarks", dataIndex: "remarks", key: "remarks" },
+  {
+    title: "Remarks",
+    dataIndex: "remarks",
+    key: "remarks",
+    render: (remarks: string) => remarks || "-",
+  },
 ];
 
 export default function AddSubmissionPage() {
@@ -76,7 +132,24 @@ export default function AddSubmissionPage() {
   const [pageLoading, setPageLoading] = useState(true);
   const [submissions, setSubmissions] = useState<Submission[]>([]);
   const [selectedMonth, setSelectedMonth] = useState(dayjs().startOf("month"));
+  const [tableLoading, setTableLoading] = useState(false);
   const router = useRouter();
+
+  // Dropdown menu items
+  const addMenuItems: MenuProps["items"] = [
+    {
+      key: "tithe",
+      label: "Add Tithe Submission",
+      icon: <PlusOutlined />,
+      onClick: () => router.push("/submissions/add/tithe"),
+    },
+    {
+      key: "offering",
+      label: "Add Offering Submission",
+      icon: <PlusOutlined />,
+      onClick: () => router.push("/submissions/add/offering"),
+    },
+  ];
 
   // Handle authentication check
   useEffect(() => {
@@ -91,37 +164,37 @@ export default function AddSubmissionPage() {
     }
   }, [loading, isAuthenticated, assembly, router]);
 
-  // Fetch submissions for the selected month
+  // Fetch submissions
   const fetchSubmissions = async () => {
     if (!assembly) return;
+    setTableLoading(true);
     try {
       const res = await fetch(`/api/submissions?assembly=${assembly}`);
       if (res.ok) {
         const data = await res.json();
-        const filteredSubmissions = data.submissions.filter((submission: Submission) => {
-          const submissionDate = dayjs(submission.date);
-          return submissionDate.isSame(selectedMonth, "month");
-        });
-        setSubmissions(filteredSubmissions || []);
+        const filtered = data.submissions.filter((s: Submission) =>
+          dayjs(s.date).isSame(selectedMonth, "month")
+        );
+        setSubmissions(filtered);
       } else {
         message.error("Failed to fetch submissions");
       }
     } catch (err) {
       message.error("Error fetching submissions");
+    } finally {
+      setTableLoading(false);
     }
   };
 
-  // Refresh submissions when month changes
   useEffect(() => {
     if (!loading && isAuthenticated && assembly) {
       fetchSubmissions();
     }
   }, [selectedMonth, loading, isAuthenticated, assembly]);
 
-  // Show loading spinner while checking auth
   if (pageLoading || loading) {
     return (
-      <div className="h-screen w-screen flex items-center justify-center">
+      <div className="h-screen w-screen flex items-center justify-center bg-gradient-to-br from-blue-50 to-indigo-50">
         <Spin size="large" />
       </div>
     );
@@ -129,66 +202,132 @@ export default function AddSubmissionPage() {
 
   return (
     <motion.div
-      className="p-4 sm:p-6 md:p-8 min-h-screen flex flex-col bg-gray-50"
+      className="p-6 md:p-8 min-h-screen flex flex-col bg-gradient-to-br from-blue-50 to-indigo-50 font-[Inter]"
       initial={{ opacity: 0, y: 20 }}
       animate={{ opacity: 1, y: 0 }}
       transition={{ duration: 0.5 }}
     >
-  
+      {/* Header with Buttons at Top */}
+      <div className="mb-8">
+        <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 mb-6">
+          <div>
+            <Title level={2} className="!text-gray-800 !mb-2 font-bold">
+              Financial Report
+            </Title>
+            <Text className="text-gray-600 text-base">
+              {assembly} • {selectedMonth.format("MMMM YYYY")}
+            </Text>
+          </div>
 
-      {/* Action Buttons */}
-      <Card
-        className="mb-6 w-full"
-        style={{
-          background: "linear-gradient(145deg, #ffffff, #f8fafc)",
-          borderRadius: "12px",
-          boxShadow: "0 4px 20px rgba(0, 0, 0, 0.1)",
-          fontFamily: "'Inter', sans-serif",
-          border: "1px solid #e2e8f0",
-        }}
-      >
-        <div className="flex flex-col sm:flex-row gap-4 justify-center">
-          <Button
-            type="primary"
-            onClick={() => router.push("/submissions/add/tithe")}
-            icon={<PlusOutlined />}
-            className="bg-blue-900 hover:bg-blue-950 text-white font-semibold rounded-lg px-6 py-6 text-lg transition-all duration-300 shadow-md w-full sm:w-auto"
-          >
-            Add Tithe
-          </Button>
-          <Button
-            type="primary"
-            onClick={() => router.push("/submissions/add/offering")}
-            icon={<PlusOutlined />}
-            className="bg-blue-700 hover:bg-blue-800 text-white font-semibold rounded-lg px-6 py-6 text-lg transition-all duration-300 shadow-md w-full sm:w-auto"
-          >
-            Add Offering
-          </Button>
+          <div className="flex items-center gap-3">
+            <MonthPicker
+              value={selectedMonth}
+              onChange={(value) => setSelectedMonth(value || dayjs())}
+              format="MMMM YYYY"
+              className="rounded-lg border-gray-300 h-12 w-48"
+              placeholder="Select month"
+              suffixIcon={<CalendarOutlined className="text-gray-400" />}
+              allowClear={false}
+            />
+            <Button
+              icon={<ReloadOutlined />}
+              onClick={fetchSubmissions}
+              className="h-12 px-4 border-gray-300 rounded-lg hover:border-blue-500 hover:text-blue-600 transition-all duration-300"
+              loading={tableLoading}
+            >
+              Refresh
+            </Button>
+          </div>
         </div>
-      </Card>
 
-      {/* Submission History */}
-      <Card
-        className="mb-6 w-full"
-        style={{
-          background: "linear-gradient(145deg, #ffffff, #f8fafc)",
-          borderRadius: "12px",
-          boxShadow: "0 4px 20px rgba(0, 0, 0, 0.1)",
-          fontFamily: "'Inter', sans-serif",
-        }}
+        {/* Action Buttons - Single Dropdown + History Button */}
+        <div className="flex justify-between items-center w-full gap-4 mb-2">
+          <div className="flex gap-4">
+            <motion.div whileHover={{ scale: 1.02 }} whileTap={{ scale: 0.98 }}>
+              <Dropdown
+                menu={{ items: addMenuItems }}
+                placement="bottomLeft"
+                trigger={["click"]}
+              >
+                <Button
+                  type="primary"
+                  icon={<PlusOutlined />}
+                  className="!bg-gradient-to-r !from-blue-600 !to-purple-600 hover:!from-blue-700 hover:!to-purple-700 !text-white !font-semibold !rounded-xl !py-2 !h-auto !text-lg shadow-lg hover:shadow-xl transition-all duration-300 border-0 flex items-center gap-2"
+                  size="large"
+                >
+                  Add New Submission
+                  <DownOutlined className="text-sm" />
+                </Button>
+              </Dropdown>
+            </motion.div>
+          </div>
+
+          <motion.div whileHover={{ scale: 1.02 }} whileTap={{ scale: 0.98 }}>
+            <Button
+              onClick={() => router.push("/submissions/history")}
+              icon={<HistoryOutlined />}
+              className="!bg-white !text-gray-700 !font-semibold !rounded-xl !py-2 !h-auto !text-lg shadow-md hover:shadow-lg border-gray-200 hover:border-blue-300 transition-all duration-300 flex items-center gap-2"
+              size="large"
+            >
+              View Full History
+            </Button>
+          </motion.div>
+        </div>
+      </div>
+
+      {/* History Section */}
+      <motion.div
+        initial={{ opacity: 0, y: 20 }}
+        animate={{ opacity: 1, y: 0 }}
+        transition={{ duration: 0.5, delay: 0.2 }}
       >
-        <Title level={4} className="text-blue-900 mb-4">
-          Submission History
-        </Title>
-        <Table
-          columns={tableColumns}
-          dataSource={submissions}
-          rowKey={(record) => `${record.week}-${record.date}`}
-          pagination={{ pageSize: 10 }}
-          scroll={{ x: "max-content" }}
-          locale={{ emptyText: "No submissions found for this month" }}
-        />
-      </Card>
+        <Card
+          bordered={false}
+          className="shadow-xl rounded-2xl bg-white border-0 overflow-hidden"
+          bodyStyle={{ padding: 0 }}
+        >
+          <div className="p-6 bg-gradient-to-r from-gray-50 to-blue-50 border-b">
+            <div className="flex items-center gap-3">
+              <HistoryOutlined className="text-blue-600 text-lg" />
+              <Title level={4} className="!text-gray-800 !mb-0">
+                Submission History - {selectedMonth.format("MMMM YYYY")}
+              </Title>
+              <Tag color="blue" className="ml-auto">
+                {submissions.length} records
+              </Tag>
+            </div>
+          </div>
+
+          <div className="p-1">
+            <Table
+              columns={tableColumns}
+              dataSource={submissions}
+              rowKey={(record) => `${record.week}-${record.date}`}
+              pagination={{
+                pageSize: 8,
+                showSizeChanger: false,
+                showQuickJumper: true,
+                showTotal: (total, range) =>
+                  `${range[0]}-${range[1]} of ${total} records`,
+              }}
+              scroll={{ x: 1000 }}
+              loading={tableLoading}
+              locale={{
+                emptyText: (
+                  <Empty
+                    description="No submissions found for this month"
+                    image={Empty.PRESENTED_IMAGE_SIMPLE}
+                  />
+                ),
+              }}
+              className="ant-table-striped"
+              rowClassName={(record, index) =>
+                index % 2 === 0 ? "bg-white" : "bg-gray-50"
+              }
+            />
+          </div>
+        </Card>
+      </motion.div>
     </motion.div>
   );
 }
