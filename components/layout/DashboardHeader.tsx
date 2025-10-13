@@ -2,7 +2,6 @@
 
 import { useState } from "react";
 import {
-  Calendar,
   Menu,
   X,
   Home,
@@ -11,14 +10,18 @@ import {
   History,
   Settings,
   LogOut,
+  Church,
+  MapPin,
+  User,
 } from "lucide-react";
-import { Typography, DatePicker } from "antd";
+import { Typography, Dropdown, Avatar } from "antd";
 import { motion, AnimatePresence } from "framer-motion";
 import dayjs from "dayjs";
 import { useRouter, usePathname } from "next/navigation";
+ import type { MenuProps } from "antd";
+
 
 const { Text } = Typography;
-const { RangePicker } = DatePicker;
 
 interface DashboardHeaderProps {
   assembly: string | null;
@@ -33,39 +36,14 @@ export default function DashboardHeader({
 }: DashboardHeaderProps) {
   const [drawerOpen, setDrawerOpen] = useState(false);
   const router = useRouter();
-  const pathname = usePathname(); // 👈 get current route
+  const pathname = usePathname();
 
   const menuItems = [
-    {
-      key: "dashboard",
-      label: "Dashboard",
-      icon: <Home size={18} />,
-      path: "/dashboard",
-    },
-    {
-      key: "reports",
-      label: "Reports",
-      icon: <FileText size={18} />,
-      path: "/reports",
-    },
-    {
-      key: "submissions",
-      label: "Add Submission",
-      icon: <Plus size={18} />,
-      path: "/submissions",
-    },
-    {
-      key: "history",
-      label: "History",
-      icon: <History size={18} />,
-      path: "/history",
-    },
-    {
-      key: "settings",
-      label: "Settings",
-      icon: <Settings size={18} />,
-      path: "/settings",
-    },
+    { key: "dashboard", label: "Dashboard", icon: <Home size={18} />, path: "/dashboard" },
+    { key: "reports", label: "Reports", icon: <FileText size={18} />, path: "/reports" },
+    { key: "submissions", label: "Add Submission", icon: <Plus size={18} />, path: "/submissions" },
+    { key: "history", label: "History", icon: <History size={18} />, path: "/history" },
+    { key: "settings", label: "Settings", icon: <Settings size={18} />, path: "/settings" },
   ];
 
   const handleLogout = () => {
@@ -73,38 +51,91 @@ export default function DashboardHeader({
     router.push("/");
   };
 
+  const isActive = (path: string) => pathname === path;
+
+  // Dropdown menu content
+
+const userMenu: MenuProps = {
+  items: [
+    {
+      key: "user",
+      label: (
+        <div className="flex flex-col gap-1 py-1">
+          <div className="flex items-center gap-2">
+            <User size={16} className="text-blue-500" />
+            <Text strong className="text-gray-800">
+              {assembly || "John Doe"}
+            </Text>
+          </div>
+          <div className="flex items-center gap-2">
+            <Church size={16} className="text-blue-500" />
+            <Text className="text-gray-600 text-sm">GOFAMINT</Text>
+          </div>
+          <div className="flex items-center gap-2">
+            <MapPin size={16} className="text-blue-500" />
+            <Text className="text-gray-600 text-sm">Akowonjo District</Text>
+          </div>
+        </div>
+      ),
+    },
+    {
+      type: "divider" as const, // 👈 this cast fixes the TS error
+    },
+    {
+      key: "settings",
+      label: (
+        <div
+          onClick={() => router.push("/settings")}
+          className="flex items-center gap-2 text-gray-700 hover:text-blue-600 transition-colors"
+        >
+          <Settings size={16} /> Settings
+        </div>
+      ),
+    },
+    {
+      key: "logout",
+      label: (
+        <div
+          onClick={handleLogout}
+          className="flex items-center gap-2 text-red-600 hover:text-red-700 transition-colors"
+        >
+          <LogOut size={16} /> Logout
+        </div>
+      ),
+    },
+  ],
+};
+
+
   return (
     <>
       <motion.div
         initial={{ opacity: 0, y: -10 }}
         animate={{ opacity: 1, y: 0 }}
         transition={{ duration: 0.4 }}
-        className="flex justify-between items-center mb-6"
+        className="flex justify-between items-center mb-6 lg:mb-10"
       >
         {/* Left: Assembly & Date */}
         <div>
-          <h3 className="text-xl tracking-tight font-bold">
+          <h3 className="lg:text-xl text-sm tracking-tight font-bold">
             Welcome back, {assembly || "Assembly"}
           </h3>
-          <Text className="text-gray-400 text-sm">
+          <Text className="text-gray-400 lg:text-sm text-xs">
             {dayjs().format("dddd, MMMM D, YYYY")}
           </Text>
         </div>
 
-        {/* Right: Date range + Menu */}
+        {/* Right: Avatar + Menu */}
         <div className="flex items-center gap-3">
-          <div className="hidden sm:flex items-center gap-2 bg-blue-50 px-4 py-2 rounded-xl border border-blue-100 shadow-sm hover:shadow-md transition-all">
-            <Calendar className="w-4 h-4 text-primary" />
-            <Text className="text-gray-700 font-medium">Date Range:</Text>
-            <RangePicker
-              value={dateRange}
-              onChange={onRangeChange}
-              format="MMM D, YYYY"
-              className="border-none bg-transparent w-full sm:w-auto"
-              size="small"
-              suffixIcon={null}
-            />
-          </div>
+          {/* Avatar Dropdown */}
+          <Dropdown menu={userMenu} placement="bottomRight" trigger={["click"]}>
+            <Avatar
+              size={40}
+              className="cursor-pointer bg-blue-600 text-white flex items-center justify-center font-semibold shadow-md hover:shadow-lg transition-all"
+            >
+              {assembly ? assembly[0].toUpperCase() : "A"}
+            </Avatar>
+          </Dropdown>
 
           {/* Mobile Menu Button */}
           <button
@@ -155,34 +186,30 @@ export default function DashboardHeader({
               </div>
 
               <div className="flex flex-col px-4 py-2">
-                {menuItems.map((item) => {
-                  const isActive = pathname === item.path; // 👈 check active path
-                  return (
-                    <motion.button
-                      key={item.key}
-                      whileHover={{ scale: 1.02 }}
-                      onClick={() => {
-                        router.push(item.path);
-                        setDrawerOpen(false);
-                      }}
-                      className={`flex items-center gap-3 w-full px-3 py-3 rounded-lg text-sm font-medium transition-all
-                        ${
-                          isActive
-                            ? "bg-blue-100 text-blue-700 font-semibold"
-                            : "text-gray-700 hover:bg-blue-50"
-                        }`}
+                {menuItems.map((item) => (
+                  <motion.button
+                    key={item.key}
+                    whileHover={{ scale: 1.02 }}
+                    onClick={() => {
+                      router.push(item.path);
+                      setDrawerOpen(false);
+                    }}
+                    className={`flex items-center gap-3 w-full px-3 py-3 rounded-lg text-sm font-medium transition-all ${
+                      isActive(item.path)
+                        ? "bg-blue-100 text-blue-700 font-semibold"
+                        : "text-gray-700 hover:bg-blue-50"
+                    }`}
+                  >
+                    <span
+                      className={`${
+                        isActive(item.path) ? "text-blue-700" : "text-blue-600"
+                      }`}
                     >
-                      <span
-                        className={`${
-                          isActive ? "text-blue-700" : "text-blue-600"
-                        }`}
-                      >
-                        {item.icon}
-                      </span>
-                      {item.label}
-                    </motion.button>
-                  );
-                })}
+                      {item.icon}
+                    </span>
+                    {item.label}
+                  </motion.button>
+                ))}
 
                 <hr className="my-2 border-gray-200" />
 

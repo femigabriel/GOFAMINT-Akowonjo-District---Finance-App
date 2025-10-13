@@ -179,7 +179,7 @@ export default function AddSubmissionPage() {
 
   return (
     <motion.div
-      className="p-4 sm:p-6 md:p-8 min-h-screen flex flex-col bg-gradient-to-br from-blue-50 to-indigo-50 font-[Inter]"
+      className="p- sm:p-2 md:p-2 min-h-screen flex flex-col"
       initial={{ opacity: 0, y: 20 }}
       animate={{ opacity: 1, y: 0 }}
       transition={{ duration: 0.5 }}

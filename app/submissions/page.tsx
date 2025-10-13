@@ -1,43 +1,15 @@
-"use client";
+import React from "react";
 
-import { useState, useEffect } from "react";
-import dayjs from "dayjs";
-import { message } from "antd";
-import { useRouter } from "next/navigation";
-import AddSubmissionPage from "@/components/add-submission/AddSubmission";
-import MainLayout from "@/components/layout/DashboardLayout";
+import AddSubmission from "@/components/submissions/SubissionsPage";
+import { NavBar } from "@/components/layout/NavBar";
 
-export default function AddSubmission() {
-  const [assembly, setAssembly] = useState<string | null>(null);
-  const [dateRange, setDateRange] = useState<[dayjs.Dayjs, dayjs.Dayjs]>([
-    dayjs().startOf("month"),
-    dayjs().endOf("month"),
-  ]);
-  const router = useRouter();
-
-  useEffect(() => {
-    const storedAssembly = localStorage.getItem("assembly");
-    if (!storedAssembly) {
-      message.error("Please log in again");
-      router.push("/");
-    } else {
-      setAssembly(storedAssembly);
-    }
-  }, [router]);
-
-  const onRangeChange = (dates: any) => {
-    if (dates) setDateRange(dates);
-  };
-
+export default function Submisions() {
   return (
-    <MainLayout
-      activeItem="add-sub"
-      showHeader
-      assembly={assembly}
-      dateRange={dateRange}
-      onRangeChange={onRangeChange}
-    >
-      <AddSubmissionPage />
-    </MainLayout>
+    <div>
+      <AddSubmission />
+       <div className="lg:hidden block">
+        <NavBar />
+      </div>
+    </div>
   );
-}
+};
