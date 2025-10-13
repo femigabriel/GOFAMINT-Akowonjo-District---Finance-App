@@ -59,50 +59,35 @@ const tableColumns = [
     dataIndex: "tithe",
     key: "tithe",
     render: (value: number) =>
-      value.toLocaleString("en-NG", {
-        minimumFractionDigits: 2,
-        maximumFractionDigits: 2,
-      }),
+      value.toLocaleString("en-NG", { minimumFractionDigits: 2 }),
   },
   {
     title: "General Offering (₦)",
     dataIndex: "offeringGeneral",
     key: "offeringGeneral",
     render: (value: number) =>
-      value.toLocaleString("en-NG", {
-        minimumFractionDigits: 2,
-        maximumFractionDigits: 2,
-      }),
+      value.toLocaleString("en-NG", { minimumFractionDigits: 2 }),
   },
   {
     title: "Special Offering (₦)",
     dataIndex: "offeringSpecial",
     key: "offeringSpecial",
     render: (value: number) =>
-      value.toLocaleString("en-NG", {
-        minimumFractionDigits: 2,
-        maximumFractionDigits: 2,
-      }),
+      value.toLocaleString("en-NG", { minimumFractionDigits: 2 }),
   },
   {
     title: "Welfare (₦)",
     dataIndex: "welfare",
     key: "welfare",
     render: (value: number) =>
-      value.toLocaleString("en-NG", {
-        minimumFractionDigits: 2,
-        maximumFractionDigits: 2,
-      }),
+      value.toLocaleString("en-NG", { minimumFractionDigits: 2 }),
   },
   {
     title: "Missionary Fund (₦)",
     dataIndex: "missionaryFund",
     key: "missionaryFund",
     render: (value: number) =>
-      value.toLocaleString("en-NG", {
-        minimumFractionDigits: 2,
-        maximumFractionDigits: 2,
-      }),
+      value.toLocaleString("en-NG", { minimumFractionDigits: 2 }),
   },
   {
     title: "Total (₦)",
@@ -114,7 +99,6 @@ const tableColumns = [
           style: "currency",
           currency: "NGN",
           minimumFractionDigits: 2,
-          maximumFractionDigits: 2,
         })}
       </Text>
     ),
@@ -135,7 +119,6 @@ export default function AddSubmissionPage() {
   const [tableLoading, setTableLoading] = useState(false);
   const router = useRouter();
 
-  // Dropdown menu items
   const addMenuItems: MenuProps["items"] = [
     {
       key: "tithe",
@@ -151,7 +134,6 @@ export default function AddSubmissionPage() {
     },
   ];
 
-  // Handle authentication check
   useEffect(() => {
     if (!loading) {
       if (!isAuthenticated || !assembly) {
@@ -164,7 +146,6 @@ export default function AddSubmissionPage() {
     }
   }, [loading, isAuthenticated, assembly, router]);
 
-  // Fetch submissions
   const fetchSubmissions = async () => {
     if (!assembly) return;
     setTableLoading(true);
@@ -176,10 +157,8 @@ export default function AddSubmissionPage() {
           dayjs(s.date).isSame(selectedMonth, "month")
         );
         setSubmissions(filtered);
-      } else {
-        message.error("Failed to fetch submissions");
-      }
-    } catch (err) {
+      } else message.error("Failed to fetch submissions");
+    } catch {
       message.error("Error fetching submissions");
     } finally {
       setTableLoading(false);
@@ -187,9 +166,7 @@ export default function AddSubmissionPage() {
   };
 
   useEffect(() => {
-    if (!loading && isAuthenticated && assembly) {
-      fetchSubmissions();
-    }
+    if (!loading && isAuthenticated && assembly) fetchSubmissions();
   }, [selectedMonth, loading, isAuthenticated, assembly]);
 
   if (pageLoading || loading) {
@@ -202,29 +179,32 @@ export default function AddSubmissionPage() {
 
   return (
     <motion.div
-      className="p-6 md:p-8 min-h-screen flex flex-col bg-gradient-to-br from-blue-50 to-indigo-50 font-[Inter]"
+      className="p-4 sm:p-6 md:p-8 min-h-screen flex flex-col bg-gradient-to-br from-blue-50 to-indigo-50 font-[Inter]"
       initial={{ opacity: 0, y: 20 }}
       animate={{ opacity: 1, y: 0 }}
       transition={{ duration: 0.5 }}
     >
-      {/* Header with Buttons at Top */}
-      <div className="mb-8">
-        <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 mb-6">
+      {/* Header Section */}
+      <div className="mb-6">
+        <div className="flex flex-col sm:flex-row justify-between gap-4 sm:items-center">
           <div>
-            <Title level={2} className="!text-gray-800 !mb-2 font-bold">
+            <Title
+              level={3}
+              className="!text-gray-800 !mb-1 !leading-tight font-bold"
+            >
               Financial Report
             </Title>
-            <Text className="text-gray-600 text-base">
+            <Text className="text-gray-600 text-sm sm:text-base">
               {assembly} • {selectedMonth.format("MMMM YYYY")}
             </Text>
           </div>
 
-          <div className="flex items-center gap-3">
+          <div className="flex flex-col sm:flex-row gap-3 w-full sm:w-auto">
             <MonthPicker
               value={selectedMonth}
               onChange={(value) => setSelectedMonth(value || dayjs())}
               format="MMMM YYYY"
-              className="rounded-lg border-gray-300 h-12 w-48"
+              className="rounded-lg border-gray-300 h-11 w-full sm:w-48"
               placeholder="Select month"
               suffixIcon={<CalendarOutlined className="text-gray-400" />}
               allowClear={false}
@@ -232,7 +212,7 @@ export default function AddSubmissionPage() {
             <Button
               icon={<ReloadOutlined />}
               onClick={fetchSubmissions}
-              className="h-12 px-4 border-gray-300 rounded-lg hover:border-blue-500 hover:text-blue-600 transition-all duration-300"
+              className="h-11 w-full sm:w-auto border-gray-300 rounded-lg hover:border-blue-500 hover:text-blue-600 transition-all duration-300"
               loading={tableLoading}
             >
               Refresh
@@ -240,77 +220,69 @@ export default function AddSubmissionPage() {
           </div>
         </div>
 
-        {/* Action Buttons - Single Dropdown + History Button */}
-        <div className="flex justify-between items-center w-full gap-4 mb-2">
-          <div className="flex gap-4">
-            <motion.div whileHover={{ scale: 1.02 }} whileTap={{ scale: 0.98 }}>
-              <Dropdown
-                menu={{ items: addMenuItems }}
-                placement="bottomLeft"
-                trigger={["click"]}
-              >
-                <Button
-                  type="primary"
-                  icon={<PlusOutlined />}
-                  className="!bg-gradient-to-r !from-blue-600 !to-purple-600 hover:!from-blue-700 hover:!to-purple-700 !text-white !font-semibold !rounded-xl !py-2 !h-auto !text-lg shadow-lg hover:shadow-xl transition-all duration-300 border-0 flex items-center gap-2"
-                  size="large"
-                >
-                  Add New Submission
-                  <DownOutlined className="text-sm" />
-                </Button>
-              </Dropdown>
-            </motion.div>
-          </div>
-
-          <motion.div whileHover={{ scale: 1.02 }} whileTap={{ scale: 0.98 }}>
+        {/* Actions */}
+        <div className="flex flex-col sm:flex-row justify-between items-stretch sm:items-center gap-3 mt-5">
+          <Dropdown menu={{ items: addMenuItems }} trigger={["click"]}>
             <Button
-              onClick={() => router.push("/submissions/history")}
-              icon={<HistoryOutlined />}
-              className="!bg-white !text-gray-700 !font-semibold !rounded-xl !py-2 !h-auto !text-lg shadow-md hover:shadow-lg border-gray-200 hover:border-blue-300 transition-all duration-300 flex items-center gap-2"
-              size="large"
+              type="primary"
+              icon={<PlusOutlined />}
+              className="!bg-gradient-to-r !from-blue-600 !to-purple-600 hover:!from-blue-700 hover:!to-purple-700 !text-white !font-semibold rounded-xl h-11 w-full sm:w-auto shadow-md hover:shadow-lg border-0 flex items-center justify-center gap-2 text-base"
             >
-              View Full History
+              Add New Submission
+              <DownOutlined className="text-sm" />
             </Button>
-          </motion.div>
+          </Dropdown>
+
+          <Button
+            onClick={() => router.push("/submissions/history")}
+            icon={<HistoryOutlined />}
+            className="!bg-white !text-gray-700 !font-semibold rounded-xl h-11 w-full sm:w-auto shadow-sm hover:shadow-md border-gray-200 hover:border-blue-300 transition-all duration-300 flex items-center justify-center gap-2 text-base"
+          >
+            View Full History
+          </Button>
         </div>
       </div>
 
-      {/* History Section */}
+      {/* Table Section */}
       <motion.div
         initial={{ opacity: 0, y: 20 }}
         animate={{ opacity: 1, y: 0 }}
         transition={{ duration: 0.5, delay: 0.2 }}
+        className="flex-1"
       >
         <Card
           bordered={false}
           className="shadow-xl rounded-2xl bg-white border-0 overflow-hidden"
-          bodyStyle={{ padding: 0 }}
         >
-          <div className="p-6 bg-gradient-to-r from-gray-50 to-blue-50 border-b">
-            <div className="flex items-center gap-3">
-              <HistoryOutlined className="text-blue-600 text-lg" />
-              <Title level={4} className="!text-gray-800 !mb-0">
-                Submission History - {selectedMonth.format("MMMM YYYY")}
-              </Title>
-              <Tag color="blue" className="ml-auto">
+          <div className="p-4 sm:p-6 bg-gradient-to-r from-gray-50 to-blue-50 border-b">
+            <div className="flex flex-col sm:flex-row items-start sm:items-center gap-3">
+              <div className="flex items-center gap-2">
+                <HistoryOutlined className="text-blue-600 text-lg" />
+                <Title
+                  level={4}
+                  className="!text-gray-800 !mb-0 !leading-snug text-base sm:text-lg"
+                >
+                  Submission History – {selectedMonth.format("MMMM YYYY")}
+                </Title>
+              </div>
+              <Tag color="blue" className="sm:ml-auto">
                 {submissions.length} records
               </Tag>
             </div>
           </div>
 
-          <div className="p-1">
+          <div className="p-2 sm:p-4 overflow-x-auto">
             <Table
               columns={tableColumns}
               dataSource={submissions}
               rowKey={(record) => `${record.week}-${record.date}`}
               pagination={{
-                pageSize: 8,
+                pageSize: 6,
                 showSizeChanger: false,
                 showQuickJumper: true,
                 showTotal: (total, range) =>
                   `${range[0]}-${range[1]} of ${total} records`,
               }}
-              scroll={{ x: 1000 }}
               loading={tableLoading}
               locale={{
                 emptyText: (
@@ -320,8 +292,8 @@ export default function AddSubmissionPage() {
                   />
                 ),
               }}
-              className="ant-table-striped"
-              rowClassName={(record, index) =>
+              className="min-w-[800px]"
+              rowClassName={(_, index) =>
                 index % 2 === 0 ? "bg-white" : "bg-gray-50"
               }
             />
