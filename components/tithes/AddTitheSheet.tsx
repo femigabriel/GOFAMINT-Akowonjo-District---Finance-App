@@ -1,6 +1,6 @@
 "use client";
 
-import { useRef, useState, useCallback, useMemo } from "react";
+import { useRef, useState, useEffect, useCallback, useMemo } from "react";
 import { HotTable, HotTableClass } from "@handsontable/react";
 import "handsontable/dist/handsontable.full.min.css";
 import {
@@ -11,10 +11,7 @@ import {
   Space,
   Statistic,
   Tooltip,
-  Popconfirm,
 } from "antd";
-import { format, startOfMonth, endOfMonth, eachWeekOfInterval } from "date-fns";
-import moment from "moment";
 import {
   SaveOutlined,
   ReloadOutlined,
@@ -22,6 +19,8 @@ import {
   PlusOutlined,
   CalendarOutlined,
 } from "@ant-design/icons";
+import { format, startOfMonth, endOfMonth, eachWeekOfInterval } from "date-fns";
+import moment from "moment";
 
 // ✅ Register all Handsontable cell types
 import { registerAllCellTypes } from "handsontable/cellTypes";
@@ -46,7 +45,7 @@ const AddTitheSheet = () => {
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [data, setData] = useState<TitheRow[]>([]);
 
-  // Get all Sundays of month
+  // ✅ Get Sundays of month
   const getSundays = useCallback((date: Date) => {
     const start = startOfMonth(date);
     const end = endOfMonth(date);
@@ -58,7 +57,7 @@ const AddTitheSheet = () => {
 
   const sundays = useMemo(() => getSundays(selectedDate), [selectedDate, getSundays]);
 
-  // Build headers
+  // ✅ Build headers dynamically
   const colHeaders = useMemo(
     () => [
       "Full Name",
@@ -69,7 +68,7 @@ const AddTitheSheet = () => {
     [sundays]
   );
 
-  // Initialize data (250 rows)
+  // ✅ Initialize data
   const initializeData = useCallback(() => {
     return Array.from({ length: 250 }, () => ({
       name: "",
@@ -83,41 +82,42 @@ const AddTitheSheet = () => {
     }));
   }, [sundays]);
 
-  // Initialize on mount
-  useState(() => setData(initializeData()));
+  // ✅ Initialize data on mount or when month changes
+  useEffect(() => {
+    setData(initializeData());
+  }, [initializeData]);
 
-  // Handle changes (calculate totals)
+  // ✅ Handle changes and recalc totals
   const afterChange = useCallback(
     (changes: CellChange[] | null, source: ChangeSource) => {
       if (changes && source !== "loadData") {
-        const newData = [...data];
-
-        changes.forEach(([row, prop, , newValue]) => {
-          const key = prop as keyof TitheRow;
-          newData[row] = { ...newData[row], [key]: newValue };
-
-          const { week1 = 0, week2 = 0, week3 = 0, week4 = 0, week5 = 0 } = newData[row];
-          newData[row].total =
-            Number(week1) +
-            Number(week2) +
-            Number(week3) +
-            Number(week4) +
-            (sundays.length === 5 ? Number(week5) : 0);
+        setData((prevData) => {
+          const newData = [...prevData];
+          changes.forEach(([row, prop, , newValue]) => {
+            const key = prop as keyof TitheRow;
+            newData[row] = { ...newData[row], [key]: newValue };
+            const { week1 = 0, week2 = 0, week3 = 0, week4 = 0, week5 = 0 } = newData[row];
+            newData[row].total =
+              Number(week1) +
+              Number(week2) +
+              Number(week3) +
+              Number(week4) +
+              (sundays.length === 5 ? Number(week5) : 0);
+          });
+          return newData;
         });
-
-        setData(newData);
       }
     },
-    [data, sundays]
+    [sundays]
   );
 
-  // Total sum of all records
+  // ✅ Compute grand total
   const grandTotal = useMemo(
     () => data.reduce((sum, row) => sum + (Number(row.total) || 0), 0),
     [data]
   );
 
-  // Save confirmation modal
+  // ✅ Save confirmation
   const handleSave = () => setIsModalOpen(true);
 
   const confirmSave = async () => {
@@ -132,6 +132,7 @@ const AddTitheSheet = () => {
         (r.week5 ?? 0) > 0
     );
 
+    // 🔹 You can replace this with backend save API call
     console.log("Saving only filled data:", filledData);
 
     setIsModalOpen(false);
@@ -142,9 +143,9 @@ const AddTitheSheet = () => {
     });
   };
 
-  // Toolbar actions
+  // ✅ Toolbar actions
   const handleAddRows = () => {
-    setData([...data, ...Array.from({ length: 50 }, () => initializeData()[0])]);
+    setData((prev) => [...prev, ...initializeData().slice(0, 50)]);
   };
 
   const handleClear = () => {
@@ -184,10 +185,10 @@ const AddTitheSheet = () => {
   };
 
   return (
-    <div className="container mx-auto p-6 bg-gray-50 rounded-t-md min-h-screen">
+    <div className="container mx-auto p-4 sm:p-6 bg-gray-50 rounded-t-md min-h-screen">
       {/* Header */}
       <div className="flex flex-col md:flex-row justify-between items-start md:items-center mb-6 gap-3">
-        <h2 className="text-2xl font-bold text-gray-800 flex items-center gap-2">
+        <h2 className="text-xl md:text-2xl font-bold text-gray-800 flex items-center gap-2">
           <CalendarOutlined /> Tithe Management Sheet
         </h2>
 
@@ -218,8 +219,8 @@ const AddTitheSheet = () => {
         </Space>
       </div>
 
-      {/* Summary Bar */}
-      <div className="bg-white border rounded-lg shadow-sm mb-4 p-4 flex justify-between items-center">
+      {/* Summary */}
+      <div className="bg-white border rounded-lg shadow-sm mb-4 p-4 flex justify-between items-center flex-wrap gap-2">
         <Statistic
           title="Total Amount Recorded"
           value={grandTotal}
@@ -231,7 +232,7 @@ const AddTitheSheet = () => {
         </span>
       </div>
 
-      {/* Handsontable */}
+      {/* Table */}
       <div
         className="handsontable-container border rounded-lg shadow-sm bg-white"
         style={{ height: "calc(100vh - 260px)", overflow: "auto" }}
@@ -241,7 +242,7 @@ const AddTitheSheet = () => {
           data={data}
           colHeaders={colHeaders}
           columns={[
-            { data: "name", type: "text", width: 300 },
+            { data: "name", type: "text", width: 200 },
             { data: "titheNumber", type: "text", width: 150 },
             { data: "week1", type: "numeric", width: 120 },
             { data: "week2", type: "numeric", width: 120 },
@@ -274,7 +275,10 @@ const AddTitheSheet = () => {
         cancelText="Cancel"
         okButtonProps={{ type: "primary" }}
       >
-        <p>Are you sure you want to save this month’s tithe data? Only filled rows will be saved.</p>
+        <p>
+          Are you sure you want to save this month’s tithe data? Only filled rows will
+          be saved.
+        </p>
       </Modal>
     </div>
   );

@@ -4,9 +4,8 @@ import { useState, useEffect } from "react";
 import dayjs from "dayjs";
 import { message } from "antd";
 import { useRouter } from "next/navigation";
-import AddSubmissionPage from "@/components/submissions/Submissions";
 import MainLayout from "@/components/layout/DashboardLayout";
-import AddTitheSheet from "./AddTithes";
+import AddTitheSheet from "./AddTitheSheet";
 
 export default function AddSubmission() {
   const [assembly, setAssembly] = useState<string | null>(null);
@@ -38,9 +37,7 @@ export default function AddSubmission() {
       dateRange={dateRange}
       onRangeChange={onRangeChange}
     >
-     {/* <div className="container mx-auto"> */}
       <AddTitheSheet />
-    {/* </div> */}
     </MainLayout>
   );
 }
