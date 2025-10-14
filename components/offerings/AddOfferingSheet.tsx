@@ -280,51 +280,53 @@ const AddOfferingSheet: React.FC<AddOfferingSheetProps> = ({ type, specialOfferi
     fetchInitialRecords();
   }, [selectedDate, type, specialOfferingType, fetchInitialRecords]);
 
-  const afterChange = useCallback(
-    (changes: CellChange[] | null, source: ChangeSource) => {
-      if (changes && source !== "loadData") {
-        setData((prevData) => {
-          const newData = [...prevData];
-          changes.forEach(([row, prop, , newValue]) => {
-            newData[row] = { ...newData[row], [prop]: Number(newValue) || 0 };
-            const {
-              week1 = 0,
-              week2 = 0,
-              week3 = 0,
-              week4 = 0,
-              week5 = 0,
-              tuesdayWeek1 = 0,
-              tuesdayWeek2 = 0,
-              tuesdayWeek3 = 0,
-              tuesdayWeek4 = 0,
-              tuesdayWeek5 = 0,
-              thursdayWeek1 = 0,
-              thursdayWeek2 = 0,
-              thursdayWeek3 = 0,
-              thursdayWeek4 = 0,
-              thursdayWeek5 = 0,
-              amount = 0,
-            } = newData[row];
-            if (type === "Sunday Service") {
-              newData[row].amount =
-                week1 + week2 + week3 + week4 + (monthDates.sundays.length === 5 ? week5 : 0);
-            } else if (type === "Tuesday Bible Study and Thursday Prayer Meeting") {
-              newData[row].amount =
-                tuesdayWeek1 + tuesdayWeek2 + tuesdayWeek3 + tuesdayWeek4 +
-                (monthDates.tuesdays.length === 5 ? tuesdayWeek5 : 0) +
-                thursdayWeek1 + thursdayWeek2 + thursdayWeek3 + thursdayWeek4 +
-                (monthDates.thursdays.length === 5 ? thursdayWeek5 : 0);
-            } else {
-              newData[row].amount = amount;
-            }
-            newData[row].total = newData[row].amount;
-          });
-          return newData;
+ const afterChange = useCallback(
+  (changes: CellChange[] | null, source: ChangeSource) => {
+    if (changes && source !== "loadData") {
+      setData((prevData) => {
+        const newData = [...prevData];
+        changes.forEach(([row, prop, , newValue]) => {
+          // Cast prop to keyof OfferingRow to satisfy TypeScript
+          const key = prop as keyof OfferingRow;
+          newData[row] = { ...newData[row], [key]: Number(newValue) || 0 };
+          const {
+            week1 = 0,
+            week2 = 0,
+            week3 = 0,
+            week4 = 0,
+            week5 = 0,
+            tuesdayWeek1 = 0,
+            tuesdayWeek2 = 0,
+            tuesdayWeek3 = 0,
+            tuesdayWeek4 = 0,
+            tuesdayWeek5 = 0,
+            thursdayWeek1 = 0,
+            thursdayWeek2 = 0,
+            thursdayWeek3 = 0,
+            thursdayWeek4 = 0,
+            thursdayWeek5 = 0,
+            amount = 0,
+          } = newData[row];
+          if (type === "Sunday Service") {
+            newData[row].amount =
+              week1 + week2 + week3 + week4 + (monthDates.sundays.length === 5 ? week5 : 0);
+          } else if (type === "Tuesday Bible Study and Thursday Prayer Meeting") {
+            newData[row].amount =
+              tuesdayWeek1 + tuesdayWeek2 + tuesdayWeek3 + tuesdayWeek4 +
+              (monthDates.tuesdays.length === 5 ? tuesdayWeek5 : 0) +
+              thursdayWeek1 + thursdayWeek2 + thursdayWeek3 + thursdayWeek4 +
+              (monthDates.thursdays.length === 5 ? thursdayWeek5 : 0);
+          } else {
+            newData[row].amount = amount;
+          }
+          newData[row].total = newData[row].amount;
         });
-      }
-    },
-    [type, monthDates]
-  );
+        return newData;
+      });
+    }
+  },
+  [type, monthDates]
+);
 
   const grandTotal = useMemo(
     () => data.reduce((sum, row) => sum + (Number(row.total) || 0), 0),
