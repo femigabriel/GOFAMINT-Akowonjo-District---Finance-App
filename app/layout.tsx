@@ -2,7 +2,7 @@
 import type { Metadata } from "next";
 import "antd/dist/reset.css";
 import "./globals.css";
-import { ConfigProvider } from "antd";
+import { ConfigProvider, App as AntdApp } from "antd";
 import { AuthProvider } from "@/context/AuthContext";
 
 export const metadata: Metadata = {
@@ -40,7 +40,9 @@ export default function RootLayout({
             },
           }}
         >
-          <AuthProvider>{children}</AuthProvider>
+          <AntdApp>
+            <AuthProvider>{children}</AuthProvider>
+          </AntdApp>
         </ConfigProvider>
       </body>
     </html>

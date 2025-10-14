@@ -130,9 +130,10 @@ export default function AddSubmissionPage() {
       key: "offering",
       label: "Add Offering Submission",
       icon: <PlusOutlined />,
-      onClick: () => router.push("/submissions/add/offering"),
+      onClick: () => router.push("submissions/add/offerings"),
     },
   ];
+  
 
   useEffect(() => {
     if (!loading) {

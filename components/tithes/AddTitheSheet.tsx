@@ -27,6 +27,7 @@ import moment from "moment";
 import { registerAllCellTypes } from "handsontable/cellTypes";
 import type { CellChange, ChangeSource } from "handsontable/common";
 import { useAuth } from "@/context/AuthContext";
+import Link from "next/link";
 
 registerAllCellTypes();
 
@@ -287,6 +288,14 @@ const AddTitheSheet = () => {
             size={[8, 8]}
             className="flex justify-end flex-wrap gap-2"
           >
+             <Tooltip title="Add more rows (up to 200)">
+              <Link href="/submissions/add/offerings">
+               <Button icon={<PlusOutlined />} >
+                Add Offerings
+              </Button>
+              </Link>
+             
+            </Tooltip>
             <Tooltip title="Add more rows (up to 200)">
               <Button icon={<PlusOutlined />} onClick={handleAddRows} disabled={data.length >= 200}>
                 Add Rows
