@@ -84,21 +84,26 @@ export default function LoginPage() {
               name="assembly"
               rules={[{ required: true, message: "Please select your assembly" }]}
             >
-              <Select
-                placeholder="Select your assembly"
-                size="large"
-                className="w-full"
-                showSearch
-                optionFilterProp="children"
-                dropdownClassName="rounded-lg"
-                aria-label="Select your assembly"
-              >
-                {assemblies.map((assembly) => (
-                  <Option key={assembly} value={assembly}>
-                    {assembly}
-                  </Option>
-                ))}
-              </Select>
+            <Select
+  placeholder="Select your assembly"
+  size="large"
+  className="w-full"
+  showSearch
+  optionFilterProp="children"
+  aria-label="Select your assembly"
+  classNames={{
+    popup: {
+      root: "rounded-lg", 
+    },
+  }}
+>
+  {assemblies.map((assembly) => (
+    <Option key={assembly} value={assembly}>
+      {assembly}
+    </Option>
+  ))}
+</Select>
+
             </Form.Item>
 
             <Form.Item

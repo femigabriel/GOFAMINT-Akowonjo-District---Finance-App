@@ -35,29 +35,30 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   }, []);
 
   const login = async (assembly: string, password: string) => {
-    try {
-      setLoading(true);
-      const response = await fetch("/api/login", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ assembly, password }),
-      });
-      const data = await response.json();
-      if (response.ok && data.success) {
-        localStorage.setItem("assembly", assembly);
-        setAssembly(assembly);
-        setIsAuthenticated(true);
-        message.success(`Welcome, ${assembly} Assembly`);
-        router.push("/dashboard");
-      } else {
-        message.error(data.error || "Invalid assembly or password");
-      }
-    } catch (error) {
-      message.error("An error occurred. Please try again.");
-    } finally {
-      setLoading(false);
+  try {
+    setLoading(true);
+    const response = await fetch("/api/login", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ assembly, password }),
+    });
+    const data = await response.json();
+    if (response.ok && data.success) {
+      localStorage.setItem("assembly", assembly);
+      setAssembly(assembly);
+      setIsAuthenticated(true);
+      message.success(`Welcome, ${assembly} Assembly`);
+      router.push("/dashboard");
+    } else {
+      message.error(data.error || "Invalid assembly or password");
     }
-  };
+  } catch {
+    message.error("An error occurred. Please try again.");
+  } finally {
+    setLoading(false);
+  }
+};
+
 
   const logout = () => {
     localStorage.removeItem("assembly");

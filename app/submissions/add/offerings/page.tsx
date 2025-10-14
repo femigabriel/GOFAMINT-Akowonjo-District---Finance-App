@@ -1,31 +1,70 @@
+// app/submissions/offerings/page.tsx
 "use client";
 
 import { useRouter } from "next/navigation";
-import { useEffect, useState } from "react";
+import { useState, useEffect } from "react";
 import dayjs from "dayjs";
 import MainLayout from "@/components/layout/DashboardLayout";
 import AddOfferingSheet from "@/components/offerings/AddOfferingSheet";
-import { DatePicker } from "antd";
+import { DatePicker, Collapse } from "antd";
 import { useAuth } from "@/context/AuthContext";
 
+const { Panel } = Collapse;
+
+const predefinedSpecialOfferings = [
+  "Pastor's Welfare",
+  "Thanksgiving",
+  "Missionaries",
+  "Retirees",
+  "Youth Offerings",
+  "District Support",
+  "ETF",
+  "Special Offerings",
+  "Vigil",
+];
+
 export default function OfferingsPage() {
-  const { assembly, isAuthenticated, loading } = useAuth(); // include loading
+  const { assembly, isAuthenticated } = useAuth();
   const router = useRouter();
   const [selectedDate, setSelectedDate] = useState<Date>(new Date());
   const [dateRange, setDateRange] = useState<[dayjs.Dayjs, dayjs.Dayjs]>([
     dayjs(),
     dayjs(),
   ]);
+  const [customOfferingType, setCustomOfferingType] = useState<string>("");
+  const [loading, setLoading] = useState(true); // Track auth loading state
 
-  // ✅ Handle redirect safely after render
+  // Debug auth state
   useEffect(() => {
-    if (!loading && (!isAuthenticated || !assembly)) {
-      router.push("/login");
-    }
-  }, [loading, isAuthenticated, assembly, router]);
+    console.log("Auth state:", { isAuthenticated, assembly });
+  }, [isAuthenticated, assembly]);
 
-  // ✅ Prevent flashing content while checking auth
-  if (loading || !isAuthenticated || !assembly) {
+  // Handle redirect only once on mount or when auth state changes to invalid
+  useEffect(() => {
+    if (!loading) {
+      console.log("Checking redirect:", { isAuthenticated, assembly });
+      if (!isAuthenticated || !assembly) {
+        console.log("Redirecting to /login due to invalid auth state");
+        router.push("/login");
+      }
+    }
+  }, [isAuthenticated, assembly, router, loading]);
+
+  // Simulate auth check (replace with actual async auth logic if needed)
+  useEffect(() => {
+    // Assuming useAuth might be async, set loading to false after initial check
+    setTimeout(() => {
+      setLoading(false);
+    }, 0); // Adjust based on actual auth context behavior
+  }, []);
+
+  // Prevent rendering until auth check is complete
+  if (loading) {
+    return null; // Avoid flashing content
+  }
+
+  // Additional check to prevent rendering if auth is invalid
+  if (!isAuthenticated || !assembly) {
     return null;
   }
 
@@ -56,23 +95,46 @@ export default function OfferingsPage() {
             className="w-full sm:w-48 rounded-md border-gray-300 focus:border-blue-500"
           />
         </div>
-        <div className="flex flex-col gap-8">
-          <AddOfferingSheet
-            type="Sunday Service"
-            selectedDate={selectedDate}
-            onDateChange={setSelectedDate}
-          />
-          <AddOfferingSheet
-            type="Tuesday Bible Study and Thursday Prayer Meeting"
-            selectedDate={selectedDate}
-            onDateChange={setSelectedDate}
-          />
-          <AddOfferingSheet
-            type="Special"
-            selectedDate={selectedDate}
-            onDateChange={setSelectedDate}
-          />
-        </div>
+        <Collapse
+          defaultActiveKey={["weekly"]}
+          className="bg-transparent"
+          expandIconPosition="end"
+        >
+          <Panel
+            header={<span className="text-lg font-semibold">Weekly Offerings</span>}
+            key="weekly"
+            className="mb-4"
+          >
+            <div className="flex flex-col gap-8">
+              <AddOfferingSheet type="Sunday Service" selectedDate={selectedDate} />
+              <AddOfferingSheet
+                type="Tuesday Bible Study and Thursday Prayer Meeting"
+                selectedDate={selectedDate}
+              />
+            </div>
+          </Panel>
+          <Panel
+            header={<span className="text-lg font-semibold">Special Offerings</span>}
+            key="special"
+            className="mb-4"
+          >
+            <div className="flex flex-col gap-8">
+              {predefinedSpecialOfferings.map((offeringType) => (
+                <AddOfferingSheet
+                  key={offeringType}
+                  type={offeringType}
+                  selectedDate={selectedDate}
+                />
+              ))}
+              <AddOfferingSheet
+                type="Custom"
+                selectedDate={selectedDate}
+                customTypeName={customOfferingType}
+                onCustomTypeChange={setCustomOfferingType}
+              />
+            </div>
+          </Panel>
+        </Collapse>
       </div>
     </MainLayout>
   );

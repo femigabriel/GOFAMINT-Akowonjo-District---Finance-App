@@ -1,4 +1,4 @@
-// components/AddOfferingSheet.tsx
+// components/offerings/AddOfferingSheet.tsx
 "use client";
 
 import { useRef, useState, useEffect, useCallback, useMemo } from "react";
@@ -6,7 +6,6 @@ import { HotTable, HotTableClass } from "@handsontable/react";
 import "handsontable/dist/handsontable.full.min.css";
 import {
   Button,
-  DatePicker,
   Modal,
   notification,
   Space,
@@ -14,8 +13,6 @@ import {
   Tooltip,
   Input,
   Form,
-  Select,
-  InputRef,
 } from "antd";
 import {
   SaveOutlined,
@@ -52,25 +49,18 @@ interface OfferingRow {
 }
 
 interface AddOfferingSheetProps {
-  type: "Sunday Service" | "Tuesday Bible Study and Thursday Prayer Meeting" | "Special";
-  specialOfferingType?: string;
+  type: string;
   selectedDate: Date;
-  onDateChange: (date: Date) => void;
+  customTypeName?: string;
+  onCustomTypeChange?: (type: string) => void;
 }
 
-const predefinedSpecialOfferings = [
-  "Pastor's Welfare",
-  "Thanksgiving",
-  "Missionaries",
-  "Retirees",
-  "Youth Offerings",
-  "District Support",
-  "ETF",
-  "Special Offerings",
-  "Vigil",
-];
-
-const AddOfferingSheet: React.FC<AddOfferingSheetProps> = ({ type, specialOfferingType: initialSpecialOfferingType, selectedDate, onDateChange }) => {
+const AddOfferingSheet: React.FC<AddOfferingSheetProps> = ({
+  type,
+  selectedDate,
+  customTypeName,
+  onCustomTypeChange,
+}) => {
   const hotRef = useRef<HotTableClass>(null);
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [data, setData] = useState<OfferingRow[]>([]);
@@ -78,9 +68,9 @@ const AddOfferingSheet: React.FC<AddOfferingSheetProps> = ({ type, specialOfferi
   const [submittedBy, setSubmittedBy] = useState<string>("");
   const { assembly } = useAuth();
   const [form] = Form.useForm();
-  const [specialOfferingType, setSpecialOfferingType] = useState<string | null>(initialSpecialOfferingType || null);
-  const [customOfferingType, setCustomOfferingType] = useState<string>("");
-  const customInputRef = useRef<InputRef>(null);
+  const [customType, setCustomType] = useState<string>(customTypeName || "");
+
+  const isSpecialOffering = !["Sunday Service", "Tuesday Bible Study and Thursday Prayer Meeting"].includes(type);
 
   const getMonthDates = useCallback((date: Date) => {
     const start = startOfMonth(date);
@@ -110,7 +100,7 @@ const AddOfferingSheet: React.FC<AddOfferingSheetProps> = ({ type, specialOfferi
           renderer: (instance: any, td: any, row: number, col: number, prop: string, value: any) => {
             td.innerHTML = value || 0;
             td.style.textAlign = "right";
-            td.className = "bg-blue-50";
+            td.className = "htNumeric bg-blue-50";
           },
         });
       });
@@ -122,7 +112,7 @@ const AddOfferingSheet: React.FC<AddOfferingSheetProps> = ({ type, specialOfferi
         renderer: (instance: any, td: any, row: number, col: number, prop: string, value: any) => {
           td.innerHTML = value || 0;
           td.style.textAlign = "right";
-          td.className = "bg-gray-100 font-semibold";
+          td.className = "htNumeric bg-gray-100 font-semibold";
         },
       });
     } else if (type === "Tuesday Bible Study and Thursday Prayer Meeting") {
@@ -134,7 +124,7 @@ const AddOfferingSheet: React.FC<AddOfferingSheetProps> = ({ type, specialOfferi
           renderer: (instance: any, td: any, row: number, col: number, prop: string, value: any) => {
             td.innerHTML = value || 0;
             td.style.textAlign = "right";
-            td.className = "bg-green-50";
+            td.className = "htNumeric bg-green-50";
           },
         });
       });
@@ -146,7 +136,7 @@ const AddOfferingSheet: React.FC<AddOfferingSheetProps> = ({ type, specialOfferi
           renderer: (instance: any, td: any, row: number, col: number, prop: string, value: any) => {
             td.innerHTML = value || 0;
             td.style.textAlign = "right";
-            td.className = "bg-yellow-50";
+            td.className = "htNumeric bg-yellow-50";
           },
         });
       });
@@ -158,10 +148,10 @@ const AddOfferingSheet: React.FC<AddOfferingSheetProps> = ({ type, specialOfferi
         renderer: (instance: any, td: any, row: number, col: number, prop: string, value: any) => {
           td.innerHTML = value || 0;
           td.style.textAlign = "right";
-          td.className = "bg-gray-100 font-semibold";
+          td.className = "htNumeric bg-gray-100 font-semibold";
         },
       });
-    } else if (type === "Special" && specialOfferingType) {
+    } else if (isSpecialOffering) {
       columns.push({
         data: "amount",
         type: "numeric",
@@ -169,7 +159,7 @@ const AddOfferingSheet: React.FC<AddOfferingSheetProps> = ({ type, specialOfferi
         renderer: (instance: any, td: any, row: number, col: number, prop: string, value: any) => {
           td.innerHTML = value || 0;
           td.style.textAlign = "right";
-          td.className = "bg-purple-50";
+          td.className = "htNumeric bg-purple-50";
         },
       });
     }
@@ -182,12 +172,12 @@ const AddOfferingSheet: React.FC<AddOfferingSheetProps> = ({ type, specialOfferi
       renderer: (instance: any, td: any, row: number, col: number, prop: string, value: any) => {
         td.innerHTML = value || 0;
         td.style.textAlign = "right";
-        td.className = "bg-gray-200 font-semibold";
+        td.className = "htNumeric bg-gray-200 font-semibold";
       },
     });
 
     return columns;
-  }, [monthDates, type, specialOfferingType]);
+  }, [monthDates, type, isSpecialOffering]);
 
   const colHeaders = useMemo(() => {
     const headers: string[] = [];
@@ -204,12 +194,12 @@ const AddOfferingSheet: React.FC<AddOfferingSheetProps> = ({ type, specialOfferi
         headers.push(`Thursday Week ${i + 1} (${format(date, "d/M")})`);
       });
       headers.push("Amount");
-    } else if (type === "Special" && specialOfferingType) {
-      headers.push(specialOfferingType);
+    } else if (isSpecialOffering) {
+      headers.push(type === "Custom" ? customType || "Custom Offering" : type);
     }
     headers.push("Total");
     return headers;
-  }, [monthDates, type, specialOfferingType]);
+  }, [monthDates, type, isSpecialOffering, customType]);
 
   const initializeEmptyData = useCallback(
     () =>
@@ -241,14 +231,14 @@ const AddOfferingSheet: React.FC<AddOfferingSheetProps> = ({ type, specialOfferi
       setLoading(false);
       return;
     }
-    if (type === "Special" && !specialOfferingType) {
+    if (isSpecialOffering && (!type || (type === "Custom" && !customType))) {
       setData(initializeEmptyData());
       setLoading(false);
       return;
     }
     setLoading(true);
     try {
-      const effectiveType = type === "Special" ? specialOfferingType || type : type;
+      const effectiveType = isSpecialOffering && type === "Custom" ? customType : type;
       const month = moment(selectedDate).format("MMMM-YYYY");
       const response = await fetch(
         `/api/offerings?assembly=${encodeURIComponent(assembly)}&type=${encodeURIComponent(effectiveType)}&month=${encodeURIComponent(month)}`
@@ -274,59 +264,58 @@ const AddOfferingSheet: React.FC<AddOfferingSheetProps> = ({ type, specialOfferi
     } finally {
       setLoading(false);
     }
-  }, [assembly, type, specialOfferingType, selectedDate, initializeEmptyData]);
+  }, [assembly, type, customType, selectedDate, isSpecialOffering, initializeEmptyData]);
 
   useEffect(() => {
     fetchInitialRecords();
-  }, [selectedDate, type, specialOfferingType, fetchInitialRecords]);
+  }, [selectedDate, type, customType, fetchInitialRecords]);
 
- const afterChange = useCallback(
-  (changes: CellChange[] | null, source: ChangeSource) => {
-    if (changes && source !== "loadData") {
-      setData((prevData) => {
-        const newData = [...prevData];
-        changes.forEach(([row, prop, , newValue]) => {
-          // Cast prop to keyof OfferingRow to satisfy TypeScript
-          const key = prop as keyof OfferingRow;
-          newData[row] = { ...newData[row], [key]: Number(newValue) || 0 };
-          const {
-            week1 = 0,
-            week2 = 0,
-            week3 = 0,
-            week4 = 0,
-            week5 = 0,
-            tuesdayWeek1 = 0,
-            tuesdayWeek2 = 0,
-            tuesdayWeek3 = 0,
-            tuesdayWeek4 = 0,
-            tuesdayWeek5 = 0,
-            thursdayWeek1 = 0,
-            thursdayWeek2 = 0,
-            thursdayWeek3 = 0,
-            thursdayWeek4 = 0,
-            thursdayWeek5 = 0,
-            amount = 0,
-          } = newData[row];
-          if (type === "Sunday Service") {
-            newData[row].amount =
-              week1 + week2 + week3 + week4 + (monthDates.sundays.length === 5 ? week5 : 0);
-          } else if (type === "Tuesday Bible Study and Thursday Prayer Meeting") {
-            newData[row].amount =
-              tuesdayWeek1 + tuesdayWeek2 + tuesdayWeek3 + tuesdayWeek4 +
-              (monthDates.tuesdays.length === 5 ? tuesdayWeek5 : 0) +
-              thursdayWeek1 + thursdayWeek2 + thursdayWeek3 + thursdayWeek4 +
-              (monthDates.thursdays.length === 5 ? thursdayWeek5 : 0);
-          } else {
-            newData[row].amount = amount;
-          }
-          newData[row].total = newData[row].amount;
+  const afterChange = useCallback(
+    (changes: CellChange[] | null, source: ChangeSource) => {
+      if (changes && source !== "loadData") {
+        setData((prevData) => {
+          const newData = [...prevData];
+          changes.forEach(([row, prop, , newValue]) => {
+            const key = prop as keyof OfferingRow;
+            newData[row] = { ...newData[row], [key]: Number(newValue) || 0 };
+            const {
+              week1 = 0,
+              week2 = 0,
+              week3 = 0,
+              week4 = 0,
+              week5 = 0,
+              tuesdayWeek1 = 0,
+              tuesdayWeek2 = 0,
+              tuesdayWeek3 = 0,
+              tuesdayWeek4 = 0,
+              tuesdayWeek5 = 0,
+              thursdayWeek1 = 0,
+              thursdayWeek2 = 0,
+              thursdayWeek3 = 0,
+              thursdayWeek4 = 0,
+              thursdayWeek5 = 0,
+              amount = 0,
+            } = newData[row];
+            if (type === "Sunday Service") {
+              newData[row].amount =
+                week1 + week2 + week3 + week4 + (monthDates.sundays.length === 5 ? week5 : 0);
+            } else if (type === "Tuesday Bible Study and Thursday Prayer Meeting") {
+              newData[row].amount =
+                tuesdayWeek1 + tuesdayWeek2 + tuesdayWeek3 + tuesdayWeek4 +
+                (monthDates.tuesdays.length === 5 ? tuesdayWeek5 : 0) +
+                thursdayWeek1 + thursdayWeek2 + thursdayWeek3 + thursdayWeek4 +
+                (monthDates.thursdays.length === 5 ? thursdayWeek5 : 0);
+            } else {
+              newData[row].amount = amount;
+            }
+            newData[row].total = newData[row].amount;
+          });
+          return newData;
         });
-        return newData;
-      });
-    }
-  },
-  [type, monthDates]
-);
+      }
+    },
+    [type, monthDates]
+  );
 
   const grandTotal = useMemo(
     () => data.reduce((sum, row) => sum + (Number(row.total) || 0), 0),
@@ -341,10 +330,10 @@ const AddOfferingSheet: React.FC<AddOfferingSheetProps> = ({ type, specialOfferi
       });
       return;
     }
-    if (type === "Special" && !specialOfferingType) {
+    if (isSpecialOffering && (!type || (type === "Custom" && !customType))) {
       notification.error({
         message: "Error",
-        description: "Please select or enter a special offering type.",
+        description: "Please enter a custom offering type.",
       });
       return;
     }
@@ -362,7 +351,7 @@ const AddOfferingSheet: React.FC<AddOfferingSheetProps> = ({ type, specialOfferi
             (r.tuesdayWeek1 > 0 || r.tuesdayWeek2 > 0 || r.tuesdayWeek3 > 0 || r.tuesdayWeek4 > 0 ||
              (r.tuesdayWeek5 ?? 0) > 0 || r.thursdayWeek1 > 0 || r.thursdayWeek2 > 0 ||
              r.thursdayWeek3 > 0 || r.thursdayWeek4 > 0 || (r.thursdayWeek5 ?? 0) > 0)) ||
-          (type === "Special" && r.amount > 0)
+          (isSpecialOffering && r.amount > 0)
       );
 
       if (filledData.length === 0) {
@@ -374,7 +363,7 @@ const AddOfferingSheet: React.FC<AddOfferingSheetProps> = ({ type, specialOfferi
       }
 
       setLoading(true);
-      const effectiveType = type === "Special" ? specialOfferingType : type;
+      const effectiveType = isSpecialOffering && type === "Custom" ? customType : type;
       const response = await fetch("/api/offerings", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
@@ -442,7 +431,7 @@ const AddOfferingSheet: React.FC<AddOfferingSheetProps> = ({ type, specialOfferi
             rowData.push(r[`thursdayWeek${i + 1}` as keyof OfferingRow] || 0);
           });
           rowData.push(r.amount);
-        } else if (type === "Special") {
+        } else if (isSpecialOffering) {
           rowData.push(r.amount || 0);
         }
         rowData.push(r.total);
@@ -462,47 +451,19 @@ const AddOfferingSheet: React.FC<AddOfferingSheetProps> = ({ type, specialOfferi
     <div className="bg-white p-4 sm:p-6 rounded-lg shadow-md mb-6">
       <div className="flex flex-col gap-4 mb-4">
         <h3 className="text-xl sm:text-2xl font-semibold text-gray-800 flex items-center gap-2">
-          <CalendarOutlined className="text-blue-600" /> {type === "Special" ? specialOfferingType || "Special Offerings" : type}
+          <CalendarOutlined className="text-blue-600" /> {type === "Custom" ? customType || "Custom Offering" : type}
         </h3>
         <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
-          {type === "Special" && (
-            <Select
-              placeholder="Select Special Offering Type"
-              allowClear
-              value={specialOfferingType}
-              onChange={(value) => {
-                setSpecialOfferingType(value || null);
-                setCustomOfferingType("");
+          {type === "Custom" && (
+            <Input
+              placeholder="Enter custom offering type"
+              value={customType}
+              onChange={(e) => {
+                setCustomType(e.target.value);
+                onCustomTypeChange?.(e.target.value);
               }}
-              className="w-full sm:w-48"
-              dropdownRender={(menu) => (
-                <>
-                  {menu}
-                  <div className="p-2">
-                    <Input
-                      ref={customInputRef}
-                      placeholder="Enter custom offering type"
-                      value={customOfferingType}
-                      onChange={(e) => setCustomOfferingType(e.target.value)}
-                      onKeyDown={(e) => {
-                        if (e.key === "Enter" && customOfferingType.trim()) {
-                          setSpecialOfferingType(customOfferingType.trim());
-                          setCustomOfferingType("");
-                          customInputRef.current?.blur();
-                        }
-                      }}
-                      className="rounded-md"
-                    />
-                  </div>
-                </>
-              )}
-            >
-              {predefinedSpecialOfferings.map((type) => (
-                <Select.Option key={type} value={type}>
-                  {type}
-                </Select.Option>
-              ))}
-            </Select>
+              className="w-full sm:w-48 rounded-md"
+            />
           )}
           <Space wrap size={[8, 8]} className="flex justify-end flex-wrap gap-2">
             <Tooltip title="Export to Excel">
@@ -529,7 +490,7 @@ const AddOfferingSheet: React.FC<AddOfferingSheetProps> = ({ type, specialOfferi
               onClick={handleSave}
               loading={loading}
               className="bg-blue-600 hover:bg-blue-700 rounded-md"
-              disabled={type === "Special" && !specialOfferingType}
+              disabled={type === "Custom" && !customType}
             >
               Save
             </Button>
@@ -567,7 +528,7 @@ const AddOfferingSheet: React.FC<AddOfferingSheetProps> = ({ type, specialOfferi
           rowHeaders={true}
           contextMenu={true}
           licenseKey="non-commercial-and-evaluation"
-          className="text-sm font-medium"
+          className="htCore text-sm font-medium"
         />
       </div>
 
@@ -585,7 +546,7 @@ const AddOfferingSheet: React.FC<AddOfferingSheetProps> = ({ type, specialOfferi
         okButtonProps={{ type: "primary", loading, className: "bg-blue-600 rounded-md" }}
         cancelButtonProps={{ className: "rounded-md" }}
       >
-        <p>Are you sure you want to save this month’s {type === "Special" ? specialOfferingType || "Special" : type} offering data? Only filled rows will be saved.</p>
+        <p>Are you sure you want to save this month’s {type === "Custom" ? customType || "Custom" : type} offering data? Only filled rows will be saved.</p>
         <Form form={form} layout="vertical" className="mt-4">
           <Form.Item
             name="submittedBy"
