@@ -465,7 +465,7 @@ const AddOfferingSheet: React.FC<AddOfferingSheetProps> = ({
               className="w-full sm:w-48 rounded-md"
             />
           )}
-          <Space wrap size={[8, 8]} className="flex justify-end flex-wrap gap-2">
+          <Space wrap size={[8, 8]} className="flex lg:justify-end flex-wrap gap-2">
             <Tooltip title="Export to Excel">
               <Button
                 icon={<FileExcelOutlined />}

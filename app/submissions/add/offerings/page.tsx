@@ -7,7 +7,9 @@ import dayjs from "dayjs";
 import { useAuth } from "@/context/AuthContext";
 import MainLayout from "@/components/layout/DashboardLayout";
 import AddOfferingSheet from "@/components/offerings/AddOfferingSheet";
-import { DatePicker, Collapse } from "antd";
+import { DatePicker, Collapse, Button } from "antd";
+import Link from "next/link";
+import { RollbackOutlined } from "@ant-design/icons";
 
 const { Panel } = Collapse;
 
@@ -58,9 +60,14 @@ export default function OfferingsPage() {
     >
       <div className="container mx-auto p-4 sm:p-6 bg-gradient-to-br from-blue-50 to-gray-100 min-h-screen">
         <div className="mb-6">
-          <h2 className="text-2xl sm:text-3xl font-bold text-gray-800 flex items-center gap-3 mb-4">
+         <div className="flex justify-between">
+           <h2 className="text-base lg:text-3xl font-bold mb-4 text-gray-800 flex items-center gap-3 mb-4">
             Offerings Management
           </h2>
+          <Link href="/submissions">
+             <Button className="shadow-md border-blue-100">Back <RollbackOutlined /></Button></Link>
+         </div>
+       
           <DatePicker.MonthPicker
             value={dayjs(selectedDate)}
             onChange={handleDateChange}

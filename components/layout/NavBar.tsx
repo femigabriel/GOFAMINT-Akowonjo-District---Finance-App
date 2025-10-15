@@ -3,7 +3,7 @@
 import React from "react";
 import { usePathname } from "next/navigation";
 import Link from "next/link";
-import { Home, FileText, Plus, History, Settings } from "lucide-react"; // Use Lucide icons for consistency
+import { Home, FileText, Plus, History, Settings } from "lucide-react"; 
 
 export const NavBar = () => {
   const pathname = usePathname();
