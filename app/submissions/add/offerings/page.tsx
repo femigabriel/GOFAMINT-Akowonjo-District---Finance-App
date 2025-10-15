@@ -88,7 +88,7 @@ export default function OfferingsPage() {
             <AddOfferingSheet type="Sunday Service" selectedDate={selectedDate} />
           </Panel>
           <Panel
-            header={<span className="text-lg font-semibold">Tuesday Bible Study and Thursday Prayer Meeting</span>}
+            header={<span className="text-lg font-semibold">Midweek Services <span className="text-xs">Tuesday and Thursday</span></span>}
             key="tuesday-thursday"
             className="mb-4"
           >

@@ -21,6 +21,7 @@ import {
   FileExcelOutlined,
   PlusOutlined,
   CalendarOutlined,
+  RollbackOutlined,
 } from "@ant-design/icons";
 import { format, startOfMonth, endOfMonth, eachWeekOfInterval } from "date-fns";
 import moment from "moment";
@@ -49,20 +50,24 @@ const AddTitheSheet = () => {
   const [data, setData] = useState<TitheRow[]>([]);
   const [loading, setLoading] = useState(true);
   const [submittedBy, setSubmittedBy] = useState<string>("");
-  const { assembly } = useAuth(); 
+  const { assembly } = useAuth();
   const [form] = Form.useForm();
 
   // Get Sundays of month
   const getSundays = useCallback((date: Date) => {
     const start = startOfMonth(date);
     const end = endOfMonth(date);
-    const sundays = eachWeekOfInterval({ start, end }, { weekStartsOn: 0 }).filter(
-      (date) => date >= start && date <= end
-    );
+    const sundays = eachWeekOfInterval(
+      { start, end },
+      { weekStartsOn: 0 }
+    ).filter((date) => date >= start && date <= end);
     return sundays.map((sunday) => format(sunday, "d/M"));
   }, []);
 
-  const sundays = useMemo(() => getSundays(selectedDate), [selectedDate, getSundays]);
+  const sundays = useMemo(
+    () => getSundays(selectedDate),
+    [selectedDate, getSundays]
+  );
 
   // Build headers dynamically
   const colHeaders = useMemo(
@@ -96,7 +101,9 @@ const AddTitheSheet = () => {
     if (!assembly) return;
     setLoading(true);
     try {
-      const response = await fetch(`/api/tithes?assembly=${encodeURIComponent(assembly)}`);
+      const response = await fetch(
+        `/api/tithes?assembly=${encodeURIComponent(assembly)}`
+      );
       const { titherList } = await response.json();
       if (titherList) {
         // Ensure exactly 200 rows
@@ -135,7 +142,13 @@ const AddTitheSheet = () => {
           changes.forEach(([row, prop, , newValue]) => {
             const key = prop as keyof TitheRow;
             newData[row] = { ...newData[row], [key]: newValue };
-            const { week1 = 0, week2 = 0, week3 = 0, week4 = 0, week5 = 0 } = newData[row];
+            const {
+              week1 = 0,
+              week2 = 0,
+              week3 = 0,
+              week4 = 0,
+              week5 = 0,
+            } = newData[row];
             newData[row].total =
               Number(week1) +
               Number(week2) +
@@ -175,7 +188,11 @@ const AddTitheSheet = () => {
         (r) =>
           r.name?.trim() &&
           r.titheNumber?.trim() &&
-          (r.week1 > 0 || r.week2 > 0 || r.week3 > 0 || r.week4 > 0 || (r.week5 ?? 0) > 0)
+          (r.week1 > 0 ||
+            r.week2 > 0 ||
+            r.week3 > 0 ||
+            r.week4 > 0 ||
+            (r.week5 ?? 0) > 0)
       );
 
       if (filledData.length === 0) {
@@ -236,7 +253,8 @@ const AddTitheSheet = () => {
   const handleClear = () => {
     Modal.confirm({
       title: "Clear All Data",
-      content: "This will reset the sheet to the initial tither list. Are you sure?",
+      content:
+        "This will reset the sheet to the initial tither list. Are you sure?",
       okText: "Yes, Clear",
       cancelText: "Cancel",
       okButtonProps: { danger: true },
@@ -265,7 +283,10 @@ const AddTitheSheet = () => {
     const url = URL.createObjectURL(blob);
     const link = document.createElement("a");
     link.href = url;
-    link.setAttribute("download", `Tithes-${moment(selectedDate).format("MMMM-YYYY")}.csv`);
+    link.setAttribute(
+      "download",
+      `Tithes-${moment(selectedDate).format("MMMM-YYYY")}.csv`
+    );
     link.click();
   };
 
@@ -273,9 +294,17 @@ const AddTitheSheet = () => {
     <div className="container mx-auto p-4 sm:p-6 bg-gray-50 rounded-t-md min-h-screen">
       {/* Header */}
       <div className="flex flex-col gap-4 mb-6">
-        <h2 className="text-xl sm:text-2xl font-bold text-gray-800 flex items-center gap-2">
-          <CalendarOutlined /> Tithe Management Sheet
-        </h2>
+      
+        <div className="flex justify-between">
+          <h2 className="text-base lg:text-3xl font-bold  text-gray-800 flex items-center gap-3 mb-4">
+            <CalendarOutlined /> Tithe Management Sheet
+          </h2>
+          <Link href="/submissions">
+            <Button className="shadow-md border-blue-100">
+              Back <RollbackOutlined />
+            </Button>
+          </Link>
+        </div>
         <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
           <DatePicker.MonthPicker
             value={moment(selectedDate)}
@@ -288,16 +317,17 @@ const AddTitheSheet = () => {
             size={[8, 8]}
             className="flex justify-end flex-wrap gap-2"
           >
-             <Tooltip title="Add more rows (up to 200)">
+            <Tooltip title="Add more rows (up to 200)">
               <Link href="/submissions/add/offerings">
-               <Button icon={<PlusOutlined />} >
-                Add Offerings
-              </Button>
+                <Button icon={<PlusOutlined />}>Add Offerings</Button>
               </Link>
-             
             </Tooltip>
             <Tooltip title="Add more rows (up to 200)">
-              <Button icon={<PlusOutlined />} onClick={handleAddRows} disabled={data.length >= 200}>
+              <Button
+                icon={<PlusOutlined />}
+                onClick={handleAddRows}
+                disabled={data.length >= 200}
+              >
                 Add Rows
               </Button>
             </Tooltip>
@@ -332,7 +362,8 @@ const AddTitheSheet = () => {
           precision={2}
         />
         <span className="text-sm text-gray-500">
-          Showing {data.length} rows — {moment(selectedDate).format("MMMM YYYY")}
+          Showing {data.length} rows —{" "}
+          {moment(selectedDate).format("MMMM YYYY")}
         </span>
       </div>
 
@@ -383,7 +414,10 @@ const AddTitheSheet = () => {
         cancelText="Cancel"
         okButtonProps={{ type: "primary", loading }}
       >
-        <p>Are you sure you want to save this month’s tithe data? Only filled rows will be saved.</p>
+        <p>
+          Are you sure you want to save this month’s tithe data? Only filled
+          rows will be saved.
+        </p>
         <Form form={form} layout="vertical" className="mt-4">
           <Form.Item
             name="submittedBy"
