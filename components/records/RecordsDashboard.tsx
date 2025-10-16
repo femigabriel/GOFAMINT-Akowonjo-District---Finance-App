@@ -617,7 +617,7 @@ const RecordsDashboard: React.FC = () => {
                   icon={<ReloadOutlined className="text-lg" />}
                   onClick={fetchRecords}
                   loading={loading}
-                  className="rounded-xl border-gray-300 font-semibold px-6 shadow-lg hover:shadow-xl transition-all"
+                  className="rounded-xl border-gray-300 font-semibold text-sm px-6 shadow-lg hover:shadow-xl transition-all"
                   size="large"
                     style={{
                 width: '60px',
@@ -625,7 +625,7 @@ const RecordsDashboard: React.FC = () => {
                 borderRadius: '50%'
               }}
                 >
-                  {screens.sm && "Refresh"}
+                  {screens.sm && ""}
                 </Button>
               </Tooltip>
               {renderAddButton()}
