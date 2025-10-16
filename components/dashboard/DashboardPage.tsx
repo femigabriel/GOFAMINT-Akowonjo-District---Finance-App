@@ -415,7 +415,7 @@ const pieData: ChartData = {
               type="primary" 
               icon={<Plus size={16} />}
               className="rounded-xl h-12 px-6 bg-gradient-to-r from-blue-600 to-purple-600 border-0 font-semibold"
-              onClick={() => router.push("/submissions/add")}
+              onClick={() => router.push("/submissions")}
             >
               {screens.sm ? "Add Submission" : "Add"}
             </Button>
@@ -638,7 +638,7 @@ const pieData: ChartData = {
                 <br />
                 <Button 
                   type="primary" 
-                  onClick={() => router.push("/submissions/add")}
+                  onClick={() => router.push("/submissions")}
                   className="mt-4"
                 >
                   Add First Submission

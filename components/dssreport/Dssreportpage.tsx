@@ -5,9 +5,10 @@ import dayjs from "dayjs";
 import { message } from "antd";
 import { useRouter } from "next/navigation";
 import MainLayout from "@/components/layout/DashboardLayout";
-import RecordsDashboard from "./RecordsDashboard";
+import DistrictSundayServiceReport from "../records/DistrictSundayServiceReport";
 
-export default function RecordsPage() {
+
+export default function Dssreportpage() {
   const [assembly, setAssembly] = useState<string | null>(null);
   const [dateRange, setDateRange] = useState<[dayjs.Dayjs, dayjs.Dayjs]>([
     dayjs().startOf("month"),
@@ -37,8 +38,7 @@ export default function RecordsPage() {
       dateRange={dateRange}
       onRangeChange={onRangeChange}
     >
-      
-      <RecordsDashboard />
+      <DistrictSundayServiceReport />
     </MainLayout>
   );
 }
