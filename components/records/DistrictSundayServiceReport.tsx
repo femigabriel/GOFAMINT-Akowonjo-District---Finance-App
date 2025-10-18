@@ -9,22 +9,20 @@ import {
   notification,
   Space,
   Statistic,
-  Tooltip,
-  Input,
-  Form,
   Card,
   Row,
   Col,
   Popconfirm,
   DatePicker,
+  Tooltip,
+  Form,
+  Input,
 } from "antd";
 import {
   SaveOutlined,
   ReloadOutlined,
   FileExcelOutlined,
   CalendarOutlined,
-  PlusOutlined,
-  DeleteOutlined,
 } from "@ant-design/icons";
 import { format, startOfMonth, endOfMonth, eachWeekOfInterval, isSameMonth } from "date-fns";
 import moment from "moment";
@@ -41,8 +39,36 @@ interface SundayServiceRow {
   tithes: number;
   offerings: number;
   specialOfferings: number;
+  etf: number;
+  pastorsWarfare: number;
+  vigil: number;
+  thanksgiving: number;
+  retirees: number;
+  missionaries: number;
+  youthOfferings: number;
+  districtSupport: number;
   total: number;
-  [key: string]: number; // Allow any string key for custom columns
+  [key: string]: number; // Index signature for dynamic access
+}
+
+interface SundayServiceRecord {
+  week: string;
+  attendance: number;
+  sbsAttendance: number;
+  visitors: number;
+  tithes: number;
+  offerings: number;
+  specialOfferings: number;
+  etf: number;
+  pastorsWarfare: number;
+  vigil: number;
+  thanksgiving: number;
+  retirees: number;
+  missionaries: number;
+  youthOfferings: number;
+  districtSupport: number;
+  total: number;
+  [key: string]: string | number; // Index signature for API payload
 }
 
 interface CustomColumn {
@@ -58,10 +84,21 @@ const DistrictSundayServiceReport: React.FC = () => {
   const [submittedBy, setSubmittedBy] = useState<string>("");
   const { assembly } = useAuth();
   const [form] = Form.useForm();
-  const [customColumns, setCustomColumns] = useState<CustomColumn[]>([]);
-  const [newColumnName, setNewColumnName] = useState<string>("");
   const [selectedDate, setSelectedDate] = useState<Date>(new Date());
 
+  // Predefined custom columns
+  const customColumns: CustomColumn[] = [
+    { name: "ETF", key: "etf" },
+    { name: "Pastor's Warfare", key: "pastorsWarfare" },
+    { name: "Vigil", key: "vigil" },
+    { name: "Thanksgiving", key: "thanksgiving" },
+    { name: "Retirees", key: "retirees" },
+    { name: "Missionaries", key: "missionaries" },
+    { name: "Youth Offerings", key: "youthOfferings" },
+    { name: "District Support", key: "districtSupport" },
+  ];
+
+  // Update selectedDate when the month changes
   useEffect(() => {
     const interval = setInterval(() => {
       const now = new Date();
@@ -72,11 +109,11 @@ const DistrictSundayServiceReport: React.FC = () => {
     return () => clearInterval(interval);
   }, [selectedDate]);
 
+  // Get Sundays of the selected month
   const getMonthDates = useCallback((date: Date) => {
     const start = startOfMonth(date);
     const end = endOfMonth(date);
     const sundays = eachWeekOfInterval({ start, end }, { weekStartsOn: 0 });
-    console.log("Sundays in month:", sundays.map((d) => format(d, "d/M")));
     return sundays.slice(0, 5);
   }, []);
 
@@ -86,6 +123,7 @@ const DistrictSundayServiceReport: React.FC = () => {
     return monthDates.map((date, i) => `Week ${i + 1} (${format(date, "d/M")})`);
   }, [monthDates]);
 
+  // Initialize empty data for the table
   const initializeEmptyData = useCallback(() => {
     return Array.from({ length: monthDates.length }, () => ({
       attendance: 0,
@@ -94,11 +132,19 @@ const DistrictSundayServiceReport: React.FC = () => {
       tithes: 0,
       offerings: 0,
       specialOfferings: 0,
+      etf: 0,
+      pastorsWarfare: 0,
+      vigil: 0,
+      thanksgiving: 0,
+      retirees: 0,
+      missionaries: 0,
+      youthOfferings: 0,
+      districtSupport: 0,
       total: 0,
-      ...customColumns.reduce((acc, col) => ({ ...acc, [col.key]: 0 }), {}),
     }));
-  }, [customColumns, monthDates]);
+  }, [monthDates]);
 
+  // Define table columns
   const getColumns = useCallback(() => {
     const columns: any[] = [];
     const fields = [
@@ -108,6 +154,14 @@ const DistrictSundayServiceReport: React.FC = () => {
       { key: "tithes", title: "Tithes (₦)", color: "bg-purple-50" },
       { key: "offerings", title: "Offerings (₦)", color: "bg-pink-50" },
       { key: "specialOfferings", title: "Special Offerings (₦)", color: "bg-indigo-50" },
+      { key: "etf", title: "ETF (₦)", color: "bg-gray-50" },
+      { key: "pastorsWarfare", title: "Pastor's Warfare (₦)", color: "bg-gray-50" },
+      { key: "vigil", title: "Vigil (₦)", color: "bg-gray-50" },
+      { key: "thanksgiving", title: "Thanksgiving (₦)", color: "bg-gray-50" },
+      { key: "retirees", title: "Retirees (₦)", color: "bg-gray-50" },
+      { key: "missionaries", title: "Missionaries (₦)", color: "bg-gray-50" },
+      { key: "youthOfferings", title: "Youth Offerings (₦)", color: "bg-gray-50" },
+      { key: "districtSupport", title: "District Support (₦)", color: "bg-gray-50" },
     ];
 
     fields.forEach((field) => {
@@ -119,19 +173,6 @@ const DistrictSundayServiceReport: React.FC = () => {
           td.innerHTML = value || 0;
           td.style.textAlign = "right";
           td.className = `htNumeric ${field.color}`;
-        },
-      });
-    });
-
-    customColumns.forEach((col) => {
-      columns.push({
-        data: col.key,
-        type: "numeric",
-        width: 120,
-        renderer: (instance: any, td: any, row: number, col: number, prop: string, value: any) => {
-          td.innerHTML = value || 0;
-          td.style.textAlign = "right";
-          td.className = "htNumeric bg-gray-50";
         },
       });
     });
@@ -149,15 +190,22 @@ const DistrictSundayServiceReport: React.FC = () => {
     });
 
     return columns;
-  }, [customColumns]);
+  }, []);
 
   const colHeaders = useMemo(() => {
-    const headers = ["Attendance", "SBS Attendance", "Visitors", "Tithes (₦)", "Offerings (₦)", "Special Offerings (₦)"];
-    customColumns.forEach((col) => headers.push(col.name));
-    headers.push("Total (₦)");
-    return headers;
-  }, [customColumns]);
+    return [
+      "Attendance",
+      "SBS Attendance",
+      "Visitors",
+      "Tithes (₦)",
+      "Offerings (₦)",
+      "Special Offerings (₦)",
+      ...customColumns.map((col) => col.name),
+      "Total (₦)",
+    ];
+  }, []);
 
+  // Fetch initial records from the API
   const fetchInitialRecords = useCallback(async () => {
     if (!assembly) {
       setData(initializeEmptyData());
@@ -174,7 +222,7 @@ const DistrictSundayServiceReport: React.FC = () => {
         throw new Error(`HTTP error ${response.status}`);
       }
       const { records } = await response.json();
-      const filledData = [...records];
+      const filledData: SundayServiceRow[] = [...records];
       while (filledData.length < monthDates.length) {
         filledData.push({
           attendance: 0,
@@ -183,8 +231,15 @@ const DistrictSundayServiceReport: React.FC = () => {
           tithes: 0,
           offerings: 0,
           specialOfferings: 0,
+          etf: 0,
+          pastorsWarfare: 0,
+          vigil: 0,
+          thanksgiving: 0,
+          retirees: 0,
+          missionaries: 0,
+          youthOfferings: 0,
+          districtSupport: 0,
           total: 0,
-          ...customColumns.reduce((acc, col) => ({ ...acc, [col.key]: 0 }), {}),
         });
       }
       setData(filledData.slice(0, monthDates.length));
@@ -204,22 +259,27 @@ const DistrictSundayServiceReport: React.FC = () => {
     fetchInitialRecords();
   }, [fetchInitialRecords]);
 
-  useEffect(() => {
-    console.log("monthDates length:", monthDates.length);
-    console.log("data length:", data.length);
-    console.log("rowHeaders:", rowHeaders);
-  }, [monthDates, data, rowHeaders]);
-
+  // Handle table changes
   const afterChange = useCallback(
     (changes: CellChange[] | null, source: ChangeSource) => {
       if (changes && source !== "loadData") {
         setData((prevData) => {
           const newData = [...prevData];
           changes.forEach(([row, prop, , newValue]) => {
-            const key = prop as keyof SundayServiceRow;
-            newData[row] = { ...newData[row], [key]: Number(newValue) || 0 };
+            newData[row] = { ...newData[row], [prop as string]: Number(newValue) || 0 };
             const rowData = newData[row];
-            newData[row].total = (rowData.tithes || 0) + (rowData.offerings || 0) + (rowData.specialOfferings || 0);
+            newData[row].total =
+              (rowData.tithes || 0) +
+              (rowData.offerings || 0) +
+              (rowData.specialOfferings || 0) +
+              (rowData.etf || 0) +
+              (rowData.pastorsWarfare || 0) +
+              (rowData.vigil || 0) +
+              (rowData.thanksgiving || 0) +
+              (rowData.retirees || 0) +
+              (rowData.missionaries || 0) +
+              (rowData.youthOfferings || 0) +
+              (rowData.districtSupport || 0);
           });
           return newData;
         });
@@ -228,6 +288,7 @@ const DistrictSundayServiceReport: React.FC = () => {
     []
   );
 
+  // Calculate summary statistics
   const summaryStats = useMemo(() => {
     const stats = {
       totalAttendance: 0,
@@ -236,6 +297,14 @@ const DistrictSundayServiceReport: React.FC = () => {
       totalTithes: 0,
       totalOfferings: 0,
       totalSpecialOfferings: 0,
+      totalETF: 0,
+      totalPastorsWarfare: 0,
+      totalVigil: 0,
+      totalThanksgiving: 0,
+      totalRetirees: 0,
+      totalMissionaries: 0,
+      totalYouthOfferings: 0,
+      totalDistrictSupport: 0,
       grandTotal: 0,
     };
     data.forEach((row) => {
@@ -245,11 +314,20 @@ const DistrictSundayServiceReport: React.FC = () => {
       stats.totalTithes += row.tithes || 0;
       stats.totalOfferings += row.offerings || 0;
       stats.totalSpecialOfferings += row.specialOfferings || 0;
+      stats.totalETF += row.etf || 0;
+      stats.totalPastorsWarfare += row.pastorsWarfare || 0;
+      stats.totalVigil += row.vigil || 0;
+      stats.totalThanksgiving += row.thanksgiving || 0;
+      stats.totalRetirees += row.retirees || 0;
+      stats.totalMissionaries += row.missionaries || 0;
+      stats.totalYouthOfferings += row.youthOfferings || 0;
+      stats.totalDistrictSupport += row.districtSupport || 0;
       stats.grandTotal += row.total || 0;
     });
     return stats;
   }, [data]);
 
+  // Handle save action
   const handleSave = () => {
     if (!assembly) {
       notification.error({
@@ -261,10 +339,12 @@ const DistrictSundayServiceReport: React.FC = () => {
     setIsModalOpen(true);
   };
 
+  // Confirm and save data
   const confirmSave = async () => {
     try {
       await form.validateFields();
-      const filledData = data
+
+      const filledData: SundayServiceRecord[] = data
         .map((row, index) => ({
           week: `Week ${index + 1}`,
           attendance: row.attendance,
@@ -273,8 +353,15 @@ const DistrictSundayServiceReport: React.FC = () => {
           tithes: row.tithes,
           offerings: row.offerings,
           specialOfferings: row.specialOfferings,
+          etf: row.etf,
+          pastorsWarfare: row.pastorsWarfare,
+          vigil: row.vigil,
+          thanksgiving: row.thanksgiving,
+          retirees: row.retirees,
+          missionaries: row.missionaries,
+          youthOfferings: row.youthOfferings,
+          districtSupport: row.districtSupport,
           total: row.total,
-          ...customColumns.reduce((acc, col) => ({ ...acc, [col.key]: row[col.key] || 0 }), {}),
         }))
         .filter(
           (r) =>
@@ -284,7 +371,14 @@ const DistrictSundayServiceReport: React.FC = () => {
             r.tithes > 0 ||
             r.offerings > 0 ||
             r.specialOfferings > 0 ||
-            customColumns.some((col) => Number(r[col.key] ?? 0) > 0)
+            r.etf > 0 ||
+            r.pastorsWarfare > 0 ||
+            r.vigil > 0 ||
+            r.thanksgiving > 0 ||
+            r.retirees > 0 ||
+            r.missionaries > 0 ||
+            r.youthOfferings > 0 ||
+            r.districtSupport > 0
         );
 
       if (filledData.length === 0) {
@@ -296,6 +390,7 @@ const DistrictSundayServiceReport: React.FC = () => {
       }
 
       setLoading(true);
+
       const response = await fetch("/api/sunday-service-reports", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
@@ -308,6 +403,7 @@ const DistrictSundayServiceReport: React.FC = () => {
       });
 
       const result = await response.json();
+
       if (response.ok && result.success) {
         notification.success({
           message: "Data Saved Successfully",
@@ -332,6 +428,7 @@ const DistrictSundayServiceReport: React.FC = () => {
     }
   };
 
+  // Handle reset action
   const handleClear = () => {
     Modal.confirm({
       title: "Reset Sheet",
@@ -343,6 +440,7 @@ const DistrictSundayServiceReport: React.FC = () => {
     });
   };
 
+  // Handle export to CSV
   const handleExport = () => {
     const headers = ["Week", ...colHeaders];
     const csvData = [
@@ -356,7 +454,14 @@ const DistrictSundayServiceReport: React.FC = () => {
           row.tithes || 0,
           row.offerings || 0,
           row.specialOfferings || 0,
-          ...customColumns.map((col) => row[col.key] || 0),
+          row.etf || 0,
+          row.pastorsWarfare || 0,
+          row.vigil || 0,
+          row.thanksgiving || 0,
+          row.retirees || 0,
+          row.missionaries || 0,
+          row.youthOfferings || 0,
+          row.districtSupport || 0,
           row.total || 0,
         ];
         return rowData.join(",");
@@ -369,45 +474,10 @@ const DistrictSundayServiceReport: React.FC = () => {
     link.href = url;
     link.setAttribute("download", `SundayServiceReport-${moment(selectedDate).format("MMMM-YYYY")}.csv`);
     link.click();
+    URL.revokeObjectURL(url);
   };
 
-  const handleAddColumn = () => {
-    if (!newColumnName.trim()) {
-      notification.error({
-        message: "Error",
-        description: "Please enter a column name.",
-      });
-      return;
-    }
-    const newKey = `custom${customColumns.length + 1}`;
-    setCustomColumns([...customColumns, { name: newColumnName.trim(), key: newKey }]);
-    setData((prevData) =>
-      prevData.map((row) => ({ ...row, [newKey]: 0 }))
-    );
-    setNewColumnName("");
-    notification.success({
-      message: "Column Added",
-      description: `Custom column "${newColumnName.trim()}" added successfully.`,
-    });
-  };
-
-  const handleRemoveColumn = (key: string) => {
-    setCustomColumns(customColumns.filter((col) => col.key !== key));
-    setData((prevData) =>
-      prevData.map((row) => {
-        const { [key]: _, ...rest } = row;
-        return {
-          ...rest,
-          total: (rest.tithes || 0) + (rest.offerings || 0) + (rest.specialOfferings || 0),
-        } as SundayServiceRow;
-      })
-    );
-    notification.success({
-      message: "Column Removed",
-      description: "Custom column removed successfully.",
-    });
-  };
-
+  // Handle month change
   const handleMonthChange = (date: moment.Moment | null) => {
     if (date) {
       setSelectedDate(date.toDate());
@@ -492,26 +562,98 @@ const DistrictSundayServiceReport: React.FC = () => {
               />
             </Card>
           </Col>
+          <Col xs={24} sm={12} lg={8}>
+            <Card className="bg-gradient-to-r from-gray-500 to-gray-600 text-white rounded-xl shadow-md">
+              <Statistic
+                title="Total ETF"
+                value={summaryStats.totalETF}
+                prefix="₦"
+                precision={2}
+                valueStyle={{ color: "#fff" }}
+              />
+            </Card>
+          </Col>
+          <Col xs={24} sm={12} lg={8}>
+            <Card className="bg-gradient-to-r from-gray-500 to-gray-600 text-white rounded-xl shadow-md">
+              <Statistic
+                title="Total Pastor's Warfare"
+                value={summaryStats.totalPastorsWarfare}
+                prefix="₦"
+                precision={2}
+                valueStyle={{ color: "#fff" }}
+              />
+            </Card>
+          </Col>
+          <Col xs={24} sm={12} lg={8}>
+            <Card className="bg-gradient-to-r from-gray-500 to-gray-600 text-white rounded-xl shadow-md">
+              <Statistic
+                title="Total Vigil"
+                value={summaryStats.totalVigil}
+                prefix="₦"
+                precision={2}
+                valueStyle={{ color: "#fff" }}
+              />
+            </Card>
+          </Col>
+          <Col xs={24} sm={12} lg={8}>
+            <Card className="bg-gradient-to-r from-gray-500 to-gray-600 text-white rounded-xl shadow-md">
+              <Statistic
+                title="Total Thanksgiving"
+                value={summaryStats.totalThanksgiving}
+                prefix="₦"
+                precision={2}
+                valueStyle={{ color: "#fff" }}
+              />
+            </Card>
+          </Col>
+          <Col xs={24} sm={12} lg={8}>
+            <Card className="bg-gradient-to-r from-gray-500 to-gray-600 text-white rounded-xl shadow-md">
+              <Statistic
+                title="Total Retirees"
+                value={summaryStats.totalRetirees}
+                prefix="₦"
+                precision={2}
+                valueStyle={{ color: "#fff" }}
+              />
+            </Card>
+          </Col>
+          <Col xs={24} sm={12} lg={8}>
+            <Card className="bg-gradient-to-r from-gray-500 to-gray-600 text-white rounded-xl shadow-md">
+              <Statistic
+                title="Total Missionaries"
+                value={summaryStats.totalMissionaries}
+                prefix="₦"
+                precision={2}
+                valueStyle={{ color: "#fff" }}
+              />
+            </Card>
+          </Col>
+          <Col xs={24} sm={12} lg={8}>
+            <Card className="bg-gradient-to-r from-gray-500 to-gray-600 text-white rounded-xl shadow-md">
+              <Statistic
+                title="Total Youth Offerings"
+                value={summaryStats.totalYouthOfferings}
+                prefix="₦"
+                precision={2}
+                valueStyle={{ color: "#fff" }}
+              />
+            </Card>
+          </Col>
+          <Col xs={24} sm={12} lg={8}>
+            <Card className="bg-gradient-to-r from-gray-500 to-gray-600 text-white rounded-xl shadow-md">
+              <Statistic
+                title="Total District Support"
+                value={summaryStats.totalDistrictSupport}
+                prefix="₦"
+                precision={2}
+                valueStyle={{ color: "#fff" }}
+              />
+            </Card>
+          </Col>
         </Row>
       </div>
 
-      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 mb-6">
-        <div className="flex items-center gap-3">
-          <Input
-            placeholder="Enter custom column name (e.g., Missions)"
-            value={newColumnName}
-            onChange={(e) => setNewColumnName(e.target.value)}
-            className="w-full sm:w-64 rounded-lg"
-          />
-          <Button
-            type="primary"
-            icon={<PlusOutlined />}
-            onClick={handleAddColumn}
-            className="bg-blue-600 hover:bg-blue-700 rounded-lg"
-          >
-            Add Column
-          </Button>
-        </div>
+      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-end gap-4 mb-6">
         <Space wrap size={[8, 8]} className="flex lg:justify-end flex-wrap gap-2">
           <Tooltip title="Export to Excel">
             <Button
@@ -571,34 +713,6 @@ const DistrictSundayServiceReport: React.FC = () => {
           className="htCore text-sm font-medium"
         />
       </div>
-
-      {customColumns.length > 0 && (
-        <div className="mt-4">
-          <h4 className="text-lg font-semibold text-gray-800 mb-2">Custom Columns</h4>
-          <Space wrap>
-            {customColumns.map((col) => (
-              <div key={col.key} className="flex items-center gap-2 bg-gray-100 p-2 rounded-lg">
-                <span>{col.name}</span>
-                <Popconfirm
-                  title={`Remove column "${col.name}"?`}
-                  description="This will delete the column and its data."
-                  onConfirm={() => handleRemoveColumn(col.key)}
-                  okText="Yes"
-                  cancelText="No"
-                  okButtonProps={{ danger: true, className: "bg-red-600 text-white rounded-lg" }}
-                >
-                  <Button
-                    icon={<DeleteOutlined />}
-                    size="small"
-                    danger
-                    className="rounded-lg"
-                  />
-                </Popconfirm>
-              </div>
-            ))}
-          </Space>
-        </div>
-      )}
 
       <Modal
         title="Confirm Save"
