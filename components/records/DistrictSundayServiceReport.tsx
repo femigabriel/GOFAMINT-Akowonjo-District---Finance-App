@@ -25,6 +25,10 @@ import {
   FileExcelOutlined,
   CalendarOutlined,
   UserOutlined,
+  UsergroupAddOutlined,
+  TeamOutlined,
+  DollarOutlined,
+  GiftOutlined,
 } from "@ant-design/icons";
 import { format, startOfMonth, endOfMonth, eachWeekOfInterval, isSameMonth } from "date-fns";
 import moment from "moment";
@@ -148,7 +152,7 @@ const DistrictSundayServiceReport: React.FC = () => {
   const getColumns = useCallback(() => {
     const isMobile = !screens.md;
     const baseWidth = screens.lg ? 120 : screens.md ? 100 : 80;
-    
+
     const columns: any[] = [];
     const fields = [
       { key: "attendance", title: "Attendance", color: "bg-blue-50" },
@@ -201,7 +205,7 @@ const DistrictSundayServiceReport: React.FC = () => {
 
   const colHeaders = useMemo(() => {
     const isMobile = !screens.md;
-    
+
     if (isMobile) {
       return [
         "Attend",
@@ -221,7 +225,7 @@ const DistrictSundayServiceReport: React.FC = () => {
         "Total",
       ];
     }
-    
+
     return [
       "Attendance",
       "SBS Attendance",
@@ -493,7 +497,6 @@ const DistrictSundayServiceReport: React.FC = () => {
     }
   };
 
-  // Responsive table height
   const tableHeight = useMemo(() => {
     if (!screens.md) return 300;
     if (!screens.lg) return 350;
@@ -503,7 +506,6 @@ const DistrictSundayServiceReport: React.FC = () => {
   return (
     <div className="bg-white p-4 sm:p-6 rounded-xl shadow-lg mb-6 border border-gray-100">
       <div className="flex flex-col gap-4 sm:gap-6 mb-4 sm:mb-6">
-        {/* Header Section */}
         <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
           <div className="flex flex-col sm:flex-row sm:items-center gap-3">
             <div className="flex items-center gap-3">
@@ -520,7 +522,7 @@ const DistrictSundayServiceReport: React.FC = () => {
               </div>
             </div>
           </div>
-          
+
           <DatePicker.MonthPicker
             value={moment(selectedDate)}
             onChange={handleMonthChange}
@@ -530,73 +532,91 @@ const DistrictSundayServiceReport: React.FC = () => {
           />
         </div>
 
-        {/* Stats Cards */}
         <Row gutter={[12, 12]}>
           <Col xs={12} sm={12} lg={6}>
-            <Card 
+            <Card
               className="bg-gradient-to-r from-blue-500 to-blue-600 text-white rounded-xl shadow-md h-full border-0"
-              bodyStyle={{ padding: screens.xs ? '16px 12px' : '20px' }}
+              bodyStyle={{ padding: screens.xs ? "16px 12px" : "20px" }}
             >
               <Statistic
-                title={<span className="text-blue-100 text-sm">Total Attendance</span>}
+                title={
+                  <span className="text-blue-100 text-sm flex items-center gap-2">
+                    <UsergroupAddOutlined />
+                    Total Attendance
+                  </span>
+                }
                 value={summaryStats.totalAttendance}
-                valueStyle={{ color: "#fff", fontSize: screens.xs ? '20px' : '24px' }}
+                valueStyle={{ color: "#fff", fontSize: screens.xs ? "20px" : "24px" }}
                 className="text-white"
               />
             </Card>
           </Col>
           <Col xs={12} sm={12} lg={6}>
-            <Card 
+            <Card
               className="bg-gradient-to-r from-green-500 to-green-600 text-white rounded-xl shadow-md h-full border-0"
-              bodyStyle={{ padding: screens.xs ? '16px 12px' : '20px' }}
+              bodyStyle={{ padding: screens.xs ? "16px 12px" : "20px" }}
             >
               <Statistic
-                title={<span className="text-green-100 text-sm">SBS Attendance</span>}
+                title={
+                  <span className="text-green-100 text-sm flex items-center gap-2">
+                    <TeamOutlined />
+                    SBS Attendance
+                  </span>
+                }
                 value={summaryStats.totalSBSAttendance}
-                valueStyle={{ color: "#fff", fontSize: screens.xs ? '20px' : '24px' }}
+                valueStyle={{ color: "#fff", fontSize: screens.xs ? "20px" : "24px" }}
               />
             </Card>
           </Col>
           <Col xs={12} sm={12} lg={6}>
-            <Card 
+            <Card
               className="bg-gradient-to-r from-purple-500 to-purple-600 text-white rounded-xl shadow-md h-full border-0"
-              bodyStyle={{ padding: screens.xs ? '16px 12px' : '20px' }}
+              bodyStyle={{ padding: screens.xs ? "16px 12px" : "20px" }}
             >
               <Statistic
-                title={<span className="text-purple-100 text-sm">Total Tithes</span>}
+                title={
+                  <span className="text-purple-100 text-sm flex items-center gap-2">
+                    <DollarOutlined />
+                    Total Tithes
+                  </span>
+                }
                 value={summaryStats.totalTithes}
                 prefix="₦"
                 precision={0}
-                valueStyle={{ color: "#fff", fontSize: screens.xs ? '20px' : '24px' }}
+                valueStyle={{ color: "#fff", fontSize: screens.xs ? "20px" : "24px" }}
               />
             </Card>
           </Col>
           <Col xs={12} sm={12} lg={6}>
-            <Card 
+            <Card
               className="bg-gradient-to-r from-pink-500 to-pink-600 text-white rounded-xl shadow-md h-full border-0"
-              bodyStyle={{ padding: screens.xs ? '16px 12px' : '20px' }}
+              bodyStyle={{ padding: screens.xs ? "16px 12px" : "20px" }}
             >
               <Statistic
-                title={<span className="text-pink-100 text-sm">Total Offerings</span>}
+                title={
+                  <span className="text-pink-100 text-sm flex items-center gap-2">
+                    <GiftOutlined />
+                    Total Offerings
+                  </span>
+                }
                 value={summaryStats.totalOfferings}
                 prefix="₦"
                 precision={0}
-                valueStyle={{ color: "#fff", fontSize: screens.xs ? '20px' : '24px' }}
+                valueStyle={{ color: "#fff", fontSize: screens.xs ? "20px" : "24px" }}
               />
             </Card>
           </Col>
         </Row>
       </div>
 
-      {/* Action Buttons */}
       <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 mb-4 sm:mb-6">
         <div className="text-sm text-gray-500">
           {screens.md && "Click on cells to edit values. Totals are calculated automatically."}
         </div>
-        <Space 
-          wrap 
-          size={[8, 8]} 
-          className={`flex ${screens.xs ? 'justify-stretch' : 'justify-end'} flex-wrap gap-2`}
+        <Space
+          wrap
+          size={[8, 8]}
+          className={`flex ${screens.xs ? "justify-stretch" : "justify-end"} flex-wrap gap-2`}
         >
           <Button
             icon={<FileExcelOutlined />}
@@ -638,7 +658,6 @@ const DistrictSundayServiceReport: React.FC = () => {
         </Space>
       </div>
 
-      {/* Data Table */}
       <div className="relative">
         {loading && (
           <div className="absolute inset-0 bg-white bg-opacity-80 flex items-center justify-center z-10 rounded-lg">
@@ -647,9 +666,9 @@ const DistrictSundayServiceReport: React.FC = () => {
         )}
         <div
           className="handsontable-container border rounded-lg shadow-sm bg-white overflow-hidden"
-          style={{ 
+          style={{
             height: tableHeight,
-            fontSize: screens.xs ? '12px' : '14px'
+            fontSize: screens.xs ? "12px" : "14px",
           }}
         >
           <HotTable
@@ -671,7 +690,6 @@ const DistrictSundayServiceReport: React.FC = () => {
         </div>
       </div>
 
-      {/* Save Modal */}
       <Modal
         title={
           <div className="flex items-center gap-2">
@@ -688,10 +706,10 @@ const DistrictSundayServiceReport: React.FC = () => {
         }}
         okText="Save Report"
         cancelText="Cancel"
-        okButtonProps={{ 
-          type: "primary", 
-          loading, 
-          className: "bg-blue-600 hover:bg-blue-700 rounded-lg h-10" 
+        okButtonProps={{
+          type: "primary",
+          loading,
+          className: "bg-blue-600 hover:bg-blue-700 rounded-lg h-10",
         }}
         cancelButtonProps={{ className: "rounded-lg h-10" }}
         width={screens.xs ? 350 : 500}
@@ -720,13 +738,13 @@ const DistrictSundayServiceReport: React.FC = () => {
 
       <style jsx global>{`
         .custom-handsontable .htCore {
-          font-size: ${screens.xs ? '12px' : '14px'};
+          font-size: ${screens.xs ? "12px" : "14px"};
         }
         .custom-handsontable th {
           font-weight: 600;
           background-color: #f8fafc;
-          padding: ${screens.xs ? '6px 8px' : '8px 12px'};
-          white-space: ${screens.xs ? 'normal' : 'nowrap'};
+          padding: ${screens.xs ? "6px 8px" : "8px 12px"};
+          white-space: ${screens.xs ? "normal" : "nowrap"};
         }
         .custom-handsontable td {
           transition: background-color 0.2s;
