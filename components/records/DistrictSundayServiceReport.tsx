@@ -16,12 +16,15 @@ import {
   DatePicker,
   Form,
   Input,
+  Spin,
+  Grid,
 } from "antd";
 import {
   SaveOutlined,
   ReloadOutlined,
   FileExcelOutlined,
   CalendarOutlined,
+  UserOutlined,
 } from "@ant-design/icons";
 import { format, startOfMonth, endOfMonth, eachWeekOfInterval, isSameMonth } from "date-fns";
 import moment from "moment";
@@ -75,6 +78,8 @@ interface CustomColumn {
   key: string;
 }
 
+const { useBreakpoint } = Grid;
+
 const DistrictSundayServiceReport: React.FC = () => {
   const hotRef = useRef<HotTableClass>(null);
   const [isModalOpen, setIsModalOpen] = useState(false);
@@ -84,6 +89,7 @@ const DistrictSundayServiceReport: React.FC = () => {
   const { assembly } = useAuth();
   const [form] = Form.useForm();
   const [selectedDate, setSelectedDate] = useState<Date>(new Date());
+  const screens = useBreakpoint();
 
   const customColumns: CustomColumn[] = [
     { name: "ETF", key: "etf" },
@@ -140,33 +146,38 @@ const DistrictSundayServiceReport: React.FC = () => {
   }, [monthDates]);
 
   const getColumns = useCallback(() => {
+    const isMobile = !screens.md;
+    const baseWidth = screens.lg ? 120 : screens.md ? 100 : 80;
+    
     const columns: any[] = [];
     const fields = [
       { key: "attendance", title: "Attendance", color: "bg-blue-50" },
-      { key: "sbsAttendance", title: "SBS Attendance", color: "bg-green-50" },
+      { key: "sbsAttendance", title: "SBS", color: "bg-green-50" },
       { key: "visitors", title: "Visitors", color: "bg-yellow-50" },
       { key: "tithes", title: "Tithes (₦)", color: "bg-purple-50" },
       { key: "offerings", title: "Offerings (₦)", color: "bg-pink-50" },
-      { key: "specialOfferings", title: "Special Offerings (₦)", color: "bg-indigo-50" },
+      { key: "specialOfferings", title: "Special (₦)", color: "bg-indigo-50" },
       { key: "etf", title: "ETF (₦)", color: "bg-gray-50" },
-      { key: "pastorsWarfare", title: "Pastor's Warfare (₦)", color: "bg-gray-50" },
+      { key: "pastorsWarfare", title: "Pastor (₦)", color: "bg-gray-50" },
       { key: "vigil", title: "Vigil (₦)", color: "bg-gray-50" },
-      { key: "thanksgiving", title: "Thanksgiving (₦)", color: "bg-gray-50" },
+      { key: "thanksgiving", title: "Thanks (₦)", color: "bg-gray-50" },
       { key: "retirees", title: "Retirees (₦)", color: "bg-gray-50" },
-      { key: "missionaries", title: "Missionaries (₦)", color: "bg-gray-50" },
-      { key: "youthOfferings", title: "Youth Offerings (₦)", color: "bg-gray-50" },
-      { key: "districtSupport", title: "District Support (₦)", color: "bg-gray-50" },
+      { key: "missionaries", title: "Missions (₦)", color: "bg-gray-50" },
+      { key: "youthOfferings", title: "Youth (₦)", color: "bg-gray-50" },
+      { key: "districtSupport", title: "District (₦)", color: "bg-gray-50" },
     ];
 
     fields.forEach((field) => {
       columns.push({
         data: field.key,
         type: "numeric",
-        width: 120,
+        width: isMobile ? Math.max(70, baseWidth - 20) : baseWidth,
         renderer: (instance: any, td: any, row: number, col: number, prop: string, value: any) => {
           td.innerHTML = value || 0;
           td.style.textAlign = "right";
-          td.className = `htNumeric ${field.color}`;
+          td.style.padding = isMobile ? "4px 6px" : "8px 12px";
+          td.style.fontSize = isMobile ? "12px" : "14px";
+          td.className = `htNumeric ${field.color} hover:bg-opacity-80 transition-colors`;
         },
       });
     });
@@ -175,18 +186,42 @@ const DistrictSundayServiceReport: React.FC = () => {
       data: "total",
       type: "numeric",
       readOnly: true,
-      width: 120,
+      width: isMobile ? Math.max(70, baseWidth - 20) : baseWidth,
       renderer: (instance: any, td: any, row: number, col: number, prop: string, value: any) => {
         td.innerHTML = value ? value.toLocaleString() : 0;
         td.style.textAlign = "right";
-        td.className = "htNumeric bg-gray-200 font-semibold";
+        td.style.padding = isMobile ? "4px 6px" : "8px 12px";
+        td.style.fontSize = isMobile ? "12px" : "14px";
+        td.className = "htNumeric bg-gray-200 font-semibold hover:bg-gray-300 transition-colors";
       },
     });
 
     return columns;
-  }, []);
+  }, [screens]);
 
   const colHeaders = useMemo(() => {
+    const isMobile = !screens.md;
+    
+    if (isMobile) {
+      return [
+        "Attend",
+        "SBS",
+        "Visitors",
+        "Tithes",
+        "Offerings",
+        "Special",
+        "ETF",
+        "Pastor",
+        "Vigil",
+        "Thanks",
+        "Retirees",
+        "Missions",
+        "Youth",
+        "District",
+        "Total",
+      ];
+    }
+    
     return [
       "Attendance",
       "SBS Attendance",
@@ -197,7 +232,7 @@ const DistrictSundayServiceReport: React.FC = () => {
       ...customColumns.map((col) => col.name),
       "Total (₦)",
     ];
-  }, []);
+  }, [screens]);
 
   const fetchInitialRecords = useCallback(async () => {
     if (!assembly) {
@@ -458,75 +493,119 @@ const DistrictSundayServiceReport: React.FC = () => {
     }
   };
 
+  // Responsive table height
+  const tableHeight = useMemo(() => {
+    if (!screens.md) return 300;
+    if (!screens.lg) return 350;
+    return 400;
+  }, [screens]);
+
   return (
-    <div className="bg-white p-6 rounded-xl shadow-lg mb-6 border border-gray-100">
-      <div className="flex flex-col gap-6 mb-6">
-        <div className="flex items-center justify-between">
-          <h3 className="text-2xl font-bold text-gray-800 flex items-center gap-3">
-            <CalendarOutlined className="text-blue-600" /> District Sunday Service Report
-            <span className="text-base text-gray-500 ml-2">
-              {moment(selectedDate).format("MMMM YYYY")}
-            </span>
-          </h3>
+    <div className="bg-white p-4 sm:p-6 rounded-xl shadow-lg mb-6 border border-gray-100">
+      <div className="flex flex-col gap-4 sm:gap-6 mb-4 sm:mb-6">
+        {/* Header Section */}
+        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+          <div className="flex flex-col sm:flex-row sm:items-center gap-3">
+            <div className="flex items-center gap-3">
+              <div className="bg-blue-600 p-2 rounded-lg">
+                <CalendarOutlined className="text-white text-lg" />
+              </div>
+              <div>
+                <h3 className="text-xl sm:text-2xl font-bold text-gray-800">
+                  Sunday Service Report
+                </h3>
+                <p className="text-sm text-gray-500 mt-1">
+                  {moment(selectedDate).format("MMMM YYYY")} • {assembly}
+                </p>
+              </div>
+            </div>
+          </div>
+          
           <DatePicker.MonthPicker
             value={moment(selectedDate)}
             onChange={handleMonthChange}
             placeholder="Select month"
-            className="rounded-lg"
+            className="rounded-lg w-full sm:w-auto"
+            size={screens.xs ? "small" : "middle"}
           />
         </div>
-        <Row gutter={[16, 16]}>
-          <Col xs={24} sm={12} lg={6}>
-            <Card className="bg-gradient-to-r from-blue-500 to-blue-600 text-white rounded-xl shadow-md">
+
+        {/* Stats Cards */}
+        <Row gutter={[12, 12]}>
+          <Col xs={12} sm={12} lg={6}>
+            <Card 
+              className="bg-gradient-to-r from-blue-500 to-blue-600 text-white rounded-xl shadow-md h-full border-0"
+              bodyStyle={{ padding: screens.xs ? '16px 12px' : '20px' }}
+            >
               <Statistic
-                title="Total Attendance"
+                title={<span className="text-blue-100 text-sm">Total Attendance</span>}
                 value={summaryStats.totalAttendance}
-                valueStyle={{ color: "#fff" }}
+                valueStyle={{ color: "#fff", fontSize: screens.xs ? '20px' : '24px' }}
+                className="text-white"
               />
             </Card>
           </Col>
-          <Col xs={24} sm={12} lg={6}>
-            <Card className="bg-gradient-to-r from-green-500 to-green-600 text-white rounded-xl shadow-md">
+          <Col xs={12} sm={12} lg={6}>
+            <Card 
+              className="bg-gradient-to-r from-green-500 to-green-600 text-white rounded-xl shadow-md h-full border-0"
+              bodyStyle={{ padding: screens.xs ? '16px 12px' : '20px' }}
+            >
               <Statistic
-                title="Total SBS Attendance"
+                title={<span className="text-green-100 text-sm">SBS Attendance</span>}
                 value={summaryStats.totalSBSAttendance}
-                valueStyle={{ color: "#fff" }}
+                valueStyle={{ color: "#fff", fontSize: screens.xs ? '20px' : '24px' }}
               />
             </Card>
           </Col>
-          <Col xs={24} sm={12} lg={6}>
-            <Card className="bg-gradient-to-r from-purple-500 to-purple-600 text-white rounded-xl shadow-md">
+          <Col xs={12} sm={12} lg={6}>
+            <Card 
+              className="bg-gradient-to-r from-purple-500 to-purple-600 text-white rounded-xl shadow-md h-full border-0"
+              bodyStyle={{ padding: screens.xs ? '16px 12px' : '20px' }}
+            >
               <Statistic
-                title="Total Tithes"
+                title={<span className="text-purple-100 text-sm">Total Tithes</span>}
                 value={summaryStats.totalTithes}
                 prefix="₦"
-                precision={2}
-                valueStyle={{ color: "#fff" }}
+                precision={0}
+                valueStyle={{ color: "#fff", fontSize: screens.xs ? '20px' : '24px' }}
               />
             </Card>
           </Col>
-          <Col xs={24} sm={12} lg={6}>
-            <Card className="bg-gradient-to-r from-pink-500 to-pink-600 text-white rounded-xl shadow-md">
+          <Col xs={12} sm={12} lg={6}>
+            <Card 
+              className="bg-gradient-to-r from-pink-500 to-pink-600 text-white rounded-xl shadow-md h-full border-0"
+              bodyStyle={{ padding: screens.xs ? '16px 12px' : '20px' }}
+            >
               <Statistic
-                title="Total Offerings"
+                title={<span className="text-pink-100 text-sm">Total Offerings</span>}
                 value={summaryStats.totalOfferings}
                 prefix="₦"
-                precision={2}
-                valueStyle={{ color: "#fff" }}
+                precision={0}
+                valueStyle={{ color: "#fff", fontSize: screens.xs ? '20px' : '24px' }}
               />
             </Card>
           </Col>
         </Row>
       </div>
 
-      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-end gap-4 mb-6">
-        <Space wrap size={[8, 8]} className="flex lg:justify-end flex-wrap gap-2">
+      {/* Action Buttons */}
+      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 mb-4 sm:mb-6">
+        <div className="text-sm text-gray-500">
+          {screens.md && "Click on cells to edit values. Totals are calculated automatically."}
+        </div>
+        <Space 
+          wrap 
+          size={[8, 8]} 
+          className={`flex ${screens.xs ? 'justify-stretch' : 'justify-end'} flex-wrap gap-2`}
+        >
           <Button
             icon={<FileExcelOutlined />}
             onClick={handleExport}
-            className="bg-green-600 text-white hover:bg-green-700 rounded-lg"
+            size={screens.xs ? "small" : "middle"}
+            className="bg-green-600 text-white hover:bg-green-700 rounded-lg flex items-center gap-1"
+            block={screens.xs}
           >
-            Export
+            {screens.sm && "Export"}
           </Button>
           <Popconfirm
             title="Reset the sheet?"
@@ -538,9 +617,11 @@ const DistrictSundayServiceReport: React.FC = () => {
           >
             <Button
               icon={<ReloadOutlined />}
-              className="bg-red-600 text-white hover:bg-red-700 rounded-lg"
+              size={screens.xs ? "small" : "middle"}
+              className="bg-red-600 text-white hover:bg-red-700 rounded-lg flex items-center gap-1"
+              block={screens.xs}
             >
-              Reset
+              {screens.sm && "Reset"}
             </Button>
           </Popconfirm>
           <Button
@@ -548,36 +629,56 @@ const DistrictSundayServiceReport: React.FC = () => {
             icon={<SaveOutlined />}
             onClick={handleSave}
             loading={loading}
-            className="bg-blue-600 hover:bg-blue-700 rounded-lg"
+            size={screens.xs ? "small" : "middle"}
+            className="bg-blue-600 hover:bg-blue-700 rounded-lg flex items-center gap-1"
+            block={screens.xs}
           >
-            Save
+            {screens.sm && "Save"}
           </Button>
         </Space>
       </div>
 
-      <div
-        className="handsontable-container border rounded-lg shadow-sm bg-white"
-        style={{ height: "400px", overflow: "auto" }}
-      >
-        <HotTable
-          ref={hotRef}
-          data={data}
-          colHeaders={colHeaders}
-          columns={getColumns()}
-          rowHeaders={rowHeaders}
-          afterChange={afterChange}
-          stretchH="all"
-          autoRowSize={true}
-          autoColumnSize={false}
-          minSpareRows={0}
-          contextMenu={true}
-          licenseKey="non-commercial-and-evaluation"
-          className="htCore text-sm font-medium"
-        />
+      {/* Data Table */}
+      <div className="relative">
+        {loading && (
+          <div className="absolute inset-0 bg-white bg-opacity-80 flex items-center justify-center z-10 rounded-lg">
+            <Spin size="large" tip="Loading data..." />
+          </div>
+        )}
+        <div
+          className="handsontable-container border rounded-lg shadow-sm bg-white overflow-hidden"
+          style={{ 
+            height: tableHeight,
+            fontSize: screens.xs ? '12px' : '14px'
+          }}
+        >
+          <HotTable
+            ref={hotRef}
+            data={data}
+            colHeaders={colHeaders}
+            columns={getColumns()}
+            rowHeaders={rowHeaders}
+            afterChange={afterChange}
+            stretchH="all"
+            autoRowSize={true}
+            autoColumnSize={false}
+            minSpareRows={0}
+            contextMenu={true}
+            licenseKey="non-commercial-and-evaluation"
+            className="htCore custom-handsontable"
+            rowHeaderWidth={screens.xs ? 80 : 100}
+          />
+        </div>
       </div>
 
+      {/* Save Modal */}
       <Modal
-        title="Confirm Save"
+        title={
+          <div className="flex items-center gap-2">
+            <UserOutlined className="text-blue-600" />
+            <span>Confirm Save</span>
+          </div>
+        }
         open={isModalOpen}
         onOk={confirmSave}
         onCancel={() => {
@@ -585,27 +686,55 @@ const DistrictSundayServiceReport: React.FC = () => {
           form.resetFields();
           setSubmittedBy("");
         }}
-        okText="Save"
+        okText="Save Report"
         cancelText="Cancel"
-        okButtonProps={{ type: "primary", loading, className: "bg-blue-600 rounded-lg" }}
-        cancelButtonProps={{ className: "rounded-lg" }}
+        okButtonProps={{ 
+          type: "primary", 
+          loading, 
+          className: "bg-blue-600 hover:bg-blue-700 rounded-lg h-10" 
+        }}
+        cancelButtonProps={{ className: "rounded-lg h-10" }}
+        width={screens.xs ? 350 : 500}
       >
-        <p>Are you sure you want to save this month’s Sunday Service Report? Only filled rows will be saved.</p>
-        <Form form={form} layout="vertical" className="mt-4">
-          <Form.Item
-            name="submittedBy"
-            label="Submitted By (Full Name)"
-            rules={[{ required: true, message: "Please enter your full name" }]}
-          >
-            <Input
-              placeholder="Enter your full name"
-              value={submittedBy}
-              onChange={(e) => setSubmittedBy(e.target.value)}
-              className="rounded-lg"
-            />
-          </Form.Item>
-        </Form>
+        <div className="space-y-4">
+          <p className="text-gray-600">
+            Are you sure you want to save this month's Sunday Service Report? Only filled rows will be saved.
+          </p>
+          <Form form={form} layout="vertical" className="mt-4">
+            <Form.Item
+              name="submittedBy"
+              label="Submitted By (Full Name)"
+              rules={[{ required: true, message: "Please enter your full name" }]}
+            >
+              <Input
+                placeholder="Enter your full name"
+                value={submittedBy}
+                onChange={(e) => setSubmittedBy(e.target.value)}
+                className="rounded-lg h-10"
+                prefix={<UserOutlined className="text-gray-400" />}
+              />
+            </Form.Item>
+          </Form>
+        </div>
       </Modal>
+
+      <style jsx global>{`
+        .custom-handsontable .htCore {
+          font-size: ${screens.xs ? '12px' : '14px'};
+        }
+        .custom-handsontable th {
+          font-weight: 600;
+          background-color: #f8fafc;
+          padding: ${screens.xs ? '6px 8px' : '8px 12px'};
+          white-space: ${screens.xs ? 'normal' : 'nowrap'};
+        }
+        .custom-handsontable td {
+          transition: background-color 0.2s;
+        }
+        .custom-handsontable td:hover {
+          background-color: #f1f5f9 !important;
+        }
+      `}</style>
     </div>
   );
 };
