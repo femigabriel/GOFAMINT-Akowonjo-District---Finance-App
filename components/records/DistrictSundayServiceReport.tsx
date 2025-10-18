@@ -14,7 +14,6 @@ import {
   Col,
   Popconfirm,
   DatePicker,
-  Tooltip,
   Form,
   Input,
 } from "antd";
@@ -48,7 +47,7 @@ interface SundayServiceRow {
   youthOfferings: number;
   districtSupport: number;
   total: number;
-  [key: string]: number; // Index signature for dynamic access
+  [key: string]: number;
 }
 
 interface SundayServiceRecord {
@@ -68,7 +67,7 @@ interface SundayServiceRecord {
   youthOfferings: number;
   districtSupport: number;
   total: number;
-  [key: string]: string | number; // Index signature for API payload
+  [key: string]: string | number;
 }
 
 interface CustomColumn {
@@ -86,7 +85,6 @@ const DistrictSundayServiceReport: React.FC = () => {
   const [form] = Form.useForm();
   const [selectedDate, setSelectedDate] = useState<Date>(new Date());
 
-  // Predefined custom columns
   const customColumns: CustomColumn[] = [
     { name: "ETF", key: "etf" },
     { name: "Pastor's Warfare", key: "pastorsWarfare" },
@@ -98,7 +96,6 @@ const DistrictSundayServiceReport: React.FC = () => {
     { name: "District Support", key: "districtSupport" },
   ];
 
-  // Update selectedDate when the month changes
   useEffect(() => {
     const interval = setInterval(() => {
       const now = new Date();
@@ -109,7 +106,6 @@ const DistrictSundayServiceReport: React.FC = () => {
     return () => clearInterval(interval);
   }, [selectedDate]);
 
-  // Get Sundays of the selected month
   const getMonthDates = useCallback((date: Date) => {
     const start = startOfMonth(date);
     const end = endOfMonth(date);
@@ -123,7 +119,6 @@ const DistrictSundayServiceReport: React.FC = () => {
     return monthDates.map((date, i) => `Week ${i + 1} (${format(date, "d/M")})`);
   }, [monthDates]);
 
-  // Initialize empty data for the table
   const initializeEmptyData = useCallback(() => {
     return Array.from({ length: monthDates.length }, () => ({
       attendance: 0,
@@ -144,7 +139,6 @@ const DistrictSundayServiceReport: React.FC = () => {
     }));
   }, [monthDates]);
 
-  // Define table columns
   const getColumns = useCallback(() => {
     const columns: any[] = [];
     const fields = [
@@ -205,7 +199,6 @@ const DistrictSundayServiceReport: React.FC = () => {
     ];
   }, []);
 
-  // Fetch initial records from the API
   const fetchInitialRecords = useCallback(async () => {
     if (!assembly) {
       setData(initializeEmptyData());
@@ -259,7 +252,6 @@ const DistrictSundayServiceReport: React.FC = () => {
     fetchInitialRecords();
   }, [fetchInitialRecords]);
 
-  // Handle table changes
   const afterChange = useCallback(
     (changes: CellChange[] | null, source: ChangeSource) => {
       if (changes && source !== "loadData") {
@@ -288,46 +280,32 @@ const DistrictSundayServiceReport: React.FC = () => {
     []
   );
 
-  // Calculate summary statistics
   const summaryStats = useMemo(() => {
     const stats = {
       totalAttendance: 0,
       totalSBSAttendance: 0,
-      totalVisitors: 0,
       totalTithes: 0,
       totalOfferings: 0,
-      totalSpecialOfferings: 0,
-      totalETF: 0,
-      totalPastorsWarfare: 0,
-      totalVigil: 0,
-      totalThanksgiving: 0,
-      totalRetirees: 0,
-      totalMissionaries: 0,
-      totalYouthOfferings: 0,
-      totalDistrictSupport: 0,
-      grandTotal: 0,
     };
     data.forEach((row) => {
       stats.totalAttendance += row.attendance || 0;
       stats.totalSBSAttendance += row.sbsAttendance || 0;
-      stats.totalVisitors += row.visitors || 0;
       stats.totalTithes += row.tithes || 0;
-      stats.totalOfferings += row.offerings || 0;
-      stats.totalSpecialOfferings += row.specialOfferings || 0;
-      stats.totalETF += row.etf || 0;
-      stats.totalPastorsWarfare += row.pastorsWarfare || 0;
-      stats.totalVigil += row.vigil || 0;
-      stats.totalThanksgiving += row.thanksgiving || 0;
-      stats.totalRetirees += row.retirees || 0;
-      stats.totalMissionaries += row.missionaries || 0;
-      stats.totalYouthOfferings += row.youthOfferings || 0;
-      stats.totalDistrictSupport += row.districtSupport || 0;
-      stats.grandTotal += row.total || 0;
+      stats.totalOfferings +=
+        (row.offerings || 0) +
+        (row.specialOfferings || 0) +
+        (row.etf || 0) +
+        (row.pastorsWarfare || 0) +
+        (row.vigil || 0) +
+        (row.thanksgiving || 0) +
+        (row.retirees || 0) +
+        (row.missionaries || 0) +
+        (row.youthOfferings || 0) +
+        (row.districtSupport || 0);
     });
     return stats;
   }, [data]);
 
-  // Handle save action
   const handleSave = () => {
     if (!assembly) {
       notification.error({
@@ -339,7 +317,6 @@ const DistrictSundayServiceReport: React.FC = () => {
     setIsModalOpen(true);
   };
 
-  // Confirm and save data
   const confirmSave = async () => {
     try {
       await form.validateFields();
@@ -428,7 +405,6 @@ const DistrictSundayServiceReport: React.FC = () => {
     }
   };
 
-  // Handle reset action
   const handleClear = () => {
     Modal.confirm({
       title: "Reset Sheet",
@@ -440,7 +416,6 @@ const DistrictSundayServiceReport: React.FC = () => {
     });
   };
 
-  // Handle export to CSV
   const handleExport = () => {
     const headers = ["Week", ...colHeaders];
     const csvData = [
@@ -477,7 +452,6 @@ const DistrictSundayServiceReport: React.FC = () => {
     URL.revokeObjectURL(url);
   };
 
-  // Handle month change
   const handleMonthChange = (date: moment.Moment | null) => {
     if (date) {
       setSelectedDate(date.toDate());
@@ -502,7 +476,7 @@ const DistrictSundayServiceReport: React.FC = () => {
           />
         </div>
         <Row gutter={[16, 16]}>
-          <Col xs={24} sm={12} lg={8}>
+          <Col xs={24} sm={12} lg={6}>
             <Card className="bg-gradient-to-r from-blue-500 to-blue-600 text-white rounded-xl shadow-md">
               <Statistic
                 title="Total Attendance"
@@ -511,7 +485,7 @@ const DistrictSundayServiceReport: React.FC = () => {
               />
             </Card>
           </Col>
-          <Col xs={24} sm={12} lg={8}>
+          <Col xs={24} sm={12} lg={6}>
             <Card className="bg-gradient-to-r from-green-500 to-green-600 text-white rounded-xl shadow-md">
               <Statistic
                 title="Total SBS Attendance"
@@ -520,16 +494,7 @@ const DistrictSundayServiceReport: React.FC = () => {
               />
             </Card>
           </Col>
-          <Col xs={24} sm={12} lg={8}>
-            <Card className="bg-gradient-to-r from-yellow-500 to-yellow-600 text-white rounded-xl shadow-md">
-              <Statistic
-                title="Total Visitors"
-                value={summaryStats.totalVisitors}
-                valueStyle={{ color: "#fff" }}
-              />
-            </Card>
-          </Col>
-          <Col xs={24} sm={12} lg={8}>
+          <Col xs={24} sm={12} lg={6}>
             <Card className="bg-gradient-to-r from-purple-500 to-purple-600 text-white rounded-xl shadow-md">
               <Statistic
                 title="Total Tithes"
@@ -540,110 +505,11 @@ const DistrictSundayServiceReport: React.FC = () => {
               />
             </Card>
           </Col>
-          <Col xs={24} sm={12} lg={8}>
+          <Col xs={24} sm={12} lg={6}>
             <Card className="bg-gradient-to-r from-pink-500 to-pink-600 text-white rounded-xl shadow-md">
               <Statistic
                 title="Total Offerings"
                 value={summaryStats.totalOfferings}
-                prefix="₦"
-                precision={2}
-                valueStyle={{ color: "#fff" }}
-              />
-            </Card>
-          </Col>
-          <Col xs={24} sm={12} lg={8}>
-            <Card className="bg-gradient-to-r from-indigo-500 to-indigo-600 text-white rounded-xl shadow-md">
-              <Statistic
-                title="Total Special Offerings"
-                value={summaryStats.totalSpecialOfferings}
-                prefix="₦"
-                precision={2}
-                valueStyle={{ color: "#fff" }}
-              />
-            </Card>
-          </Col>
-          <Col xs={24} sm={12} lg={8}>
-            <Card className="bg-gradient-to-r from-gray-500 to-gray-600 text-white rounded-xl shadow-md">
-              <Statistic
-                title="Total ETF"
-                value={summaryStats.totalETF}
-                prefix="₦"
-                precision={2}
-                valueStyle={{ color: "#fff" }}
-              />
-            </Card>
-          </Col>
-          <Col xs={24} sm={12} lg={8}>
-            <Card className="bg-gradient-to-r from-gray-500 to-gray-600 text-white rounded-xl shadow-md">
-              <Statistic
-                title="Total Pastor's Warfare"
-                value={summaryStats.totalPastorsWarfare}
-                prefix="₦"
-                precision={2}
-                valueStyle={{ color: "#fff" }}
-              />
-            </Card>
-          </Col>
-          <Col xs={24} sm={12} lg={8}>
-            <Card className="bg-gradient-to-r from-gray-500 to-gray-600 text-white rounded-xl shadow-md">
-              <Statistic
-                title="Total Vigil"
-                value={summaryStats.totalVigil}
-                prefix="₦"
-                precision={2}
-                valueStyle={{ color: "#fff" }}
-              />
-            </Card>
-          </Col>
-          <Col xs={24} sm={12} lg={8}>
-            <Card className="bg-gradient-to-r from-gray-500 to-gray-600 text-white rounded-xl shadow-md">
-              <Statistic
-                title="Total Thanksgiving"
-                value={summaryStats.totalThanksgiving}
-                prefix="₦"
-                precision={2}
-                valueStyle={{ color: "#fff" }}
-              />
-            </Card>
-          </Col>
-          <Col xs={24} sm={12} lg={8}>
-            <Card className="bg-gradient-to-r from-gray-500 to-gray-600 text-white rounded-xl shadow-md">
-              <Statistic
-                title="Total Retirees"
-                value={summaryStats.totalRetirees}
-                prefix="₦"
-                precision={2}
-                valueStyle={{ color: "#fff" }}
-              />
-            </Card>
-          </Col>
-          <Col xs={24} sm={12} lg={8}>
-            <Card className="bg-gradient-to-r from-gray-500 to-gray-600 text-white rounded-xl shadow-md">
-              <Statistic
-                title="Total Missionaries"
-                value={summaryStats.totalMissionaries}
-                prefix="₦"
-                precision={2}
-                valueStyle={{ color: "#fff" }}
-              />
-            </Card>
-          </Col>
-          <Col xs={24} sm={12} lg={8}>
-            <Card className="bg-gradient-to-r from-gray-500 to-gray-600 text-white rounded-xl shadow-md">
-              <Statistic
-                title="Total Youth Offerings"
-                value={summaryStats.totalYouthOfferings}
-                prefix="₦"
-                precision={2}
-                valueStyle={{ color: "#fff" }}
-              />
-            </Card>
-          </Col>
-          <Col xs={24} sm={12} lg={8}>
-            <Card className="bg-gradient-to-r from-gray-500 to-gray-600 text-white rounded-xl shadow-md">
-              <Statistic
-                title="Total District Support"
-                value={summaryStats.totalDistrictSupport}
                 prefix="₦"
                 precision={2}
                 valueStyle={{ color: "#fff" }}
@@ -655,32 +521,28 @@ const DistrictSundayServiceReport: React.FC = () => {
 
       <div className="flex flex-col sm:flex-row sm:items-center sm:justify-end gap-4 mb-6">
         <Space wrap size={[8, 8]} className="flex lg:justify-end flex-wrap gap-2">
-          <Tooltip title="Export to Excel">
+          <Button
+            icon={<FileExcelOutlined />}
+            onClick={handleExport}
+            className="bg-green-600 text-white hover:bg-green-700 rounded-lg"
+          >
+            Export
+          </Button>
+          <Popconfirm
+            title="Reset the sheet?"
+            description="This will clear all data and reset to empty records."
+            onConfirm={handleClear}
+            okText="Yes"
+            cancelText="No"
+            okButtonProps={{ danger: true, className: "bg-red-600 text-white rounded-lg" }}
+          >
             <Button
-              icon={<FileExcelOutlined />}
-              onClick={handleExport}
-              className="bg-green-600 text-white hover:bg-green-700 rounded-lg"
+              icon={<ReloadOutlined />}
+              className="bg-red-600 text-white hover:bg-red-700 rounded-lg"
             >
-              Export
+              Reset
             </Button>
-          </Tooltip>
-          <Tooltip title="Reset to empty records">
-            <Popconfirm
-              title="Reset the sheet?"
-              description="This will clear all data and reset to empty records."
-              onConfirm={handleClear}
-              okText="Yes"
-              cancelText="No"
-              okButtonProps={{ danger: true, className: "bg-red-600 text-white rounded-lg" }}
-            >
-              <Button
-                icon={<ReloadOutlined />}
-                className="bg-red-600 text-white hover:bg-red-700 rounded-lg"
-              >
-                Reset
-              </Button>
-            </Popconfirm>
-          </Tooltip>
+          </Popconfirm>
           <Button
             type="primary"
             icon={<SaveOutlined />}
