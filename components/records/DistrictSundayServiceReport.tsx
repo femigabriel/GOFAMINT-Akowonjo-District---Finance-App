@@ -30,11 +30,11 @@ import {
   DollarOutlined,
   GiftOutlined,
 } from "@ant-design/icons";
-import { format, startOfMonth, endOfMonth, eachWeekOfInterval, isSameMonth } from "date-fns";
-import moment from "moment";
+import { format, startOfMonth, endOfMonth, eachWeekOfInterval, isSunday } from "date-fns";
 import { registerAllCellTypes } from "handsontable/cellTypes";
 import type { CellChange, ChangeSource } from "handsontable/common";
 import { useAuth } from "@/context/AuthContext";
+import moment from "moment";
 
 registerAllCellTypes();
 
@@ -59,6 +59,7 @@ interface SundayServiceRow {
 
 interface SundayServiceRecord {
   week: string;
+  date: string;
   attendance: number;
   sbsAttendance: number;
   visitors: number;
@@ -106,31 +107,22 @@ const DistrictSundayServiceReport: React.FC = () => {
     { name: "District Support", key: "districtSupport" },
   ];
 
-  useEffect(() => {
-    const interval = setInterval(() => {
-      const now = new Date();
-      if (!isSameMonth(now, selectedDate)) {
-        setSelectedDate(now);
-      }
-    }, 24 * 60 * 60 * 1000);
-    return () => clearInterval(interval);
-  }, [selectedDate]);
-
-  const getMonthDates = useCallback((date: Date) => {
+  // Get all Sundays in the selected month
+  const getMonthSundays = useCallback((date: Date) => {
     const start = startOfMonth(date);
     const end = endOfMonth(date);
-    const sundays = eachWeekOfInterval({ start, end }, { weekStartsOn: 0 });
-    return sundays.slice(0, 5);
+    const days = eachWeekOfInterval({ start, end }, { weekStartsOn: 0 });
+    return days.filter((d) => isSunday(d)).slice(0, 5); // Limit to max 5 Sundays
   }, []);
 
-  const monthDates = useMemo(() => getMonthDates(selectedDate), [selectedDate, getMonthDates]);
+  const monthSundays = useMemo(() => getMonthSundays(selectedDate), [selectedDate, getMonthSundays]);
 
   const rowHeaders = useMemo(() => {
-    return monthDates.map((date, i) => `Week ${i + 1} (${format(date, "d/M")})`);
-  }, [monthDates]);
+    return monthSundays.map((date, i) => `Week ${i + 1} (${format(date, "d/M")})`);
+  }, [monthSundays]);
 
   const initializeEmptyData = useCallback(() => {
-    return Array.from({ length: monthDates.length }, () => ({
+    return Array.from({ length: monthSundays.length }, () => ({
       attendance: 0,
       sbsAttendance: 0,
       visitors: 0,
@@ -147,7 +139,7 @@ const DistrictSundayServiceReport: React.FC = () => {
       districtSupport: 0,
       total: 0,
     }));
-  }, [monthDates]);
+  }, [monthSundays]);
 
   const getColumns = useCallback(() => {
     const isMobile = !screens.md;
@@ -161,14 +153,11 @@ const DistrictSundayServiceReport: React.FC = () => {
       { key: "tithes", title: "Tithes (₦)", color: "bg-purple-50" },
       { key: "offerings", title: "Offerings (₦)", color: "bg-pink-50" },
       { key: "specialOfferings", title: "Special (₦)", color: "bg-indigo-50" },
-      { key: "etf", title: "ETF (₦)", color: "bg-gray-50" },
-      { key: "pastorsWarfare", title: "Pastor (₦)", color: "bg-gray-50" },
-      { key: "vigil", title: "Vigil (₦)", color: "bg-gray-50" },
-      { key: "thanksgiving", title: "Thanks (₦)", color: "bg-gray-50" },
-      { key: "retirees", title: "Retirees (₦)", color: "bg-gray-50" },
-      { key: "missionaries", title: "Missions (₦)", color: "bg-gray-50" },
-      { key: "youthOfferings", title: "Youth (₦)", color: "bg-gray-50" },
-      { key: "districtSupport", title: "District (₦)", color: "bg-gray-50" },
+      ...customColumns.map((col) => ({
+        key: col.key,
+        title: col.name + " (₦)",
+        color: "bg-gray-50",
+      })),
     ];
 
     fields.forEach((field) => {
@@ -201,7 +190,7 @@ const DistrictSundayServiceReport: React.FC = () => {
     });
 
     return columns;
-  }, [screens]);
+  }, [screens, customColumns]);
 
   const colHeaders = useMemo(() => {
     const isMobile = !screens.md;
@@ -214,14 +203,7 @@ const DistrictSundayServiceReport: React.FC = () => {
         "Tithes",
         "Offerings",
         "Special",
-        "ETF",
-        "Pastor",
-        "Vigil",
-        "Thanks",
-        "Retirees",
-        "Missions",
-        "Youth",
-        "District",
+        ...customColumns.map((col) => col.name.split(" ")[0]),
         "Total",
       ];
     }
@@ -233,10 +215,10 @@ const DistrictSundayServiceReport: React.FC = () => {
       "Tithes (₦)",
       "Offerings (₦)",
       "Special Offerings (₦)",
-      ...customColumns.map((col) => col.name),
+      ...customColumns.map((col) => col.name + " (₦)"),
       "Total (₦)",
     ];
-  }, [screens]);
+  }, [screens, customColumns]);
 
   const fetchInitialRecords = useCallback(async () => {
     if (!assembly) {
@@ -246,7 +228,7 @@ const DistrictSundayServiceReport: React.FC = () => {
     }
     setLoading(true);
     try {
-      const month = moment(selectedDate).format("MMMM-YYYY");
+      const month = format(selectedDate, "MMMM-yyyy");
       const response = await fetch(
         `/api/sunday-service-reports?assembly=${encodeURIComponent(assembly)}&month=${encodeURIComponent(month)}`
       );
@@ -254,27 +236,45 @@ const DistrictSundayServiceReport: React.FC = () => {
         throw new Error(`HTTP error ${response.status}`);
       }
       const { records } = await response.json();
-      const filledData: SundayServiceRow[] = [...records];
-      while (filledData.length < monthDates.length) {
-        filledData.push({
-          attendance: 0,
-          sbsAttendance: 0,
-          visitors: 0,
-          tithes: 0,
-          offerings: 0,
-          specialOfferings: 0,
-          etf: 0,
-          pastorsWarfare: 0,
-          vigil: 0,
-          thanksgiving: 0,
-          retirees: 0,
-          missionaries: 0,
-          youthOfferings: 0,
-          districtSupport: 0,
-          total: 0,
-        });
-      }
-      setData(filledData.slice(0, monthDates.length));
+      const filledData: SundayServiceRow[] = monthSundays.map((sunday, index) => {
+        const record = records.find((r: SundayServiceRecord) => r.date === format(sunday, "yyyy-MM-dd"));
+        return record
+          ? {
+              attendance: record.attendance || 0,
+              sbsAttendance: record.sbsAttendance || 0,
+              visitors: record.visitors || 0,
+              tithes: record.tithes || 0,
+              offerings: record.offerings || 0,
+              specialOfferings: record.specialOfferings || 0,
+              etf: record.etf || 0,
+              pastorsWarfare: record.pastorsWarfare || 0,
+              vigil: record.vigil || 0,
+              thanksgiving: record.thanksgiving || 0,
+              retirees: record.retirees || 0,
+              missionaries: record.missionaries || 0,
+              youthOfferings: record.youthOfferings || 0,
+              districtSupport: record.districtSupport || 0,
+              total: record.total || 0,
+            }
+          : {
+              attendance: 0,
+              sbsAttendance: 0,
+              visitors: 0,
+              tithes: 0,
+              offerings: 0,
+              specialOfferings: 0,
+              etf: 0,
+              pastorsWarfare: 0,
+              vigil: 0,
+              thanksgiving: 0,
+              retirees: 0,
+              missionaries: 0,
+              youthOfferings: 0,
+              districtSupport: 0,
+              total: 0,
+            };
+      });
+      setData(filledData);
     } catch (error) {
       console.error("Error fetching initial records:", error);
       notification.error({
@@ -285,7 +285,7 @@ const DistrictSundayServiceReport: React.FC = () => {
     } finally {
       setLoading(false);
     }
-  }, [assembly, selectedDate, initializeEmptyData, monthDates]);
+  }, [assembly, selectedDate, initializeEmptyData, monthSundays]);
 
   useEffect(() => {
     fetchInitialRecords();
@@ -299,6 +299,7 @@ const DistrictSundayServiceReport: React.FC = () => {
           changes.forEach(([row, prop, , newValue]) => {
             newData[row] = { ...newData[row], [prop as string]: Number(newValue) || 0 };
             const rowData = newData[row];
+            // Exclude attendance fields from total
             newData[row].total =
               (rowData.tithes || 0) +
               (rowData.offerings || 0) +
@@ -323,12 +324,14 @@ const DistrictSundayServiceReport: React.FC = () => {
     const stats = {
       totalAttendance: 0,
       totalSBSAttendance: 0,
+      totalVisitors: 0,
       totalTithes: 0,
       totalOfferings: 0,
     };
     data.forEach((row) => {
       stats.totalAttendance += row.attendance || 0;
       stats.totalSBSAttendance += row.sbsAttendance || 0;
+      stats.totalVisitors += row.visitors || 0;
       stats.totalTithes += row.tithes || 0;
       stats.totalOfferings +=
         (row.offerings || 0) +
@@ -363,6 +366,7 @@ const DistrictSundayServiceReport: React.FC = () => {
       const filledData: SundayServiceRecord[] = data
         .map((row, index) => ({
           week: `Week ${index + 1}`,
+          date: format(monthSundays[index], "yyyy-MM-dd"),
           attendance: row.attendance,
           sbsAttendance: row.sbsAttendance,
           visitors: row.visitors,
@@ -381,9 +385,6 @@ const DistrictSundayServiceReport: React.FC = () => {
         }))
         .filter(
           (r) =>
-            r.attendance > 0 ||
-            r.sbsAttendance > 0 ||
-            r.visitors > 0 ||
             r.tithes > 0 ||
             r.offerings > 0 ||
             r.specialOfferings > 0 ||
@@ -394,7 +395,10 @@ const DistrictSundayServiceReport: React.FC = () => {
             r.retirees > 0 ||
             r.missionaries > 0 ||
             r.youthOfferings > 0 ||
-            r.districtSupport > 0
+            r.districtSupport > 0 ||
+            r.attendance > 0 ||
+            r.sbsAttendance > 0 ||
+            r.visitors > 0
         );
 
       if (filledData.length === 0) {
@@ -413,7 +417,7 @@ const DistrictSundayServiceReport: React.FC = () => {
         body: JSON.stringify({
           assembly,
           submittedBy,
-          month: moment(selectedDate).format("MMMM-YYYY"),
+          month: format(selectedDate, "MMMM-yyyy"),
           records: filledData,
         }),
       });
@@ -451,17 +455,18 @@ const DistrictSundayServiceReport: React.FC = () => {
       okText: "Yes, Reset",
       cancelText: "Cancel",
       okButtonProps: { danger: true, className: "bg-red-600 text-white rounded-lg" },
-      onOk: () => fetchInitialRecords(),
+      onOk: () => setData(initializeEmptyData()),
     });
   };
 
   const handleExport = () => {
-    const headers = ["Week", ...colHeaders];
+    const headers = ["Week", "Date", ...colHeaders];
     const csvData = [
       headers.join(","),
       ...data.map((row, index) => {
         const rowData: (string | number)[] = [
           `Week ${index + 1}`,
+          format(monthSundays[index], "yyyy-MM-dd"),
           row.attendance || 0,
           row.sbsAttendance || 0,
           row.visitors || 0,
@@ -486,7 +491,7 @@ const DistrictSundayServiceReport: React.FC = () => {
     const url = URL.createObjectURL(blob);
     const link = document.createElement("a");
     link.href = url;
-    link.setAttribute("download", `SundayServiceReport-${moment(selectedDate).format("MMMM-YYYY")}.csv`);
+    link.setAttribute("download", `SundayServiceReport-${format(selectedDate, "MMMM-yyyy")}.csv`);
     link.click();
     URL.revokeObjectURL(url);
   };
@@ -517,7 +522,7 @@ const DistrictSundayServiceReport: React.FC = () => {
                   Sunday Service Report
                 </h3>
                 <p className="text-sm text-gray-500 mt-1">
-                  {moment(selectedDate).format("MMMM YYYY")} • {assembly}
+                  {format(selectedDate, "MMMM yyyy")} • {assembly}
                 </p>
               </div>
             </div>
@@ -529,6 +534,7 @@ const DistrictSundayServiceReport: React.FC = () => {
             placeholder="Select month"
             className="rounded-lg w-full sm:w-auto"
             size={screens.xs ? "small" : "middle"}
+            allowClear={false}
           />
         </div>
 
@@ -564,6 +570,23 @@ const DistrictSundayServiceReport: React.FC = () => {
                   </span>
                 }
                 value={summaryStats.totalSBSAttendance}
+                valueStyle={{ color: "#fff", fontSize: screens.xs ? "20px" : "24px" }}
+              />
+            </Card>
+          </Col>
+          <Col xs={12} sm={12} lg={6}>
+            <Card
+              className="bg-gradient-to-r from-yellow-500 to-yellow-600 text-white rounded-xl shadow-md h-full border-0"
+              bodyStyle={{ padding: screens.xs ? "16px 12px" : "20px" }}
+            >
+              <Statistic
+                title={
+                  <span className="text-yellow-100 text-sm flex items-center gap-2">
+                    <UserOutlined />
+                    Total Visitors
+                  </span>
+                }
+                value={summaryStats.totalVisitors}
                 valueStyle={{ color: "#fff", fontSize: screens.xs ? "20px" : "24px" }}
               />
             </Card>

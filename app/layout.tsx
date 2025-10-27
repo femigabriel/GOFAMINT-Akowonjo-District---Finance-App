@@ -4,6 +4,7 @@ import "antd/dist/reset.css";
 import "./globals.css";
 import { ConfigProvider, App as AntdApp } from "antd";
 import { AuthProvider } from "@/context/AuthContext";
+import { ThemeProvider } from "@/context/ThemeContext";
 
 export const metadata: Metadata = {
   title: "GOFAMINT Akowonjo District - Finance App",
@@ -41,7 +42,12 @@ export default function RootLayout({
           }}
         >
           <AntdApp>
-            <AuthProvider>{children}</AuthProvider>
+            <AuthProvider>
+                  <ThemeProvider>
+ {children}
+                  </ThemeProvider>
+             
+              </AuthProvider>
           </AntdApp>
         </ConfigProvider>
       </body>
