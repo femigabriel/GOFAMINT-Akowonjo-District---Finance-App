@@ -2,23 +2,17 @@
 "use client";
 
 import { Card, Table, Button, Tag, Space, Select, Statistic, Row, Col, message, Spin, Tabs, Progress, Tooltip } from "antd";
-import { DollarSign, Download, Filter, TrendingUp, TrendingDown, Users, Church, Calendar, Building2, Target } from "lucide-react";
+import { DollarSign, Download, Filter, Users, Church, Calendar, Building2, Target } from "lucide-react";
 import { useState, useEffect } from "react";
+import { assemblies as ASSEMBLIES } from "@/lib/assemblies";
 
 const { Option } = Select;
 const { TabPane } = Tabs;
-
-const ASSEMBLIES = [
-  "PPS", "Overcomers", "Beulah", "Jubilee", 
-  "Success", "Restoration", "Liberty", "RayPower"
-];
 
 const MONTHS = [
   "January", "February", "March", "April", "May", "June",
   "July", "August", "September", "October", "November", "December"
 ];
-
-const YEARS = ["2023", "2024", "2025", "2026"];
 
 interface FinancialSummary {
   totalIncome: number;
@@ -36,13 +30,30 @@ interface ReportData {
   rawData: any;
 }
 
+interface PerAssembly {
+  [key: string]: {
+    hasData: boolean;
+    lastUpdate: string | null;
+    summary: FinancialSummary;
+  };
+}
+
 export default function FinancialReports() {
+  // Generate dynamic years (last 5 to current +1)
+  const currentYear = new Date().getFullYear();
+  const YEARS = Array.from({ length: 7 }, (_, i) => (currentYear - 5 + i).toString());
+
+  // Set initial values to current date (live)
+  const currentMonthIndex = new Date().getMonth();
+  const currentMonth = MONTHS[currentMonthIndex];
+
   const [loading, setLoading] = useState(false);
   const [selectedAssembly, setSelectedAssembly] = useState<string>('all');
-  const [selectedMonth, setSelectedMonth] = useState<string>('October');
-  const [selectedYear, setSelectedYear] = useState<string>('2025');
+  const [selectedMonth, setSelectedMonth] = useState<string>(currentMonth);
+  const [selectedYear, setSelectedYear] = useState<string>(currentYear.toString());
   const [reportData, setReportData] = useState<ReportData | null>(null);
   const [summary, setSummary] = useState<FinancialSummary | null>(null);
+  const [perAssembly, setPerAssembly] = useState<PerAssembly | null>(null);
 
   useEffect(() => {
     fetchReports();
@@ -62,14 +73,22 @@ export default function FinancialReports() {
       if (result.success) {
         setReportData(result.data);
         setSummary(result.summary);
+        if (result.perAssembly) {
+          setPerAssembly(result.perAssembly);
+        }
       } else {
         message.error('Failed to fetch reports');
       }
     } catch (error) {
+      console.error('Fetch error:', error);
       message.error('Error fetching reports');
     } finally {
       setLoading(false);
     }
+  };
+
+  const handleAssemblyClick = (assembly: string) => {
+    setSelectedAssembly(assembly);
   };
 
   const handleDownloadExcel = () => {
@@ -85,8 +104,6 @@ export default function FinancialReports() {
     {
       title: 'Total Income',
       value: summary.totalIncome,
-      change: 12.5,
-      isPositive: true,
       color: '#10b981',
       prefix: '₦',
       progress: calculateProgress(summary.totalIncome),
@@ -96,8 +113,6 @@ export default function FinancialReports() {
     {
       title: 'Total Tithe',
       value: summary.totalTithe,
-      change: 8.2,
-      isPositive: true,
       color: '#3b82f6',
       prefix: '₦',
       progress: calculateProgress(summary.totalTithe, 500000),
@@ -107,8 +122,6 @@ export default function FinancialReports() {
     {
       title: 'Total Offering',
       value: summary.totalOffering,
-      change: 15.3,
-      isPositive: true,
       color: '#8b5cf6',
       prefix: '₦',
       progress: calculateProgress(summary.totalOffering, 300000),
@@ -118,8 +131,6 @@ export default function FinancialReports() {
     {
       title: 'Total Attendance',
       value: summary.totalAttendance,
-      change: 5.7,
-      isPositive: true,
       color: '#f59e0b',
       prefix: '',
       progress: calculateProgress(summary.totalAttendance, 2000),
@@ -226,12 +237,7 @@ export default function FinancialReports() {
     {
       title: 'Growth',
       key: 'growth',
-      render: (_: any, record: any) => (
-        <Tag color="green" className="flex items-center gap-1">
-          <TrendingUp size={12} />
-          +{record.metric === 'Main Service' ? '5.7' : record.metric === 'SBS Attendance' ? '3.2' : '8.1'}%
-        </Tag>
-      ),
+      render: () => null,
     }
   ];
 
@@ -346,6 +352,7 @@ export default function FinancialReports() {
               onChange={setSelectedYear}
               size="large"
             >
+              <Option value="all">All Years</Option>
               {YEARS.map(year => (
                 <Option key={year} value={year}>{year}</Option>
               ))}
@@ -402,10 +409,6 @@ export default function FinancialReports() {
                         strokeColor={stat.color}
                       />
                     </Tooltip>
-                    <Tag color={stat.isPositive ? 'green' : 'red'} className="flex items-center gap-1 ml-2">
-                      {stat.isPositive ? <TrendingUp size={12} /> : <TrendingDown size={12} />}
-                      {stat.change}%
-                    </Tag>
                   </div>
                 </Card>
               </Col>
@@ -521,8 +524,8 @@ export default function FinancialReports() {
             </Tabs>
           </Card>
 
-          {/* Assembly Status */}
-          {selectedAssembly === 'all' && (
+          {/* Assembly Status - only when viewing all */}
+          {selectedAssembly === 'all' && perAssembly && (
             <Card 
               title={
                 <div className="flex items-center gap-2">
@@ -533,31 +536,44 @@ export default function FinancialReports() {
               className="border-0 shadow-xl bg-white/80 backdrop-blur-sm mt-8"
             >
               <Row gutter={[16, 16]}>
-                {ASSEMBLIES.map((assembly, index) => (
-                  <Col xs={24} sm={12} lg={6} key={assembly}>
-                    <Card 
-                      size="small" 
-                      className="border-0 shadow-sm hover:shadow-md transition-shadow cursor-pointer"
-                      bodyStyle={{ padding: '16px' }}
-                    >
-                      <div className="flex items-center justify-between">
-                        <div className="flex items-center gap-3">
-                          <div 
-                            className="w-3 h-3 rounded-full"
-                            style={{
-                              backgroundColor: index % 2 === 0 ? '#10b981' : '#3b82f6'
-                            }}
-                          ></div>
-                          <span className="font-medium">{assembly}</span>
+                {ASSEMBLIES.map((assembly, index) => {
+                  const assData = perAssembly[assembly];
+                  const hasData = assData?.hasData || false;
+                  const lastUpdate = assData?.lastUpdate;
+                  const updateDate = lastUpdate ? new Date(lastUpdate).toLocaleDateString('en-US', { 
+                    month: 'long', 
+                    day: 'numeric', 
+                    year: 'numeric' 
+                  }) : 'No submissions';
+                  return (
+                    <Col xs={24} sm={12} lg={6} key={assembly}>
+                      <Card 
+                        size="small" 
+                        className="border-0 shadow-sm hover:shadow-md transition-shadow cursor-pointer"
+                        bodyStyle={{ padding: '16px' }}
+                        onClick={() => handleAssemblyClick(assembly)}
+                      >
+                        <div className="flex items-center justify-between">
+                          <div className="flex items-center gap-3">
+                            <div 
+                              className="w-3 h-3 rounded-full"
+                              style={{
+                                backgroundColor: index % 2 === 0 ? '#10b981' : '#3b82f6'
+                              }}
+                            ></div>
+                            <span className="font-medium">{assembly}</span>
+                          </div>
+                          <Tag color={hasData ? "green" : "default"}>
+                            {hasData ? "Submitted" : "Pending"}
+                          </Tag>
                         </div>
-                        <Tag color="green">Submitted</Tag>
-                      </div>
-                      <div className="mt-2 text-xs text-gray-500">
-                        Last update: {selectedMonth} 15, {selectedYear}
-                      </div>
-                    </Card>
-                  </Col>
-                ))}
+                        <div className="mt-2 text-xs text-gray-500">
+                          Last update: {updateDate}
+                        </div>
+                      </Card>
+                    </Col>
+                  );
+                })}
               </Row>
             </Card>
           )}
