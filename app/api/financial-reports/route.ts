@@ -6,6 +6,25 @@ import OfferingRecord from "@/models/OfferingRecord";
 import SundayServiceReport from "@/models/SundayServiceReport";
 import { assemblies } from "@/lib/assemblies";
 
+interface FinancialSummary {
+  totalIncome: number;
+  totalTithe: number;
+  totalOffering: number;
+  totalAttendance: number;
+  totalSBSAttendance: number;
+  totalVisitors: number;
+}
+
+interface AssemblyData {
+  hasData: boolean;
+  lastUpdate: string | null;
+  summary: FinancialSummary;
+}
+
+interface PerAssembly {
+  [key: string]: AssemblyData;
+}
+
 export async function GET(request: NextRequest) {
   try {
     await dbConnect("gof-akowonjo");
@@ -50,11 +69,10 @@ export async function GET(request: NextRequest) {
 
     let processedData = processFinancialData(titheRecords, offeringRecords, sundayServiceReports);
     let summary = generateSummary(processedData);
-    let perAssembly = null;
+    let perAssembly: PerAssembly | null = null;
 
     if (isAll) {
-      perAssembly = {};
-      assemblies.forEach((ass) => {
+      perAssembly = assemblies.reduce<PerAssembly>((acc, ass) => {
         const titheForAss = titheRecords.filter((r) => r.assembly === ass);
         const offeringForAss = offeringRecords.filter((r) => r.assembly === ass);
         const sundayForAss = sundayServiceReports.filter((r) => r.assembly === ass);
@@ -69,12 +87,14 @@ export async function GET(request: NextRequest) {
         ];
         const lastUpdate = timestamps.length > 0 ? Math.max(...timestamps) : 0;
 
-        perAssembly[ass] = {
+        acc[ass] = {
           hasData: titheForAss.length > 0 || offeringForAss.length > 0 || sundayForAss.length > 0,
           lastUpdate: lastUpdate > 0 ? new Date(lastUpdate).toISOString() : null,
           summary: assSummary,
         };
-      });
+
+        return acc;
+      }, {});
     }
 
     return NextResponse.json({
@@ -167,7 +187,7 @@ function processFinancialData(tithes: any[], offerings: any[], sundayServices: a
   };
 }
 
-function generateSummary(data: any) {
+function generateSummary(data: any): FinancialSummary {
   // Sum distinct sources; adjust for overlaps as needed (e.g., if Sunday includes tithes/offerings, subtract)
   const totalIncome =
     data.titheSummary.totalTithe +
