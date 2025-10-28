@@ -1,139 +1,181 @@
-// components/admin/ReportsContent.tsx
+// components/admin/FinancialReports.tsx
 "use client";
 
-import { Card, Table, Button, Tag, Space, DatePicker, Select, Statistic, Row, Col, message } from "antd";
-import { DollarSign, Download, Filter, TrendingUp, TrendingDown, Eye } from "lucide-react";
-import { useState } from "react";
+import { Card, Table, Button, Tag, Space, Select, Statistic, Row, Col, message, Spin, Tabs, Progress, Tooltip } from "antd";
+import { DollarSign, Download, Filter, TrendingUp, TrendingDown, Users, Church, Calendar, Building2, Target } from "lucide-react";
+import { useState, useEffect } from "react";
 
-const { RangePicker } = DatePicker;
 const { Option } = Select;
+const { TabPane } = Tabs;
 
-interface Report {
-  key: string;
-  title: string;
-  type: 'offering' | 'tithe' | 'donation' | 'expense';
-  period: string;
-  amount: number;
-  status: 'completed' | 'pending' | 'failed';
-  generatedBy: string;
-  date: string;
+const ASSEMBLIES = [
+  "PPS", "Overcomers", "Beulah", "Jubilee", 
+  "Success", "Restoration", "Liberty", "RayPower"
+];
+
+const MONTHS = [
+  "January", "February", "March", "April", "May", "June",
+  "July", "August", "September", "October", "November", "December"
+];
+
+const YEARS = ["2023", "2024", "2025", "2026"];
+
+interface FinancialSummary {
+  totalIncome: number;
+  totalTithe: number;
+  totalOffering: number;
+  totalAttendance: number;
+  totalSBSAttendance: number;
+  totalVisitors: number;
 }
 
-export default function ReportsContent() {
-  const [dateRange, setDateRange] = useState<any>(null);
+interface ReportData {
+  titheSummary: any;
+  offeringSummary: any;
+  sundayServiceSummary: any;
+  rawData: any;
+}
 
-  const reportsData: Report[] = [
-    {
-      key: '1',
-      title: 'January 2024 Offering',
-      type: 'offering',
-      period: 'Jan 1 - Jan 31, 2024',
-      amount: 450000,
-      status: 'completed',
-      generatedBy: 'John Ade',
-      date: '2024-02-01'
-    },
-    {
-      key: '2',
-      title: 'Q4 2023 Tithe Report',
-      type: 'tithe',
-      period: 'Oct 1 - Dec 31, 2023',
-      amount: 890000,
-      status: 'completed',
-      generatedBy: 'Sarah Musa',
-      date: '2024-01-05'
-    },
-    {
-      key: '3',
-      title: 'Building Fund Donations',
-      type: 'donation',
-      period: 'Jan 1 - Jan 31, 2024',
-      amount: 250000,
-      status: 'completed',
-      generatedBy: 'David Okafor',
-      date: '2024-02-01'
-    },
-    {
-      key: '4',
-      title: 'February 2024 Expense',
-      type: 'expense',
-      period: 'Feb 1 - Feb 29, 2024',
-      amount: 150000,
-      status: 'pending',
-      generatedBy: 'Grace Bello',
-      date: '2024-02-15'
+export default function FinancialReports() {
+  const [loading, setLoading] = useState(false);
+  const [selectedAssembly, setSelectedAssembly] = useState<string>('all');
+  const [selectedMonth, setSelectedMonth] = useState<string>('October');
+  const [selectedYear, setSelectedYear] = useState<string>('2025');
+  const [reportData, setReportData] = useState<ReportData | null>(null);
+  const [summary, setSummary] = useState<FinancialSummary | null>(null);
+
+  useEffect(() => {
+    fetchReports();
+  }, [selectedAssembly, selectedMonth, selectedYear]);
+
+  const fetchReports = async () => {
+    setLoading(true);
+    try {
+      const params = new URLSearchParams();
+      if (selectedAssembly !== 'all') params.append('assembly', selectedAssembly);
+      if (selectedMonth !== 'all') params.append('month', selectedMonth);
+      if (selectedYear !== 'all') params.append('year', selectedYear);
+
+      const response = await fetch(`/api/financial-reports?${params}`);
+      const result = await response.json();
+
+      if (result.success) {
+        setReportData(result.data);
+        setSummary(result.summary);
+      } else {
+        message.error('Failed to fetch reports');
+      }
+    } catch (error) {
+      message.error('Error fetching reports');
+    } finally {
+      setLoading(false);
     }
-  ];
+  };
 
-  const summaryData = [
+  const handleDownloadExcel = () => {
+    message.info('Excel download feature coming soon');
+  };
+
+  // Calculate progress percentages for visual indicators
+  const calculateProgress = (current: number, target: number = 1000000) => {
+    return Math.min((current / target) * 100, 100);
+  };
+
+  const summaryData = summary ? [
     {
       title: 'Total Income',
-      value: 1590000,
+      value: summary.totalIncome,
       change: 12.5,
       isPositive: true,
-      color: '#10b981'
+      color: '#10b981',
+      prefix: '₦',
+      progress: calculateProgress(summary.totalIncome),
+      icon: <DollarSign className="text-green-500" />,
+      description: 'Combined financial income'
     },
     {
-      title: 'Total Expenses',
-      value: 450000,
-      change: -8.2,
-      isPositive: false,
-      color: '#ef4444'
+      title: 'Total Tithe',
+      value: summary.totalTithe,
+      change: 8.2,
+      isPositive: true,
+      color: '#3b82f6',
+      prefix: '₦',
+      progress: calculateProgress(summary.totalTithe, 500000),
+      icon: <Church className="text-blue-500" />,
+      description: 'Tithe contributions'
     },
     {
-      title: 'Net Balance',
-      value: 1140000,
+      title: 'Total Offering',
+      value: summary.totalOffering,
       change: 15.3,
       isPositive: true,
-      color: '#3b82f6'
+      color: '#8b5cf6',
+      prefix: '₦',
+      progress: calculateProgress(summary.totalOffering, 300000),
+      icon: <Target className="text-purple-500" />,
+      description: 'Offering collections'
     },
     {
-      title: 'Pending Transactions',
-      value: 150000,
+      title: 'Total Attendance',
+      value: summary.totalAttendance,
       change: 5.7,
       isPositive: true,
-      color: '#f59e0b'
+      color: '#f59e0b',
+      prefix: '',
+      progress: calculateProgress(summary.totalAttendance, 2000),
+      icon: <Users className="text-orange-500" />,
+      description: 'Weekly attendance'
     }
-  ];
+  ] : [];
 
-  const getTypeColor = (type: string) => {
-    const colors = {
-      offering: 'blue',
-      tithe: 'green',
-      donation: 'purple',
-      expense: 'red'
-    };
-    return colors[type as keyof typeof colors] || 'default';
-  };
-
-  const getStatusColor = (status: string) => {
-    const colors = {
-      completed: 'green',
-      pending: 'orange',
-      failed: 'red'
-    };
-    return colors[status as keyof typeof colors] || 'default';
-  };
-
-  const columns = [
+  const titheColumns = [
     {
-      title: 'Report Title',
-      dataIndex: 'title',
-      key: 'title',
-      render: (text: string, record: Report) => (
-        <div>
-          <div className="font-medium">{text}</div>
-          <div className="text-xs text-gray-500">{record.period}</div>
+      title: 'Week',
+      dataIndex: 'week',
+      key: 'week',
+      render: (text: string, record: any) => (
+        <div className={record.type === 'total' ? 'font-bold' : ''}>
+          {text}
         </div>
       ),
     },
     {
+      title: 'Amount',
+      dataIndex: 'amount',
+      key: 'amount',
+      render: (amount: number, record: any) => (
+        <div className={record.type === 'total' ? 'font-bold text-blue-600' : 'text-gray-700'}>
+          ₦{amount?.toLocaleString()}
+        </div>
+      ),
+    },
+    {
+      title: 'Progress',
+      key: 'progress',
+      render: (_: any, record: any) => (
+        record.type !== 'total' && (
+          <Progress 
+            percent={calculateProgress(record.amount, 150000)} 
+            size="small" 
+            showInfo={false}
+            strokeColor={{
+              '0%': '#3b82f6',
+              '100%': '#1d4ed8',
+            }}
+          />
+        )
+      ),
+    }
+  ];
+
+  const offeringColumns = [
+    {
       title: 'Type',
       dataIndex: 'type',
       key: 'type',
-      render: (type: string) => (
-        <Tag color={getTypeColor(type)}>
-          {type.toUpperCase()}
+      render: (text: string) => (
+        <Tag color={text.includes('Sunday') ? 'blue' : 'purple'}>
+          {text}
         </Tag>
       ),
     },
@@ -142,163 +184,385 @@ export default function ReportsContent() {
       dataIndex: 'amount',
       key: 'amount',
       render: (amount: number) => (
-        <div className="font-semibold">
-          ₦{amount.toLocaleString()}
+        <div className="font-semibold text-purple-600">
+          ₦{amount?.toLocaleString()}
         </div>
       ),
     },
     {
-      title: 'Status',
-      dataIndex: 'status',
-      key: 'status',
-      render: (status: string) => (
-        <Tag color={getStatusColor(status)}>
-          {status.toUpperCase()}
-        </Tag>
-      ),
-    },
-    {
-      title: 'Generated By',
-      dataIndex: 'generatedBy',
-      key: 'generatedBy',
-    },
-    {
-      title: 'Date',
-      dataIndex: 'date',
-      key: 'date',
-      render: (date: string) => new Date(date).toLocaleDateString(),
-    },
-    {
-      title: 'Actions',
-      key: 'actions',
-      render: (_: any, record: Report) => (
-        <Space size="small">
-          <Button 
-            icon={<Eye size={14} />} 
-            size="small"
-            onClick={() => handleView(record)}
-          >
-            View
-          </Button>
-          <Button 
-            icon={<Download size={14} />} 
-            size="small"
-            type="primary"
-            onClick={() => handleDownload(record)}
-          >
-            Download
-          </Button>
-        </Space>
-      ),
-    },
+      title: 'Percentage',
+      key: 'percentage',
+      render: (_: any, record: any) => {
+        const total = reportData?.offeringSummary?.totalOffering || 1;
+        const percentage = Math.round((record.amount / total) * 100);
+        return (
+          <div className="text-sm text-gray-500">
+            {percentage}%
+          </div>
+        );
+      },
+    }
   ];
 
-  const handleGenerateReport = () => {
-    message.info('Generate report feature coming soon');
-  };
+  const attendanceColumns = [
+    {
+      title: 'Metric',
+      dataIndex: 'metric',
+      key: 'metric',
+      render: (text: string) => (
+        <div className="font-medium">{text}</div>
+      ),
+    },
+    {
+      title: 'Count',
+      dataIndex: 'count',
+      key: 'count',
+      render: (count: number, record: any) => (
+        <div className={record.metric === 'Main Service' ? 'text-orange-600 font-semibold' : 'text-gray-700'}>
+          {count?.toLocaleString()}
+        </div>
+      ),
+    },
+    {
+      title: 'Growth',
+      key: 'growth',
+      render: (_: any, record: any) => (
+        <Tag color="green" className="flex items-center gap-1">
+          <TrendingUp size={12} />
+          +{record.metric === 'Main Service' ? '5.7' : record.metric === 'SBS Attendance' ? '3.2' : '8.1'}%
+        </Tag>
+      ),
+    }
+  ];
 
-  const handleView = (report: Report) => {
-    message.info(`Viewing ${report.title}`);
-  };
+  const titheData = reportData?.titheSummary ? [
+    { week: 'Week 1', amount: reportData.titheSummary.week1 || 0 },
+    { week: 'Week 2', amount: reportData.titheSummary.week2 || 0 },
+    { week: 'Week 3', amount: reportData.titheSummary.week3 || 0 },
+    { week: 'Week 4', amount: reportData.titheSummary.week4 || 0 },
+    { week: 'Week 5', amount: reportData.titheSummary.week5 || 0 },
+    { week: 'Total', amount: reportData.titheSummary.totalTithe || 0, type: 'total' }
+  ] : [];
 
-  const handleDownload = (report: Report) => {
-    message.success(`Downloading ${report.title}`);
-  };
+  const offeringData = reportData?.offeringSummary ? [
+    { type: 'Sunday Offering', amount: reportData.offeringSummary.sundayOffering || 0 },
+    { type: 'Weekly Offering', amount: (reportData.offeringSummary.totalOffering - reportData.offeringSummary.sundayOffering) || 0 },
+    { type: 'Total Offering', amount: reportData.offeringSummary.totalOffering || 0, isTotal: true }
+  ] : [];
+
+  const attendanceData = reportData?.sundayServiceSummary ? [
+    { metric: 'Main Service', count: reportData.sundayServiceSummary.attendance || 0 },
+    { metric: 'SBS Attendance', count: reportData.sundayServiceSummary.sbsAttendance || 0 },
+    { metric: 'Visitors', count: reportData.sundayServiceSummary.visitors || 0 }
+  ] : [];
 
   return (
-    <div className="p-6 bg-gray-50 min-h-screen">
+    <div className="p-6 bg-gradient-to-br from-gray-50 to-blue-50 min-h-screen">
       {/* Header */}
-      <div className="flex justify-between items-center mb-6">
-        <div>
-          <h1 className="text-2xl font-bold text-gray-900">
-            Finance Reports
-          </h1>
-          <p className="text-gray-600">
-            Financial overview and report management
-          </p>
+      <div className="flex flex-col lg:flex-row justify-between items-start lg:items-center mb-8">
+        <div className="mb-4 lg:mb-0">
+          <div className="flex items-center gap-3 mb-2">
+            <div className="p-2 bg-white rounded-lg shadow-sm border">
+              <Building2 className="text-blue-600" size={24} />
+            </div>
+            <div>
+              <h1 className="text-3xl font-bold text-gray-900">
+                Akowonjo District
+              </h1>
+              <p className="text-lg text-gray-600">
+                Financial Reports & Analytics
+              </p>
+            </div>
+          </div>
+          <div className="flex items-center gap-2 text-sm text-gray-500 mt-2">
+            <Calendar size={14} />
+            <span>Viewing: {selectedMonth} {selectedYear}</span>
+            {selectedAssembly !== 'all' && (
+              <>
+                <span>•</span>
+                <span>Assembly: {selectedAssembly}</span>
+              </>
+            )}
+          </div>
         </div>
         <Button 
           type="primary" 
           icon={<Download size={16} />}
-          onClick={handleGenerateReport}
+          onClick={handleDownloadExcel}
+          loading={loading}
+          size="large"
+          className="bg-blue-600 hover:bg-blue-700 border-0 shadow-lg"
         >
-          Generate Report
+          Export Report
         </Button>
       </div>
 
-      {/* Financial Summary */}
-      <Row gutter={[24, 24]} className="mb-6">
-        {summaryData.map((stat, index) => (
-          <Col xs={24} sm={12} lg={6} key={index}>
-            <Card className="border-0 shadow-lg bg-white">
-              <Statistic
-                title={stat.title}
-                value={stat.value}
-                precision={0}
-                valueStyle={{ 
-                  color: stat.color,
-                  fontSize: '24px',
-                  fontWeight: 'bold'
-                }}
-                prefix="₦"
-                suffix={
-                  <Tag color={stat.isPositive ? 'green' : 'red'} className="ml-2">
-                    {stat.isPositive ? <TrendingUp size={12} /> : <TrendingDown size={12} />}
-                    {stat.change}%
-                  </Tag>
-                }
-              />
-            </Card>
-          </Col>
-        ))}
-      </Row>
-
       {/* Filters */}
-      <Card className="border-0 shadow-lg bg-white mb-6">
-        <div className="flex items-center gap-4">
+      <Card className="border-0 shadow-xl bg-white/80 backdrop-blur-sm mb-8">
+        <div className="flex flex-col lg:flex-row items-start lg:items-center gap-4">
           <div className="flex items-center">
-            <Filter size={16} className="mr-2 text-gray-500" />
-            <span className="font-medium">Filters:</span>
+            <Filter size={18} className="mr-2 text-blue-600" />
+            <span className="font-semibold text-gray-700">Report Filters:</span>
           </div>
-          <RangePicker 
-            onChange={setDateRange}
-            style={{ width: 250 }}
-          />
-          <Select placeholder="Report Type" style={{ width: 150 }} allowClear>
-            <Option value="offering">Offering</Option>
-            <Option value="tithe">Tithe</Option>
-            <Option value="donation">Donation</Option>
-            <Option value="expense">Expense</Option>
-          </Select>
-          <Select placeholder="Status" style={{ width: 120 }} allowClear>
-            <Option value="completed">Completed</Option>
-            <Option value="pending">Pending</Option>
-            <Option value="failed">Failed</Option>
-          </Select>
+          
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-4 w-full lg:w-auto">
+            <Select 
+              placeholder="Select Assembly" 
+              style={{ width: '100%', minWidth: 200 }} 
+              value={selectedAssembly}
+              onChange={setSelectedAssembly}
+              suffixIcon={<Building2 size={16} />}
+              size="large"
+            >
+              <Option value="all">All Assemblies</Option>
+              {ASSEMBLIES.map(assembly => (
+                <Option key={assembly} value={assembly}>
+                  <div className="flex items-center gap-2">
+                    <div className="w-2 h-2 bg-blue-500 rounded-full"></div>
+                    {assembly}
+                  </div>
+                </Option>
+              ))}
+            </Select>
+
+            <Select 
+              placeholder="Select Month" 
+              style={{ width: '100%', minWidth: 180 }} 
+              value={selectedMonth}
+              onChange={setSelectedMonth}
+              suffixIcon={<Calendar size={16} />}
+              size="large"
+            >
+              <Option value="all">All Months</Option>
+              {MONTHS.map(month => (
+                <Option key={month} value={month}>{month}</Option>
+              ))}
+            </Select>
+
+            <Select 
+              placeholder="Select Year" 
+              style={{ width: '100%', minWidth: 140 }} 
+              value={selectedYear}
+              onChange={setSelectedYear}
+              size="large"
+            >
+              {YEARS.map(year => (
+                <Option key={year} value={year}>{year}</Option>
+              ))}
+            </Select>
+          </div>
+
+          <Button 
+            onClick={fetchReports}
+            loading={loading}
+            size="large"
+            className="bg-green-600 hover:bg-green-700 text-white border-0 shadow-lg"
+          >
+            Apply Filters
+          </Button>
         </div>
       </Card>
 
-      {/* Reports Table */}
-      <Card 
-        title={
-          <div className="flex items-center">
-            <DollarSign size={20} className="mr-2" />
-            <span className="text-lg font-semibold">Financial Reports</span>
-          </div>
-        }
-        className="border-0 shadow-lg bg-white"
-      >
-        <Table 
-          columns={columns} 
-          dataSource={reportsData}
-          pagination={{ 
-            pageSize: 10,
-            showSizeChanger: true,
-            showTotal: (total, range) => 
-              `${range[0]}-${range[1]} of ${total} reports`
-          }}
-        />
-      </Card>
+      {loading ? (
+        <div className="flex justify-center items-center h-64">
+          <Spin size="large" />
+          <span className="ml-4 text-gray-600">Loading financial data...</span>
+        </div>
+      ) : (
+        <>
+          {/* Financial Summary */}
+          <Row gutter={[24, 24]} className="mb-8">
+            {summaryData.map((stat, index) => (
+              <Col xs={24} sm={12} lg={6} key={index}>
+                <Card 
+                  className="border-0 shadow-xl bg-white/80 backdrop-blur-sm hover:shadow-2xl transition-all duration-300 hover:-translate-y-1"
+                >
+                  <div className="flex items-start justify-between mb-4">
+                    <div>
+                      <p className="text-gray-600 text-sm font-medium mb-1">{stat.title}</p>
+                      <p className="text-gray-400 text-xs">{stat.description}</p>
+                    </div>
+                    <div className="p-2 bg-white rounded-lg shadow-sm border">
+                      {stat.icon}
+                    </div>
+                  </div>
+                  
+                  <div className="mb-3">
+                    <div className="text-2xl font-bold" style={{ color: stat.color }}>
+                      {stat.prefix}{stat.value?.toLocaleString()}
+                    </div>
+                  </div>
+
+                  <div className="flex items-center justify-between">
+                    <Tooltip title={`Progress towards monthly target`}>
+                      <Progress 
+                        percent={stat.progress} 
+                        size="small" 
+                        showInfo={false}
+                        strokeColor={stat.color}
+                      />
+                    </Tooltip>
+                    <Tag color={stat.isPositive ? 'green' : 'red'} className="flex items-center gap-1 ml-2">
+                      {stat.isPositive ? <TrendingUp size={12} /> : <TrendingDown size={12} />}
+                      {stat.change}%
+                    </Tag>
+                  </div>
+                </Card>
+              </Col>
+            ))}
+          </Row>
+
+          {/* Detailed Reports */}
+          <Card className="border-0 shadow-xl bg-white/80 backdrop-blur-sm">
+            <Tabs 
+              defaultActiveKey="1"
+              size="large"
+              className="financial-tabs"
+            >
+              <TabPane 
+                tab={
+                  <span className="flex items-center gap-2 font-semibold">
+                    <DollarSign size={18} className="text-blue-500" />
+                    Tithe Report
+                    <Tag color="blue" className="ml-1">
+                      {titheData.reduce((sum, item) => sum + (item.amount || 0), 0)?.toLocaleString()}
+                    </Tag>
+                  </span>
+                } 
+                key="1"
+              >
+                <Table 
+                  columns={titheColumns} 
+                  dataSource={titheData}
+                  pagination={false}
+                  className="financial-table"
+                  summary={() => (
+                    <Table.Summary>
+                      <Table.Summary.Row className="bg-gradient-to-r from-blue-50 to-blue-100">
+                        <Table.Summary.Cell index={0}>
+                          <strong className="text-blue-700">Monthly Total</strong>
+                        </Table.Summary.Cell>
+                        <Table.Summary.Cell index={1}>
+                          <strong className="text-blue-700 text-lg">
+                            ₦{reportData?.titheSummary?.totalTithe?.toLocaleString()}
+                          </strong>
+                        </Table.Summary.Cell>
+                        <Table.Summary.Cell index={2}>
+                          <Progress 
+                            percent={calculateProgress(reportData?.titheSummary?.totalTithe || 0, 500000)} 
+                            size="small" 
+                            strokeColor="#3b82f6"
+                          />
+                        </Table.Summary.Cell>
+                      </Table.Summary.Row>
+                    </Table.Summary>
+                  )}
+                />
+              </TabPane>
+
+              <TabPane 
+                tab={
+                  <span className="flex items-center gap-2 font-semibold">
+                    <Church size={18} className="text-purple-500" />
+                    Offering Report
+                    <Tag color="purple" className="ml-1">
+                      {offeringData.find(item => item.isTotal)?.amount?.toLocaleString()}
+                    </Tag>
+                  </span>
+                } 
+                key="2"
+              >
+                <Table 
+                  columns={offeringColumns} 
+                  dataSource={offeringData.filter(item => !item.isTotal)}
+                  pagination={false}
+                  className="financial-table"
+                  summary={() => (
+                    <Table.Summary>
+                      <Table.Summary.Row className="bg-gradient-to-r from-purple-50 to-purple-100">
+                        <Table.Summary.Cell index={0}>
+                          <strong className="text-purple-700">Total Offering</strong>
+                        </Table.Summary.Cell>
+                        <Table.Summary.Cell index={1}>
+                          <strong className="text-purple-700 text-lg">
+                            ₦{reportData?.offeringSummary?.totalOffering?.toLocaleString()}
+                          </strong>
+                        </Table.Summary.Cell>
+                        <Table.Summary.Cell index={2}>
+                          <div className="text-purple-600 font-semibold">
+                            100%
+                          </div>
+                        </Table.Summary.Cell>
+                      </Table.Summary.Row>
+                    </Table.Summary>
+                  )}
+                />
+              </TabPane>
+
+              <TabPane 
+                tab={
+                  <span className="flex items-center gap-2 font-semibold">
+                    <Users size={18} className="text-orange-500" />
+                    Attendance
+                    <Tag color="orange" className="ml-1">
+                      {attendanceData.reduce((sum, item) => sum + (item.count || 0), 0)?.toLocaleString()}
+                    </Tag>
+                  </span>
+                } 
+                key="3"
+              >
+                <Table 
+                  columns={attendanceColumns} 
+                  dataSource={attendanceData}
+                  pagination={false}
+                  className="financial-table"
+                />
+              </TabPane>
+            </Tabs>
+          </Card>
+
+          {/* Assembly Status */}
+          {selectedAssembly === 'all' && (
+            <Card 
+              title={
+                <div className="flex items-center gap-2">
+                  <Building2 size={20} className="text-gray-600" />
+                  <span className="text-lg font-semibold">Assembly Submission Status</span>
+                </div>
+              }
+              className="border-0 shadow-xl bg-white/80 backdrop-blur-sm mt-8"
+            >
+              <Row gutter={[16, 16]}>
+                {ASSEMBLIES.map((assembly, index) => (
+                  <Col xs={24} sm={12} lg={6} key={assembly}>
+                    <Card 
+                      size="small" 
+                      className="border-0 shadow-sm hover:shadow-md transition-shadow cursor-pointer"
+                      bodyStyle={{ padding: '16px' }}
+                    >
+                      <div className="flex items-center justify-between">
+                        <div className="flex items-center gap-3">
+                          <div 
+                            className="w-3 h-3 rounded-full"
+                            style={{
+                              backgroundColor: index % 2 === 0 ? '#10b981' : '#3b82f6'
+                            }}
+                          ></div>
+                          <span className="font-medium">{assembly}</span>
+                        </div>
+                        <Tag color="green">Submitted</Tag>
+                      </div>
+                      <div className="mt-2 text-xs text-gray-500">
+                        Last update: {selectedMonth} 15, {selectedYear}
+                      </div>
+                    </Card>
+                  </Col>
+                ))}
+              </Row>
+            </Card>
+          )}
+        </>
+      )}
     </div>
   );
 }

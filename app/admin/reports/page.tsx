@@ -1,0 +1,15 @@
+// app/admin/dashboard/page.tsx
+"use client";
+
+import FinancialReports from "@/components/admin/dashbord/ReportsContent";
+import AdminLayout from "@/components/admin/layout/AdminLayout";
+
+
+
+export default function AdminDashboard() {
+  return (
+    <AdminLayout>
+      <FinancialReports />
+    </AdminLayout>
+  );
+}
