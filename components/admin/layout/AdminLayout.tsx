@@ -43,6 +43,24 @@ export default function AdminLayout({ children }: AdminLayoutProps) {
     checkAdminAuth();
   }, [router]);
 
+  // Responsive sidebar: auto-collapse on mobile/small screens
+  useEffect(() => {
+    const breakpoint = 768; // Mobile breakpoint (adjust as needed)
+
+    const handleResize = () => {
+      if (window.innerWidth < breakpoint && !collapsed) {
+        setCollapsed(true);
+      } else if (window.innerWidth >= breakpoint && collapsed) {
+        setCollapsed(false);
+      }
+    };
+
+    window.addEventListener("resize", handleResize);
+    handleResize(); // Initial check
+
+    return () => window.removeEventListener("resize", handleResize);
+  }, [collapsed]);
+
   const handleLogout = () => {
     localStorage.removeItem("admin");
     message.success("Logged out successfully!");

@@ -25,7 +25,7 @@ export default function LoginPage() {
     setLoading(true);
     try {
       if (
-        values.email === "admin@gofamintakownjodp.com" &&
+        values.email === "admin@gofamintakownjos_dst.com" &&
         values.password === "password"
       ) {
         localStorage.setItem("admin", "true");

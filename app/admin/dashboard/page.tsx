@@ -2,6 +2,7 @@
 "use client";
 
 import DashboardContent from "@/components/admin/dashbord/DashboardContent";
+import FinancialReports from "@/components/admin/dashbord/ReportsContent";
 import AdminLayout from "@/components/admin/layout/AdminLayout";
 
 
@@ -9,7 +10,8 @@ import AdminLayout from "@/components/admin/layout/AdminLayout";
 export default function AdminDashboard() {
   return (
     <AdminLayout>
-      <DashboardContent />
+      {/* <DashboardContent /> */}
+        <FinancialReports />
     </AdminLayout>
   );
 }
