@@ -10,8 +10,8 @@ import AdminLayout from "@/components/admin/layout/AdminLayout";
 export default function AdminDashboard() {
   return (
     <AdminLayout>
-      {/* <DashboardContent /> */}
-        <FinancialReports />
+      <DashboardContent />
+        {/* <FinancialReports /> */}
     </AdminLayout>
   );
 }
