@@ -2,7 +2,8 @@
 import mongoose, { Schema, Document } from "mongoose";
 
 interface ISundayServiceRecord {
-  week: string;
+  week: string;               // "Week 1"
+  date: string;               // "2025-11-02"
   attendance: number;
   sbsAttendance: number;
   visitors: number;
@@ -18,36 +19,41 @@ interface ISundayServiceRecord {
   youthOfferings: number;
   districtSupport: number;
   total: number;
+  totalAttendance: number;    // calculated on the server
 }
 
 interface ISundayServiceReport extends Document {
   assembly: string;
   submittedBy: string;
-  month: string;
+  month: string;              // "November-2025"
   records: ISundayServiceRecord[];
   createdAt: Date;
   updatedAt: Date;
 }
 
+/* ---------- Record sub-schema ---------- */
 const SundayServiceRecordSchema = new Schema<ISundayServiceRecord>({
   week: { type: String, required: true },
-  attendance: { type: Number, required: true, default: 0 },
-  sbsAttendance: { type: Number, required: true, default: 0 },
-  visitors: { type: Number, required: true, default: 0 },
-  tithes: { type: Number, required: true, default: 0 },
-  offerings: { type: Number, required: true, default: 0 },
-  specialOfferings: { type: Number, required: true, default: 0 },
-  etf: { type: Number, required: true, default: 0 },
-  pastorsWarfare: { type: Number, required: true, default: 0 },
-  vigil: { type: Number, required: true, default: 0 },
-  thanksgiving: { type: Number, required: true, default: 0 },
-  retirees: { type: Number, required: true, default: 0 },
-  missionaries: { type: Number, required: true, default: 0 },
-  youthOfferings: { type: Number, required: true, default: 0 },
-  districtSupport: { type: Number, required: true, default: 0 },
-  total: { type: Number, required: true, default: 0 },
+  date: { type: String, required: true },               // <-- NEW
+  attendance: { type: Number, default: 0 },
+  sbsAttendance: { type: Number, default: 0 },
+  visitors: { type: Number, default: 0 },
+  tithes: { type: Number, default: 0 },
+  offerings: { type: Number, default: 0 },
+  specialOfferings: { type: Number, default: 0 },
+  etf: { type: Number, default: 0 },
+  pastorsWarfare: { type: Number, default: 0 },
+  vigil: { type: Number, default: 0 },
+  thanksgiving: { type: Number, default: 0 },
+  retirees: { type: Number, default: 0 },
+  missionaries: { type: Number, default: 0 },
+  youthOfferings: { type: Number, default: 0 },
+  districtSupport: { type: Number, default: 0 },
+  total: { type: Number, default: 0 },
+  totalAttendance: { type: Number, default: 0 },
 });
 
+/* ---------- Main schema ---------- */
 const SundayServiceReportSchema = new Schema<ISundayServiceReport>(
   {
     assembly: { type: String, required: true },
@@ -57,6 +63,9 @@ const SundayServiceReportSchema = new Schema<ISundayServiceReport>(
   },
   { timestamps: true }
 );
+
+/* optional index for fast lookup */
+SundayServiceReportSchema.index({ assembly: 1, month: 1 });
 
 export default mongoose.models.SundayServiceReport ||
   mongoose.model<ISundayServiceReport>("SundayServiceReport", SundayServiceReportSchema);

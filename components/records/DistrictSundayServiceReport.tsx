@@ -25,8 +25,6 @@ import {
   FileExcelOutlined,
   CalendarOutlined,
   UserOutlined,
-  DollarOutlined,
-  GiftOutlined,
 } from "@ant-design/icons";
 import {
   format,
@@ -115,13 +113,13 @@ const DistrictSundayServiceReport: React.FC = () => {
   /* --------------------------------------------------------------
      1. ONLY Sundays that fall INSIDE the selected month
      -------------------------------------------------------------- */
-const monthSundays = useMemo(() => {
-  const start = startOfMonth(selectedDate);
-  const end = endOfMonth(selectedDate);
-  return eachDayOfInterval({ start, end })
-    .filter((date): boolean => isSunday(date))
-    .slice(0, 5); // max 5, never pad
-}, [selectedDate]);
+  const monthSundays = useMemo(() => {
+    const start = startOfMonth(selectedDate);
+    const end = endOfMonth(selectedDate);
+    return eachDayOfInterval({ start, end })
+      .filter((date): boolean => isSunday(date))
+      .slice(0, 5); // max 5, never pad
+  }, [selectedDate]);
 
   const rowCount = monthSundays.length;
 
@@ -237,66 +235,145 @@ const monthSundays = useMemo(() => {
     return [...base, "Total Att.", "Total (₦)"];
   }, [screens, customColumns]);
 
-  /* --------------------------------------------------------------
-     3. Load data from API (only for the real Sundays)
-     -------------------------------------------------------------- */
+  const monthKey = (d: Date) => format(d, "MMMM-yyyy");
+
   const fetchInitialRecords = useCallback(async () => {
     if (!assembly) {
       setData(initializeEmptyData());
       setLoading(false);
       return;
     }
+
     setLoading(true);
     try {
-      const month = format(selectedDate, "MMMM-yyyy");
+      const month = monthKey(selectedDate);
       const resp = await fetch(
-        `/api/sunday-service-reports?assembly=${encodeURIComponent(assembly)}&month=${encodeURIComponent(month)}`
+        `/api/sunday-service-reports?assembly=${encodeURIComponent(
+          assembly
+        )}&month=${encodeURIComponent(month)}`
       );
       if (!resp.ok) throw new Error(`HTTP ${resp.status}`);
       const { records } = await resp.json();
 
-      const filled: SundayServiceRow[] = monthSundays.map((sun) => {
-        const rec = records.find((r: SundayServiceRecord) => r.date === format(sun, "yyyy-MM-dd"));
-        if (rec) {
-          const totAtt = (rec.attendance ?? 0) + (rec.sbsAttendance ?? 0) + (rec.visitors ?? 0);
-          return { ...rec, totalAttendance: totAtt };
+      console.log("Fetched records:", records); // DEBUG
+      console.log("Month Sundays:", monthSundays.map(d => format(d, "yyyy-MM-dd"))); // DEBUG
+
+      const filled: SundayServiceRow[] = monthSundays.map((sun, index) => {
+        const dateStr = format(sun, "yyyy-MM-dd");
+        
+        // Try exact match first
+        let saved = records.find((r: any) => r.date === dateStr);
+        
+        // If no exact match, try matching by week number as fallback
+        if (!saved && records[index]) {
+          saved = records[index];
         }
-        return {
-          attendance: 0,
-          sbsAttendance: 0,
-          visitors: 0,
-          tithes: 0,
-          offerings: 0,
-          specialOfferings: 0,
-          etf: 0,
-          pastorsWarfare: 0,
-          vigil: 0,
-          thanksgiving: 0,
-          retirees: 0,
-          missionaries: 0,
-          youthOfferings: 0,
-          districtSupport: 0,
-          total: 0,
-          totalAttendance: 0,
-        };
+
+        if (saved) {
+          return {
+            attendance: saved.attendance || 0,
+            sbsAttendance: saved.sbsAttendance || 0,
+            visitors: saved.visitors || 0,
+            tithes: saved.tithes || 0,
+            offerings: saved.offerings || 0,
+            specialOfferings: saved.specialOfferings || 0,
+            etf: saved.etf || 0,
+            pastorsWarfare: saved.pastorsWarfare || 0,
+            vigil: saved.vigil || 0,
+            thanksgiving: saved.thanksgiving || 0,
+            retirees: saved.retirees || 0,
+            missionaries: saved.missionaries || 0,
+            youthOfferings: saved.youthOfferings || 0,
+            districtSupport: saved.districtSupport || 0,
+            total: saved.total || 0,
+            totalAttendance: saved.totalAttendance || 0,
+          };
+        }
+
+        // Return empty row
+        return initializeEmptyData()[0];
       });
+
+      console.log("Final filled data:", filled); // DEBUG
       setData(filled);
-    } catch (e) {
+    } catch (e: any) {
       console.error(e);
-      notification.error({ message: "Error", description: "Failed to load data." });
+      notification.error({ message: "Load error", description: e.message });
       setData(initializeEmptyData());
     } finally {
       setLoading(false);
     }
   }, [assembly, selectedDate, initializeEmptyData, monthSundays]);
 
+  const confirmSave = async () => {
+    try {
+      await form.validateFields();
+
+      console.log("About to save with assembly:", assembly);
+
+      const payload = data
+        .map((row, i) => ({
+          week: `Week ${i + 1}`,
+          date: format(monthSundays[i], "yyyy-MM-dd"),
+          ...row,
+        }))
+        .filter((r) => Object.values(r).some((v) => typeof v === "number" && v > 0));
+
+      if (!payload.length) {
+        notification.error({ message: "Nothing to save" });
+        return;
+      }
+
+      console.log("Sending payload:", { assembly, submittedBy, month: monthKey(selectedDate), records: payload });
+
+      setLoading(true);
+      const resp = await fetch("/api/sunday-service-reports", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          assembly,
+          submittedBy,
+          month: monthKey(selectedDate),
+          records: payload,
+        }),
+      });
+
+      // FIXED: Add response handling
+      if (!resp.ok) {
+        throw new Error(`HTTP ${resp.status}`);
+      }
+
+      const result = await resp.json();
+      
+      // Show success notification
+      notification.success({
+        message: "Successfully Saved!",
+        description: `Sunday service report for ${format(selectedDate, "MMMM yyyy")} has been saved.`,
+      });
+
+      // Close modal and reset form
+      setIsModalOpen(false);
+      form.resetFields();
+      setSubmittedBy("");
+
+      // Refresh data to get the latest from server
+      fetchInitialRecords();
+
+    } catch (e: any) {
+      console.error(e);
+      notification.error({ 
+        message: "Save Failed", 
+        description: e.message || "Failed to save Sunday service report. Please try again." 
+      });
+    } finally {
+      setLoading(false);
+    }
+  };
+
   useEffect(() => {
     fetchInitialRecords();
   }, [fetchInitialRecords]);
 
-  /* --------------------------------------------------------------
-     4. Auto-calc totals on every change
-     -------------------------------------------------------------- */
   const afterChange = useCallback(
     (changes: CellChange[] | null, source: ChangeSource) => {
       if (!changes || source === "loadData") return;
@@ -326,9 +403,6 @@ const monthSundays = useMemo(() => {
     []
   );
 
-  /* --------------------------------------------------------------
-     5. Summary cards – ONE attendance card + 3 others
-     -------------------------------------------------------------- */
   const summaryStats = useMemo(() => {
     return data.reduce(
       (a, r) => {
@@ -341,51 +415,9 @@ const monthSundays = useMemo(() => {
     );
   }, [data]);
 
-  /* --------------------------------------------------------------
-     6. Save / Export / Reset
-     -------------------------------------------------------------- */
   const handleSave = () => {
     if (!assembly) return notification.error({ message: "No assembly" });
     setIsModalOpen(true);
-  };
-
-  const confirmSave = async () => {
-    try {
-      await form.validateFields();
-      const payload = data
-        .map((row, i) => ({
-          week: `Week ${i + 1}`,
-          date: format(monthSundays[i], "yyyy-MM-dd"),
-          ...row,
-        }))
-        .filter((r) => Object.values(r).some((v) => typeof v === "number" && v > 0));
-
-      if (!payload.length) return notification.error({ message: "No data to save" });
-
-      setLoading(true);
-      const resp = await fetch("/api/sunday-service-reports", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          assembly,
-          submittedBy,
-          month: format(selectedDate, "MMMM-yyyy"),
-          records: payload,
-        }),
-      });
-      const res = await resp.json();
-      if (resp.ok && res.success) {
-        notification.success({ message: "Saved!" });
-        setIsModalOpen(false);
-        form.resetFields();
-        setSubmittedBy("");
-        await fetchInitialRecords();
-      } else throw new Error(res.error);
-    } catch (e) {
-      notification.error({ message: "Save failed" });
-    } finally {
-      setLoading(false);
-    }
   };
 
   const handleClear = () => {
@@ -434,12 +466,9 @@ const monthSundays = useMemo(() => {
 
   const tableHeight = useMemo(() => {
     const rowH = screens.md ? 42 : 36;
-    return rowH * (rowCount + 1) + 10; // +1 for header
+    return rowH * (rowCount + 1) + 10; 
   }, [screens, rowCount]);
 
-  /* --------------------------------------------------------------
-     UI
-     -------------------------------------------------------------- */
   return (
     <div className="bg-white p-4 sm:p-6 rounded-xl shadow-lg mb-6 border border-gray-100">
       {/* Header + Month picker */}
@@ -468,9 +497,9 @@ const monthSundays = useMemo(() => {
           />
         </div>
 
-        {/* 4 CARDS ONLY */}
+        {/* 3 CARDS ONLY */}
         <Row gutter={[12, 12]}>
-          <Col xs={12} sm={12} lg={6}>
+          <Col xs={12} sm={12} lg={8}>
             <Card
               className="bg-gradient-to-r from-blue-500 to-blue-600 text-white rounded-xl shadow-md h-full border-0"
               bodyStyle={{ padding: screens.xs ? "16px 12px" : "20px" }}
@@ -483,7 +512,7 @@ const monthSundays = useMemo(() => {
             </Card>
           </Col>
 
-          <Col xs={12} sm={12} lg={6}>
+          <Col xs={12} sm={12} lg={8}>
             <Card
               className="bg-gradient-to-r from-purple-500 to-purple-600 text-white rounded-xl shadow-md h-full border-0"
               bodyStyle={{ padding: screens.xs ? "16px 12px" : "20px" }}
@@ -498,7 +527,7 @@ const monthSundays = useMemo(() => {
             </Card>
           </Col>
 
-          <Col xs={12} sm={12} lg={6}>
+          <Col xs={24} sm={24} lg={8}>
             <Card
               className="bg-gradient-to-r from-pink-500 to-pink-600 text-white rounded-xl shadow-md h-full border-0"
               bodyStyle={{ padding: screens.xs ? "16px 12px" : "20px" }}
