@@ -383,6 +383,7 @@ const DistrictSundayServiceReport: React.FC = () => {
           copy[row] = { ...copy[row], [prop as string]: Number(newVal) || 0 };
         });
         copy.forEach((r) => {
+          // FIXED: Calculate total attendance as sum of all attendance types
           r.totalAttendance = r.attendance + r.sbsAttendance + r.visitors;
           r.total =
             r.tithes +
@@ -403,15 +404,26 @@ const DistrictSundayServiceReport: React.FC = () => {
     []
   );
 
+  // FIXED: Calculate total attendance properly
   const summaryStats = useMemo(() => {
     return data.reduce(
       (a, r) => {
-        a.totalAttendance += r.totalAttendance;
+        a.serviceAttendance += r.attendance;
+        a.sbsAttendance += r.sbsAttendance;
+        a.visitors += r.visitors;
+        a.totalAttendance += r.attendance + r.sbsAttendance + r.visitors; // Sum all attendance types
         a.totalTithes += r.tithes;
         a.totalOfferings += r.total;
         return a;
       },
-      { totalAttendance: 0, totalTithes: 0, totalOfferings: 0 }
+      { 
+        serviceAttendance: 0, 
+        sbsAttendance: 0, 
+        visitors: 0, 
+        totalAttendance: 0, 
+        totalTithes: 0, 
+        totalOfferings: 0 
+      }
     );
   }, [data]);
 
@@ -497,48 +509,64 @@ const DistrictSundayServiceReport: React.FC = () => {
           />
         </div>
 
-        {/* 3 CARDS ONLY */}
+        {/* FIXED: 3 equal cards with proper total calculation */}
         <Row gutter={[12, 12]}>
-          <Col xs={12} sm={12} lg={8}>
+          {/* Total Attendance Card */}
+          <Col xs={24} sm={8} lg={8}>
             <Card
               className="bg-gradient-to-r from-blue-500 to-blue-600 text-white rounded-xl shadow-md h-full border-0"
               bodyStyle={{ padding: screens.xs ? "16px 12px" : "20px" }}
             >
-              <Statistic
-                title={<span className="text-blue-100 text-sm flex items-center gap-2">Total Attendance</span>}
-                value={summaryStats.totalAttendance}
-                valueStyle={{ color: "#fff", fontSize: screens.xs ? "20px" : "24px" }}
-              />
+              <div className="text-center">
+                <div className="text-blue-100 text-sm font-semibold mb-2">Total Attendance</div>
+                <div className="text-2xl sm:text-3xl font-bold text-white mb-3">
+                  {summaryStats.totalAttendance.toLocaleString()}
+                </div>
+                <div className="grid grid-cols-3 gap-2 text-center border-t border-blue-400 pt-3">
+                  <div>
+                    <div className="text-blue-100 text-xs">Service</div>
+                    <div className="text-white font-semibold text-sm">{summaryStats.serviceAttendance.toLocaleString()}</div>
+                  </div>
+                  <div>
+                    <div className="text-blue-100 text-xs">SBS</div>
+                    <div className="text-white font-semibold text-sm">{summaryStats.sbsAttendance.toLocaleString()}</div>
+                  </div>
+                  <div>
+                    <div className="text-blue-100 text-xs">Visitors</div>
+                    <div className="text-white font-semibold text-sm">{summaryStats.visitors.toLocaleString()}</div>
+                  </div>
+                </div>
+              </div>
             </Card>
           </Col>
 
-          <Col xs={12} sm={12} lg={8}>
+          {/* Total Tithes Card */}
+          <Col xs={24} sm={8} lg={8}>
             <Card
               className="bg-gradient-to-r from-purple-500 to-purple-600 text-white rounded-xl shadow-md h-full border-0"
               bodyStyle={{ padding: screens.xs ? "16px 12px" : "20px" }}
             >
-              <Statistic
-                title={<span className="text-purple-100 text-sm flex items-center gap-2">Total Tithes</span>}
-                value={summaryStats.totalTithes}
-                prefix="₦"
-                precision={0}
-                valueStyle={{ color: "#fff", fontSize: screens.xs ? "20px" : "24px" }}
-              />
+              <div className="text-center">
+                <div className="text-purple-100 text-sm font-semibold mb-2">Total Tithes</div>
+                <div className="text-2xl sm:text-3xl font-bold text-white">
+                  ₦{summaryStats.totalTithes.toLocaleString()}
+                </div>
+              </div>
             </Card>
           </Col>
 
-          <Col xs={24} sm={24} lg={8}>
+          {/* All Offerings Card */}
+          <Col xs={24} sm={8} lg={8}>
             <Card
               className="bg-gradient-to-r from-pink-500 to-pink-600 text-white rounded-xl shadow-md h-full border-0"
               bodyStyle={{ padding: screens.xs ? "16px 12px" : "20px" }}
             >
-              <Statistic
-                title={<span className="text-pink-100 text-sm flex items-center gap-2">All Offerings</span>}
-                value={summaryStats.totalOfferings}
-                prefix="₦"
-                precision={0}
-                valueStyle={{ color: "#fff", fontSize: screens.xs ? "20px" : "24px" }}
-              />
+              <div className="text-center">
+                <div className="text-pink-100 text-sm font-semibold mb-2">All Offerings</div>
+                <div className="text-2xl sm:text-3xl font-bold text-white">
+                  ₦{summaryStats.totalOfferings.toLocaleString()}
+                </div>
+              </div>
             </Card>
           </Col>
         </Row>
