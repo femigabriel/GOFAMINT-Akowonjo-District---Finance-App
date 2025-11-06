@@ -256,14 +256,14 @@ export default function DashboardContent() {
       <div className="flex flex-col lg:flex-row justify-between items-start lg:items-center mb-8">
         <div className="mb-4 lg:mb-0">
           <div className="flex items-center gap-3 mb-2">
-            <div className="p-2 bg-white rounded-lg shadow-sm border">
-              <BarChart3 className="text-blue-600" size={24} />
+            <div className="p-2 bg-white rounded-lg shadow-sm border hidden lg:block">
+              <BarChart3 className="text-blue-600 " size={24} />
             </div>
             <div>
-              <h1 className="text-3xl font-bold text-gray-900">
+              <h1 className="lg:text-3xl text-base font-bold text-gray-900">
                 District Financial Dashboard
               </h1>
-              <p className="text-lg text-gray-600">
+              <p className="lg:text-lg text-sm text-gray-600">
                 Akowonjo District - Financial Overview & Analytics
               </p>
             </div>
@@ -292,9 +292,9 @@ export default function DashboardContent() {
       {/* Filters */}
       <Card className="border-0 shadow-xl bg-white/80 backdrop-blur-sm mb-8">
         <div className="flex flex-col lg:flex-row items-start lg:items-center gap-4">
-          <div className="flex items-center">
+          <div className="flex">
             <Filter size={18} className="mr-2 text-blue-600" />
-            <span className="font-semibold text-gray-700">Dashboard Filters:</span>
+            <span className="font-semibold text-gray-700 text-xs">Dashboard Filters:</span>
           </div>
           
           <div className="grid grid-cols-1 md:grid-cols-3 gap-4 w-full lg:w-auto">

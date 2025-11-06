@@ -185,8 +185,8 @@ export default function AdminLayout({ children }: AdminLayoutProps) {
         </Header>
 
         <Content
-          className={`p-6 ${isDarkMode ? "bg-gray-900" : "bg-gray-50"}`}
-          style={{ margin: 0, paddingLeft: 'calc(24px + env(safe-area-inset-left))' }} // Account for padding and safe area
+          className={`lg:p-6 p-0 ${isDarkMode ? "bg-gray-900" : "bg-gray-50"}`}
+          style={{ margin: 0, paddingLeft: 'calc(4px + env(safe-area-inset-left))' }} // Account for padding and safe area
         >
           <div className="max-w-7xl mx-auto">{children}</div>
         </Content>
