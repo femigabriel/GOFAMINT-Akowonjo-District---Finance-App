@@ -3,9 +3,10 @@ import { NextResponse } from "next/server";
 import dbConnect from "@/lib/mongodb";
 import SundayServiceReport from "@/models/SundayServiceReport";
 import { format } from "date-fns";
+import MidweekServiceReport from "@/models/MidweekServiceReport";
 
-/* ---------- Helper to calculate totals ---------- */
-function calcTotals(r: any) {
+/* ---------- Helper to calculate totals for Sunday ---------- */
+function calcSundayTotals(r: any) {
   const attendance = Number(r.attendance) || 0;
   const sbs = Number(r.sbsAttendance) || 0;
   const visitors = Number(r.visitors) || 0;
@@ -29,7 +30,7 @@ function calcTotals(r: any) {
   };
 }
 
-/* ---------- Helper to generate date based on week and month ---------- */
+/* ---------- Helper to generate date based on week and month for Sunday ---------- */
 function generateDateForWeek(week: string, month: string): string {
   try {
     // Parse month like "November-2025"
@@ -71,7 +72,7 @@ export async function POST(request: Request) {
     await dbConnect();
     console.log("Connected to MongoDB (POST)");
 
-    const { assembly, submittedBy, month, records } = await request.json();
+    const { assembly, submittedBy, month, records, serviceType = "sunday" } = await request.json();
 
     if (!assembly || !submittedBy || !month || !Array.isArray(records)) {
       return NextResponse.json(
@@ -80,80 +81,121 @@ export async function POST(request: Request) {
       );
     }
 
-    /* Filter out completely empty rows & calculate totals */
-    const validRecords = records
-      .filter((r: any) => {
-        const hasValue =
-          r.attendance > 0 ||
-          r.sbsAttendance > 0 ||
-          r.visitors > 0 ||
-          r.tithes > 0 ||
-          r.offerings > 0 ||
-          r.specialOfferings > 0 ||
-          r.etf > 0 ||
-          r.pastorsWarfare > 0 ||
-          r.vigil > 0 ||
-          r.thanksgiving > 0 ||
-          r.retirees > 0 ||
-          r.missionaries > 0 ||
-          r.youthOfferings > 0 ||
-          r.districtSupport > 0;
-        return hasValue;
-      })
-      .map((r: any) => {
-        const { totalAttendance, total } = calcTotals(r);
-        
-        // AUTO-GENERATE DATE IF MISSING
-        let recordDate = r.date;
-        if (!recordDate && r.week && month) {
-          recordDate = generateDateForWeek(r.week, month);
-          console.log(`📅 Generated date for ${r.week}: ${recordDate}`);
-        }
-
-        return {
-          week: r.week,
-          date: recordDate, // Now this will always have a value
+    if (serviceType === "midweek") {
+      /* Filter out completely empty rows & calculate totals for midweek */
+      const validRecords = records
+        .filter((r: any) => {
+          const hasValue =
+            r.attendance > 0 ||
+            r.offering > 0;
+          return hasValue;
+        })
+        .map((r: any) => ({
+          date: r.date,
+          day: r.day,
           attendance: Number(r.attendance) || 0,
-          sbsAttendance: Number(r.sbsAttendance) || 0,
-          visitors: Number(r.visitors) || 0,
-          tithes: Number(r.tithes) || 0,
-          offerings: Number(r.offerings) || 0,
-          specialOfferings: Number(r.specialOfferings) || 0,
-          etf: Number(r.etf) || 0,
-          pastorsWarfare: Number(r.pastorsWarfare) || 0,
-          vigil: Number(r.vigil) || 0,
-          thanksgiving: Number(r.thanksgiving) || 0,
-          retirees: Number(r.retirees) || 0,
-          missionaries: Number(r.missionaries) || 0,
-          youthOfferings: Number(r.youthOfferings) || 0,
-          districtSupport: Number(r.districtSupport) || 0,
-          total,
-          totalAttendance,
-        };
+          offering: Number(r.offering) || 0,
+          total: Number(r.offering) || 0,
+        }));
+
+      if (validRecords.length === 0) {
+        return NextResponse.json(
+          { error: "No valid records to save" },
+          { status: 400 }
+        );
+      }
+
+      const report = new MidweekServiceReport({
+        assembly,
+        submittedBy,
+        month,
+        records: validRecords,
       });
 
-    if (validRecords.length === 0) {
-      return NextResponse.json(
-        { error: "No valid records to save" },
-        { status: 400 }
-      );
+      await report.save();
+      console.log("Saved midweek report – records:", validRecords.length);
+      console.log("Saved midweek records with dates:", validRecords.map(r => ({ date: r.date, day: r.day })));
+
+      return NextResponse.json({
+        success: true,
+        message: `${validRecords.length} record(s) saved`,
+      });
+    } else {
+      /* Filter out completely empty rows & calculate totals for sunday */
+      const validRecords = records
+        .filter((r: any) => {
+          const hasValue =
+            r.attendance > 0 ||
+            r.sbsAttendance > 0 ||
+            r.visitors > 0 ||
+            r.tithes > 0 ||
+            r.offerings > 0 ||
+            r.specialOfferings > 0 ||
+            r.etf > 0 ||
+            r.pastorsWarfare > 0 ||
+            r.vigil > 0 ||
+            r.thanksgiving > 0 ||
+            r.retirees > 0 ||
+            r.missionaries > 0 ||
+            r.youthOfferings > 0 ||
+            r.districtSupport > 0;
+          return hasValue;
+        })
+        .map((r: any) => {
+          const { totalAttendance, total } = calcSundayTotals(r);
+          
+          // AUTO-GENERATE DATE IF MISSING
+          let recordDate = r.date;
+          if (!recordDate && r.week && month) {
+            recordDate = generateDateForWeek(r.week, month);
+            console.log(`📅 Generated date for ${r.week}: ${recordDate}`);
+          }
+
+          return {
+            week: r.week,
+            date: recordDate, // Now this will always have a value
+            attendance: Number(r.attendance) || 0,
+            sbsAttendance: Number(r.sbsAttendance) || 0,
+            visitors: Number(r.visitors) || 0,
+            tithes: Number(r.tithes) || 0,
+            offerings: Number(r.offerings) || 0,
+            specialOfferings: Number(r.specialOfferings) || 0,
+            etf: Number(r.etf) || 0,
+            pastorsWarfare: Number(r.pastorsWarfare) || 0,
+            vigil: Number(r.vigil) || 0,
+            thanksgiving: Number(r.thanksgiving) || 0,
+            retirees: Number(r.retirees) || 0,
+            missionaries: Number(r.missionaries) || 0,
+            youthOfferings: Number(r.youthOfferings) || 0,
+            districtSupport: Number(r.districtSupport) || 0,
+            total,
+            totalAttendance,
+          };
+        });
+
+      if (validRecords.length === 0) {
+        return NextResponse.json(
+          { error: "No valid records to save" },
+          { status: 400 }
+        );
+      }
+
+      const report = new SundayServiceReport({
+        assembly,
+        submittedBy,
+        month,
+        records: validRecords,
+      });
+
+      await report.save();
+      console.log("Saved sunday report – records:", validRecords.length);
+      console.log("Saved sunday records with dates:", validRecords.map(r => ({ week: r.week, date: r.date })));
+
+      return NextResponse.json({
+        success: true,
+        message: `${validRecords.length} record(s) saved`,
+      });
     }
-
-    const report = new SundayServiceReport({
-      assembly,
-      submittedBy,
-      month,
-      records: validRecords,
-    });
-
-    await report.save();
-    console.log("Saved report – records:", validRecords.length);
-    console.log("Saved records with dates:", validRecords.map(r => ({ week: r.week, date: r.date })));
-
-    return NextResponse.json({
-      success: true,
-      message: `${validRecords.length} record(s) saved`,
-    });
   } catch (err: any) {
     console.error("POST error:", err);
     return NextResponse.json({ error: err.message || "Server error" }, { status: 500 });
@@ -169,6 +211,7 @@ export async function GET(request: Request) {
     const { searchParams } = new URL(request.url);
     const assembly = searchParams.get("assembly");
     const month = searchParams.get("month");
+    const serviceType = searchParams.get("serviceType") || "sunday";
 
     if (!assembly || !month) {
       return NextResponse.json(
@@ -177,27 +220,49 @@ export async function GET(request: Request) {
       );
     }
 
-    const doc = await SundayServiceReport.findOne({ assembly, month })
-      .sort({ createdAt: -1 })
-      .lean();
+    if (serviceType === "midweek") {
+      const doc = await MidweekServiceReport.findOne({ assembly, month })
+        .sort({ createdAt: -1 })
+        .lean();
 
+      if (!doc) {
+        // Return empty structure with the requested month
+        return NextResponse.json({
+          _id: null,
+          assembly,
+          submittedBy: "",
+          month,
+          records: [],
+          createdAt: null,
+          updatedAt: null,
+          __v: 0
+        });
+      }
 
-    if (!doc) {
-      // Return empty structure with the requested month
-      return NextResponse.json({
-        _id: null,
-        assembly,
-        submittedBy: "",
-        month,
-        records: [],
-        createdAt: null,
-        updatedAt: null,
-        __v: 0
-      });
+      // Return the ENTIRE document, not just records
+      return NextResponse.json(doc);
+    } else {
+      const doc = await SundayServiceReport.findOne({ assembly, month })
+        .sort({ createdAt: -1 })
+        .lean();
+
+      if (!doc) {
+        // Return empty structure with the requested month
+        return NextResponse.json({
+          _id: null,
+          assembly,
+          submittedBy: "",
+          month,
+          records: [],
+          createdAt: null,
+          updatedAt: null,
+          __v: 0
+        });
+      }
+
+      // Return the ENTIRE document, not just records
+      return NextResponse.json(doc);
     }
-
-    // Return the ENTIRE document, not just records
-    return NextResponse.json(doc);
     
   } catch (err: any) {
     console.error("GET error:", err);

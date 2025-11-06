@@ -5,7 +5,8 @@ import dayjs from "dayjs";
 import { message } from "antd";
 import { useRouter } from "next/navigation";
 import MainLayout from "@/components/layout/DashboardLayout";
-import DistrictSundayServiceReport from "../records/DistrictSundayServiceReport";
+import DistrictSundayServiceReport from "./DistrictSundayServiceReport";
+import ServiceReportsManager from "./ServiceReportsManager";
 
 
 export default function Dssreportpage() {
@@ -38,7 +39,8 @@ export default function Dssreportpage() {
       dateRange={dateRange}
       onRangeChange={onRangeChange}
     >
-      <DistrictSundayServiceReport />
+      {/* <DistrictSundayServiceReport /> */}
+      <ServiceReportsManager />
     </MainLayout>
   );
 }
