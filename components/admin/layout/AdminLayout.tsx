@@ -70,7 +70,7 @@ export default function AdminLayout({ children }: AdminLayoutProps) {
   const menuItems = [
     { key: "/admin/dashboard", icon: <BarChart3 size={20} />, label: "Dashboard" },
     { key: "/admin/assemblies", icon: <Church size={20} />, label: "Assemblies" },
-    { key: "/admin/users", icon: <Users size={20} />, label: "Users" },
+    // { key: "/admin/users", icon: <Users size={20} />, label: "Users" },
     { key: "/admin/reports", icon: <DollarSign size={20} />, label: "Finance Reports" },
   ];
 

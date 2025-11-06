@@ -26,7 +26,7 @@ export default function MainLayout({
   const [sidebarActiveItem, setSidebarActiveItem] = useState(activeItem);
 
   return (
-    <div className="h-screen w-screen flex bg-background overflow-hidden">
+    <div className="lg:h-screen h-full w-screen flex bg-background overflow-hidden">
       <Sidebar onItemClick={setSidebarActiveItem} />
       <div className="flex-1 p-4 sm:p-6 overflow-auto">
         {showHeader && assembly && dateRange && onRangeChange && (

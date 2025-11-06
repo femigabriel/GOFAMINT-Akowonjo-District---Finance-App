@@ -24,7 +24,7 @@ export const NavBar = () => {
   ];
 
   return (
-    <nav className="fixed bottom-0 left-0 w-full bg-[#f5f5f5] border-t border-gray-200 shadow-md md:hidden">
+    <nav className="fixed bottom-0 left-0 w-full bg-[#f5f5f5] mt-10 border-t border-gray-200 shadow-md md:hidden">
       <div className="flex justify-around items-center px-4 py-2">
         {navItems.map(({ href, label, icon: Icon }) => (
           <Link key={href} href={href}>

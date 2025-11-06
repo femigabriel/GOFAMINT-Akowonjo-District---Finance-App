@@ -6,7 +6,8 @@ export const Dashboard = () => {
   return (
     <div>
       <DashboardPage />
-       <div className="lg:hidden block">
+     <div className="lg:hidden block mt-10">
+        <div className="h-[50px]"></div>
         <NavBar />
       </div>
     </div>
