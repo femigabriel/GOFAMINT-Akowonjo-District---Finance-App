@@ -115,6 +115,7 @@ export async function POST(request: Request) {
   }
 }
 
+
 /* ---------- GET – fetch latest report for assembly+month ---------- */
 export async function GET(request: Request) {
   try {
@@ -134,11 +135,26 @@ export async function GET(request: Request) {
 
     const doc = await SundayServiceReport.findOne({ assembly, month })
       .sort({ createdAt: -1 })
-      .lean();                     // plain JS object – faster
+      .lean();
 
-    console.log("Fetched doc:", doc?._id ?? "none");
 
-    return NextResponse.json({ records: doc?.records ?? [] });
+    if (!doc) {
+      // Return empty structure with the requested month
+      return NextResponse.json({
+        _id: null,
+        assembly,
+        submittedBy: "",
+        month,
+        records: [],
+        createdAt: null,
+        updatedAt: null,
+        __v: 0
+      });
+    }
+
+    // Return the ENTIRE document, not just records
+    return NextResponse.json(doc);
+    
   } catch (err: any) {
     console.error("GET error:", err);
     return NextResponse.json({ error: err.message || "Server error" }, { status: 500 });
