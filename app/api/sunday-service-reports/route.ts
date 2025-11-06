@@ -29,6 +29,42 @@ function calcTotals(r: any) {
   };
 }
 
+/* ---------- Helper to generate date based on week and month ---------- */
+function generateDateForWeek(week: string, month: string): string {
+  try {
+    // Parse month like "November-2025"
+    const [monthName, year] = month.split('-');
+    const monthIndex = [
+      'January', 'February', 'March', 'April', 'May', 'June',
+      'July', 'August', 'September', 'October', 'November', 'December'
+    ].indexOf(monthName);
+    
+    if (monthIndex === -1) return '';
+    
+    // Get week number (e.g., "Week 1" -> 1)
+    const weekNumber = parseInt(week.replace('Week ', '')) || 1;
+    
+    // Calculate date: first Sunday of the month + (week-1) * 7 days
+    const firstOfMonth = new Date(parseInt(year), monthIndex, 1);
+    
+    // Find first Sunday of the month
+    let firstSunday = new Date(firstOfMonth);
+    while (firstSunday.getDay() !== 0) { // 0 is Sunday
+      firstSunday.setDate(firstSunday.getDate() + 1);
+    }
+    
+    // Add weeks
+    const recordDate = new Date(firstSunday);
+    recordDate.setDate(firstSunday.getDate() + (weekNumber - 1) * 7);
+    
+    return recordDate.toISOString().split('T')[0]; // YYYY-MM-DD format
+    
+  } catch (error) {
+    console.error('Error generating date:', error);
+    return '';
+  }
+}
+
 /* ---------- POST – save report ---------- */
 export async function POST(request: Request) {
   try {
@@ -66,9 +102,17 @@ export async function POST(request: Request) {
       })
       .map((r: any) => {
         const { totalAttendance, total } = calcTotals(r);
+        
+        // AUTO-GENERATE DATE IF MISSING
+        let recordDate = r.date;
+        if (!recordDate && r.week && month) {
+          recordDate = generateDateForWeek(r.week, month);
+          console.log(`📅 Generated date for ${r.week}: ${recordDate}`);
+        }
+
         return {
           week: r.week,
-          date: r.date,               // <-- saved
+          date: recordDate, // Now this will always have a value
           attendance: Number(r.attendance) || 0,
           sbsAttendance: Number(r.sbsAttendance) || 0,
           visitors: Number(r.visitors) || 0,
@@ -104,6 +148,7 @@ export async function POST(request: Request) {
 
     await report.save();
     console.log("Saved report – records:", validRecords.length);
+    console.log("Saved records with dates:", validRecords.map(r => ({ week: r.week, date: r.date })));
 
     return NextResponse.json({
       success: true,
@@ -114,7 +159,6 @@ export async function POST(request: Request) {
     return NextResponse.json({ error: err.message || "Server error" }, { status: 500 });
   }
 }
-
 
 /* ---------- GET – fetch latest report for assembly+month ---------- */
 export async function GET(request: Request) {
