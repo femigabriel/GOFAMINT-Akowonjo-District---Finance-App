@@ -28,6 +28,7 @@ export default function AdminLayout({ children }: AdminLayoutProps) {
   const pathname = usePathname();
   const [collapsed, setCollapsed] = useState(false);
   const [mobileOpen, setMobileOpen] = useState(false);
+  const [isMobile, setIsMobile] = useState(false);
   const { isDarkMode, toggleTheme } = useTheme();
 
   // 🔐 Check admin authentication
@@ -45,16 +46,20 @@ export default function AdminLayout({ children }: AdminLayoutProps) {
     checkAdminAuth();
   }, [router]);
 
-  // Responsive collapse state
+  // ✅ Handle responsiveness
   useEffect(() => {
     const handleResize = () => {
-      if (window.innerWidth < 992 && !collapsed) setCollapsed(true);
-      if (window.innerWidth >= 992 && collapsed) setCollapsed(false);
+      setIsMobile(window.innerWidth < 992);
+      if (window.innerWidth < 992) {
+        setCollapsed(true);
+      } else {
+        setCollapsed(false);
+      }
     };
     handleResize();
     window.addEventListener("resize", handleResize);
     return () => window.removeEventListener("resize", handleResize);
-  }, [collapsed]);
+  }, []);
 
   const handleLogout = () => {
     localStorage.removeItem("admin");
@@ -115,29 +120,29 @@ export default function AdminLayout({ children }: AdminLayoutProps) {
 
   return (
     <Layout style={{ minHeight: "100vh" }} className={isDarkMode ? "dark" : "light"}>
-      {/* Desktop Sidebar */}
-      <Sider
-        collapsible
-        collapsed={collapsed}
-        onCollapse={setCollapsed}
-        breakpoint="lg"
-        collapsedWidth="0"
-        theme={isDarkMode ? "dark" : "light"}
-        style={{
-          position: "fixed",
-          height: "100vh",
-          zIndex: 1000,
-          left: 0,
-          top: 0,
-          display: window.innerWidth >= 992 ? "block" : "none",
-          background: isDarkMode ? "#001529" : "#fff",
-          borderRight: isDarkMode ? "none" : "1px solid #f0f0f0",
-        }}
-      >
-        {MenuContent}
-      </Sider>
+      {/* ✅ Desktop Sidebar (hidden on mobile) */}
+      {!isMobile && (
+        <Sider
+          collapsible
+          collapsed={collapsed}
+          onCollapse={setCollapsed}
+          width={200}
+          theme={isDarkMode ? "dark" : "light"}
+          style={{
+            position: "fixed",
+            height: "100vh",
+            zIndex: 1000,
+            left: 0,
+            top: 0,
+            background: isDarkMode ? "#001529" : "#fff",
+            borderRight: isDarkMode ? "none" : "1px solid #f0f0f0",
+          }}
+        >
+          {MenuContent}
+        </Sider>
+      )}
 
-      {/* Mobile Drawer */}
+      {/* ✅ Mobile Drawer Menu */}
       <Drawer
         title={
           <div className="flex items-center gap-2">
@@ -153,14 +158,15 @@ export default function AdminLayout({ children }: AdminLayoutProps) {
         placement="left"
         open={mobileOpen}
         onClose={() => setMobileOpen(false)}
+        bodyStyle={{ padding: 0 }}
       >
         {MenuContent}
       </Drawer>
 
-      {/* Main Layout */}
-      <Layout style={{ marginLeft: window.innerWidth >= 992 ? siderWidth : 0 }}>
+      {/* ✅ Main Layout */}
+      <Layout style={{ marginLeft: isMobile ? 0 : siderWidth }}>
         <Header
-          className={`flex items-center justify-between px-4 md:px-6 ${
+          className={`flex flex-wrap items-center justify-between px-4 md:px-6 ${
             isDarkMode
               ? "bg-gray-800 border-b border-gray-700"
               : "bg-white shadow-sm"
@@ -168,14 +174,14 @@ export default function AdminLayout({ children }: AdminLayoutProps) {
           style={{ position: "sticky", top: 0, zIndex: 999 }}
         >
           {/* Left section */}
-          <div className="flex items-center gap-4">
-            {/* Hamburger for mobile */}
-            <Button
-              type="text"
-              className="lg:hidden block"
-              icon={<MenuIcon size={22} />}
-              onClick={() => setMobileOpen(true)}
-            />
+          <div className="flex items-center gap-3 flex-shrink-0">
+            {isMobile && (
+              <Button
+                type="text"
+                icon={<MenuIcon size={22} />}
+                onClick={() => setMobileOpen(true)}
+              />
+            )}
             <h1
               className={`text-sm md:text-xl font-bold ${
                 isDarkMode ? "text-white" : "text-primary"
@@ -186,7 +192,7 @@ export default function AdminLayout({ children }: AdminLayoutProps) {
           </div>
 
           {/* Right section */}
-          <div className="flex items-center gap-4">
+          <div className="flex items-center gap-3 flex-wrap">
             {/* Theme Switch */}
             <div className="flex items-center gap-2">
               <Sun
