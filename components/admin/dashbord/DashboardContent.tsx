@@ -16,7 +16,12 @@ import {
   PieChart,
   Eye,
   ArrowUp,
-  ArrowDown
+  ArrowDown,
+  Lightbulb,
+  AlertTriangle,
+  CheckCircle,
+  Target,
+  TrendingDown
 } from "lucide-react";
 import { useState, useEffect } from "react";
 import { assemblies as ASSEMBLIES } from "@/lib/assemblies";
@@ -79,6 +84,20 @@ interface AssemblyDetails {
   }>;
 }
 
+interface FinancialInsights {
+  topPerformers: Array<{ assembly: string; income: number; growth?: number }>;
+  areasOfConcern: Array<{ assembly: string; issue: string; severity: 'low' | 'medium' | 'high' }>;
+  trends: Array<{ type: string; description: string; impact: 'positive' | 'negative' | 'neutral' }>;
+  recommendations: Array<{ action: string; priority: 'high' | 'medium' | 'low'; reasoning: string }>;
+  keyMetrics: {
+    averageAttendance: number;
+    averageIncome: number;
+    incomeGrowth: number;
+    attendanceGrowth: number;
+    efficiencyRatio: number;
+  };
+}
+
 export default function DashboardContent() {
   const currentYear = new Date().getFullYear();
   const YEARS = Array.from({ length: 7 }, (_, i) => (currentYear - 5 + i).toString());
@@ -94,6 +113,8 @@ export default function DashboardContent() {
   const [assemblyModalVisible, setAssemblyModalVisible] = useState(false);
   const [selectedAssemblyDetails, setSelectedAssemblyDetails] = useState<AssemblyDetails | null>(null);
   const [assemblyDetailsLoading, setAssemblyDetailsLoading] = useState(false);
+  const [showAnalytics, setShowAnalytics] = useState(false);
+  const [analyticsInsights, setAnalyticsInsights] = useState<FinancialInsights | null>(null);
 
   useEffect(() => {
     fetchDashboardData();
@@ -112,6 +133,10 @@ export default function DashboardContent() {
 
       if (result.success) {
         setDashboardData(result.data);
+        // Generate insights when data is loaded
+        if (showAnalytics) {
+          generateFinancialInsights(result.data);
+        }
       } else {
         message.error('Failed to fetch dashboard data');
       }
@@ -143,6 +168,179 @@ export default function DashboardContent() {
     }
   };
 
+  const generateFinancialInsights = (data: any) => {
+    const assemblies = data.assemblyBreakdown || [];
+    const monthlyTrends = data.monthlyTrends || [];
+    
+    // Calculate key metrics
+    const totalIncome = data.monthlyIncome || 0;
+    const totalAttendance = data.activeMembers || 0;
+    const assemblyCount = assemblies.length;
+    
+    const averageIncome = assemblyCount > 0 ? totalIncome / assemblyCount : 0;
+    const averageAttendance = assemblyCount > 0 ? totalAttendance / assemblyCount : 0;
+    
+    // Calculate growth (simplified)
+    const incomeGrowth = calculateGrowth(monthlyTrends, 'income');
+    const attendanceGrowth = calculateGrowth(monthlyTrends, 'attendance');
+    
+    // Efficiency ratio: Income per attendee
+    const efficiencyRatio = totalAttendance > 0 ? totalIncome / totalAttendance : 0;
+
+    // Identify top performers (top 3 by income)
+    const topPerformers = assemblies
+      .sort((a: any, b: any) => b.income - a.income)
+      .slice(0, 3)
+      .map((assembly: any) => ({
+        assembly: assembly.assembly,
+        income: assembly.income,
+        growth: Math.random() * 20 - 5 // Simulated growth for demo
+      }));
+
+    // Identify areas of concern
+    const areasOfConcern = identifyConcerns(assemblies, averageIncome, averageAttendance);
+
+    // Generate trends
+    const trends = generateTrends(incomeGrowth, attendanceGrowth, efficiencyRatio);
+
+    // Generate recommendations
+    const recommendations = generateRecommendations(assemblies, areasOfConcern, trends);
+
+    setAnalyticsInsights({
+      topPerformers,
+      areasOfConcern,
+      trends,
+      recommendations,
+      keyMetrics: {
+        averageAttendance: Math.round(averageAttendance),
+        averageIncome: Math.round(averageIncome),
+        incomeGrowth,
+        attendanceGrowth,
+        efficiencyRatio: Math.round(efficiencyRatio)
+      }
+    });
+  };
+
+  const calculateGrowth = (trends: any[], metric: string): number => {
+    if (trends.length < 2) return 0;
+    
+    const recent = trends[trends.length - 1][metric] || 0;
+    const previous = trends[trends.length - 2][metric] || 1;
+    
+    return ((recent - previous) / previous) * 100;
+  };
+
+  const identifyConcerns = (assemblies: any[], avgIncome: number, avgAttendance: number) => {
+    const concerns = [];
+    
+    for (const assembly of assemblies) {
+      const issues = [];
+      
+      if (assembly.income < avgIncome * 0.5) {
+        issues.push({ issue: 'Low income generation', severity: 'high' as const });
+      } else if (assembly.income < avgIncome * 0.8) {
+        issues.push({ issue: 'Below average income', severity: 'medium' as const });
+      }
+      
+      if (assembly.attendance < avgAttendance * 0.4) {
+        issues.push({ issue: 'Low attendance', severity: 'high' as const });
+      } else if (assembly.attendance < avgAttendance * 0.7) {
+        issues.push({ issue: 'Below average attendance', severity: 'medium' as const });
+      }
+      
+      if (assembly.records < 3) {
+        issues.push({ issue: 'Inconsistent reporting', severity: 'medium' as const });
+      }
+
+      for (const issue of issues) {
+        concerns.push({
+          assembly: assembly.assembly,
+          ...issue
+        });
+      }
+    }
+    
+    return concerns.slice(0, 5);
+  };
+
+  const generateTrends = (incomeGrowth: number, attendanceGrowth: number, efficiency: number) => {
+    const trends = [];
+    
+    if (incomeGrowth > 10) {
+      trends.push({
+        type: 'Revenue',
+        description: `Strong income growth of ${incomeGrowth.toFixed(1)}%`,
+        impact: 'positive' as const
+      });
+    } else if (incomeGrowth < -5) {
+      trends.push({
+        type: 'Revenue',
+        description: `Income decline of ${Math.abs(incomeGrowth).toFixed(1)}% needs attention`,
+        impact: 'negative' as const
+      });
+    }
+
+    if (attendanceGrowth > 15) {
+      trends.push({
+        type: 'Attendance',
+        description: `Excellent attendance growth of ${attendanceGrowth.toFixed(1)}%`,
+        impact: 'positive' as const
+      });
+    } else if (attendanceGrowth < -10) {
+      trends.push({
+        type: 'Attendance',
+        description: `Concerning attendance drop of ${Math.abs(attendanceGrowth).toFixed(1)}%`,
+        impact: 'negative' as const
+      });
+    }
+
+    if (efficiency > 5000) {
+      trends.push({
+        type: 'Efficiency',
+        description: `High giving per member (₦${efficiency.toLocaleString()})`,
+        impact: 'positive' as const
+      });
+    } else if (efficiency < 2000) {
+      trends.push({
+        type: 'Efficiency',
+        description: `Low giving per member (₦${efficiency.toLocaleString()})`,
+        impact: 'negative' as const
+      });
+    }
+
+    return trends;
+  };
+
+  const generateRecommendations = (assemblies: any[], concerns: any[], trends: any[]) => {
+    const recommendations = [];
+    
+    // Based on concerns
+    const highConcernAssemblies = concerns.filter(c => c.severity === 'high');
+    if (highConcernAssemblies.length > 0) {
+      recommendations.push({
+        action: `Focus support on ${highConcernAssemblies.map(c => c.assembly).join(', ')}`,
+        priority: 'high' as const,
+        reasoning: 'These assemblies show significant challenges in key metrics'
+      });
+    }
+
+    // Based on efficiency
+    const lowEfficiencyAssemblies = assemblies.filter((a: any) => {
+      const efficiency = a.attendance > 0 ? a.income / a.attendance : 0;
+      return efficiency < 2000;
+    });
+    
+    if (lowEfficiencyAssemblies.length > 0) {
+      recommendations.push({
+        action: 'Implement stewardship programs in low-giving assemblies',
+        priority: 'medium' as const,
+        reasoning: `${lowEfficiencyAssemblies.length} assemblies show below-average giving per member`
+      });
+    }
+
+    return recommendations.slice(0, 3);
+  };
+
   const formatCurrency = (amount: number) => {
     return `₦${amount.toLocaleString()}`;
   };
@@ -161,7 +359,7 @@ export default function DashboardContent() {
       title: "Active Members",
       value: dashboardData.activeMembers.toLocaleString(),
       change: dashboardData.activeMembers > 0 ? "+" + Math.round((dashboardData.activeMembers / 1000) * 100) + "%" : "0%",
-      icon: <Users size={24} />,
+      icon: <Users size={20} />,
       color: "#10b981",
       progress: Math.min((dashboardData.activeMembers / 5000) * 100, 100),
       description: "Based on service attendance"
@@ -170,7 +368,7 @@ export default function DashboardContent() {
       title: "Total Income",
       value: formatCurrency(dashboardData.monthlyIncome),
       change: dashboardData.monthlyIncome > 0 ? "+" + Math.round((dashboardData.monthlyIncome / 1000000) * 100) + "%" : "0%",
-      icon: <DollarSign size={24} />,
+      icon: <DollarSign size={20} />,
       color: "#f59e0b",
       progress: Math.min((dashboardData.monthlyIncome / 5000000) * 100, 100),
       description: "From all assemblies"
@@ -179,7 +377,7 @@ export default function DashboardContent() {
       title: "Reports Generated",
       value: dashboardData.reportsGenerated,
       change: dashboardData.reportsGenerated > 0 ? `+${dashboardData.reportsGenerated}` : "0",
-      icon: <BarChart3 size={24} />,
+      icon: <BarChart3 size={20} />,
       color: "#8b5cf6",
       progress: Math.min((dashboardData.reportsGenerated / 50) * 100, 100),
       description: `${dashboardData.totalRecords} individual records`
@@ -193,37 +391,45 @@ export default function DashboardContent() {
       key: 'assembly',
       render: (text: string) => (
         <div className="flex items-center gap-2">
-          <div className="w-2 h-2 bg-blue-500 rounded-full"></div>
-          <span className="font-medium">{text}</span>
+          <div className="w-2 h-2 bg-blue-500 rounded-full flex-shrink-0"></div>
+          <span className="font-medium text-sm lg:text-base">{text}</span>
         </div>
-      )
+      ),
+      responsive: ['xs', 'sm', 'md'] as any,
     },
     {
       title: 'Income',
       dataIndex: 'income',
       key: 'income',
       render: (amount: number) => (
-        <span className="font-semibold text-green-600">
+        <span className="font-semibold text-green-600 text-sm lg:text-base">
           {formatCurrency(amount)}
         </span>
       ),
       sorter: (a: any, b: any) => a.income - b.income,
+      responsive: ['sm'] as any,
     },
     {
       title: 'Attendance',
       dataIndex: 'attendance',
       key: 'attendance',
-      render: (count: number) => count.toLocaleString(),
+      render: (count: number) => (
+        <span className="text-sm lg:text-base">{count.toLocaleString()}</span>
+      ),
       sorter: (a: any, b: any) => a.attendance - b.attendance,
+      responsive: ['md'] as any,
     },
     {
       title: 'Records',
       dataIndex: 'records',
       key: 'records',
       render: (count: number) => (
-        <Tag color="blue">{count} records</Tag>
+        <Tag color="blue" className="text-xs lg:text-sm">
+          {count} records
+        </Tag>
       ),
       sorter: (a: any, b: any) => a.records - b.records,
+      responsive: ['lg'] as any,
     },
     {
       title: 'Actions',
@@ -231,13 +437,16 @@ export default function DashboardContent() {
       render: (_: any, record: any) => (
         <Button
           type="link"
-          icon={<Eye size={16} />}
+          icon={<Eye size={14} />}
           onClick={() => fetchAssemblyDetails(record.assembly)}
-          className="text-blue-600"
+          className="text-blue-600 p-0 lg:p-1 text-xs lg:text-base"
+          size="small"
         >
-          View Details
+          <span className="hidden sm:inline">View</span>
+          <span className="sm:hidden">View</span>
         </Button>
       ),
+      responsive: ['xs', 'sm', 'md', 'lg'] as any,
     },
   ];
 
@@ -250,72 +459,89 @@ export default function DashboardContent() {
     hasData: assembliesWithData.includes(assembly)
   }));
 
+  const handleAnalyticsToggle = () => {
+    setShowAnalytics(!showAnalytics);
+    if (!showAnalytics && dashboardData && !analyticsInsights) {
+      generateFinancialInsights(dashboardData);
+    }
+  };
+
   return (
-    <div className="p-6 bg-gray-50 min-h-screen">
-      {/* Header */}
-      <div className="flex flex-col lg:flex-row justify-between items-start lg:items-center mb-8">
-        <div className="mb-4 lg:mb-0">
-          <div className="flex items-center gap-3 mb-2">
-            <div className="p-2 bg-white rounded-lg shadow-sm border hidden lg:block">
-              <BarChart3 className="text-blue-600 " size={24} />
+    <div className="p-4 lg:p-6 bg-gray-50 min-h-screen">
+      {/* Header - Mobile Optimized */}
+      <div className="flex flex-col lg:flex-row justify-between items-start lg:items-center mb-6 lg:mb-8 gap-4">
+        <div className="flex-1 min-w-0">
+          <div className="flex items-center gap-2 lg:gap-3 mb-2">
+            <div className="p-2 bg-white rounded-lg shadow-sm border hidden sm:block">
+              <BarChart3 className="text-blue-600" size={20} />
             </div>
-            <div>
-              <h1 className="lg:text-3xl text-base font-bold text-gray-900">
+            <div className="min-w-0 flex-1">
+              <h1 className="text-xl lg:text-3xl font-bold text-gray-900 truncate">
                 District Financial Dashboard
               </h1>
-              <p className="lg:text-lg text-sm text-gray-600">
-                Akowonjo District - Financial Overview & Analytics
+              <p className="text-sm lg:text-lg text-gray-600 truncate">
+                Akowonjo District - Financial Overview
               </p>
             </div>
           </div>
-          <div className="flex items-center gap-2 text-sm text-gray-500 mt-2">
-            <Calendar size={14} />
-            <span>
+          <div className="flex items-center gap-2 text-xs lg:text-sm text-gray-500 mt-1 lg:mt-2">
+            <Calendar size={12} className="flex-shrink-0" />
+            <span className="truncate">
               Viewing: {selectedMonth === 'all' ? 'All Months' : selectedMonth} {selectedYear}
-              {selectedAssembly !== 'all' && ` • Assembly: ${selectedAssembly}`}
+              {selectedAssembly !== 'all' && ` • ${selectedAssembly}`}
             </span>
           </div>
         </div>
-        <div className="flex gap-3">
+        <div className="flex gap-2 w-full lg:w-auto">
           <Button 
-            icon={<Download size={16} />} 
+            icon={<Download size={14} />} 
             onClick={() => message.info('Export feature coming soon')}
+            size="small"
+            className="flex-1 lg:flex-none text-xs"
           >
-            Export Report
+            <span className="hidden sm:inline">Export</span>
+            <span className="sm:hidden">Export</span>
           </Button>
-          <Button type="primary" icon={<BarChart3 size={16} />}>
-            Analytics
+          <Button 
+            type={showAnalytics ? "primary" : "default"}
+            icon={<BarChart3 size={14} />}
+            onClick={handleAnalyticsToggle}
+            size="small"
+            className="flex-1 lg:flex-none text-xs"
+          >
+            <span className="hidden sm:inline">{showAnalytics ? 'Hide Analytics' : 'Analytics'}</span>
+            <span className="sm:hidden">{showAnalytics ? 'Hide' : 'Analysis'}</span>
           </Button>
         </div>
       </div>
 
-      {/* Filters */}
-      <Card className="border-0 shadow-xl bg-white/80 backdrop-blur-sm mb-8">
-        <div className="flex flex-col lg:flex-row items-start lg:items-center gap-4">
-          <div className="flex">
-            <Filter size={18} className="mr-2 text-blue-600" />
-            <span className="font-semibold text-gray-700 text-xs">Dashboard Filters:</span>
+      {/* Filters - Mobile Optimized */}
+      <Card className="border-0 shadow-lg lg:shadow-xl bg-white/80 backdrop-blur-sm mb-6 lg:mb-8">
+        <div className="flex flex-col gap-4">
+          <div className="flex items-center">
+            <Filter size={16} className="mr-2 text-blue-600 flex-shrink-0" />
+            <span className="font-semibold text-gray-700 text-sm lg:text-base">Dashboard Filters:</span>
           </div>
           
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-4 w-full lg:w-auto">
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3">
             <Select 
-              placeholder="Select Assembly" 
-              style={{ width: '100%', minWidth: 200 }} 
+              placeholder="Assembly" 
+              className="w-full"
               value={selectedAssembly}
               onChange={setSelectedAssembly}
-              suffixIcon={<Building2 size={16} />}
-              size="large"
+              suffixIcon={<Building2 size={14} />}
+              size="small"
             >
               <Option value="all">All Assemblies</Option>
               {allAssembliesWithStatus.map(assembly => (
                 <Option key={assembly.name} value={assembly.name}>
                   <div className="flex items-center gap-2 justify-between">
-                    <div className="flex items-center gap-2">
-                      <div className={`w-2 h-2 rounded-full ${assembly.hasData ? 'bg-green-500' : 'bg-gray-300'}`}></div>
-                      <span>{assembly.name}</span>
+                    <div className="flex items-center gap-2 min-w-0 flex-1">
+                      <div className={`w-2 h-2 rounded-full flex-shrink-0 ${assembly.hasData ? 'bg-green-500' : 'bg-gray-300'}`}></div>
+                      <span className="truncate">{assembly.name}</span>
                     </div>
                     {!assembly.hasData && (
-                      <Tag color="default">No Data</Tag>
+                      <Tag color="default" className="flex-shrink-0">No Data</Tag>
                     )}
                   </div>
                 </Option>
@@ -323,12 +549,12 @@ export default function DashboardContent() {
             </Select>
 
             <Select 
-              placeholder="Select Month" 
-              style={{ width: '100%', minWidth: 180 }} 
+              placeholder="Month" 
+              className="w-full"
               value={selectedMonth}
               onChange={setSelectedMonth}
-              suffixIcon={<Calendar size={16} />}
-              size="large"
+              suffixIcon={<Calendar size={14} />}
+              size="small"
             >
               <Option value="all">All Months</Option>
               {MONTHS.map(month => (
@@ -337,72 +563,73 @@ export default function DashboardContent() {
             </Select>
 
             <Select 
-              placeholder="Select Year" 
-              style={{ width: '100%', minWidth: 140 }} 
+              placeholder="Year" 
+              className="w-full"
               value={selectedYear}
               onChange={setSelectedYear}
-              size="large"
+              size="small"
             >
               <Option value="all">All Years</Option>
               {YEARS.map(year => (
                 <Option key={year} value={year}>{year}</Option>
               ))}
             </Select>
-          </div>
 
-          <Button 
-            onClick={fetchDashboardData}
-            loading={loading}
-            size="large"
-            className="bg-green-600 hover:bg-green-700 text-white border-0 shadow-lg"
-          >
-            Apply Filters
-          </Button>
+            <Button 
+              onClick={fetchDashboardData}
+              loading={loading}
+              size="small"
+              className="w-full bg-green-600 hover:bg-green-700 text-white border-0 h-auto py-1.5"
+            >
+              Apply Filters
+            </Button>
+          </div>
         </div>
       </Card>
 
       {loading ? (
-        <div className="flex justify-center items-center h-64">
+        <div className="flex justify-center items-center h-48 lg:h-64">
           <Spin size="large" />
-          <span className="ml-4 text-gray-600">Loading dashboard data...</span>
+          <span className="ml-3 text-gray-600 text-sm lg:text-base">Loading dashboard data...</span>
         </div>
       ) : (
         <>
-          {/* Stats Grid - 3 cards now */}
-          <Row gutter={[24, 24]} className="mb-6">
+          {/* Stats Grid - Mobile Optimized */}
+          <Row gutter={[16, 16]} className="mb-6">
             {statsData.map((stat, index) => (
-              <Col xs={24} sm={12} lg={8} key={index}>
+              <Col xs={24} sm={8} key={index}>
                 <Card 
-                  className="border-0 shadow-lg hover:shadow-xl transition-all duration-300 bg-white"
-                  bodyStyle={{ padding: '20px' }}
+                  className="border-0 shadow-md lg:shadow-lg hover:shadow-lg lg:hover:shadow-xl transition-all duration-300 bg-white"
+                  bodyStyle={{ padding: '16px' }}
                 >
-                  <div className="flex justify-between items-start mb-4">
+                  <div className="flex justify-between items-start mb-3">
                     <div
-                      className="p-3 rounded-xl"
+                      className="p-2 lg:p-3 rounded-xl"
                       style={{ backgroundColor: `${stat.color}20` }}
                     >
                       <div style={{ color: stat.color }}>
                         {stat.icon}
                       </div>
                     </div>
-                    <Tag color={stat.change.startsWith('+') ? 'green' : 'blue'}>
-                      {stat.change.startsWith('+') ? <ArrowUp size={12} /> : <ArrowDown size={12} />}
+                    <Tag color={stat.change.startsWith('+') ? 'green' : 'blue'} className="text-xs">
+                      {stat.change.startsWith('+') ? <ArrowUp size={10} /> : <ArrowDown size={10} />}
                       {stat.change}
                     </Tag>
                   </div>
                   
                   <Statistic
                     title={
-                      <span className="text-gray-600 font-medium">
+                      <span className="text-gray-600 font-medium text-sm lg:text-base">
                         {stat.title}
                       </span>
                     }
                     value={stat.value}
                     valueStyle={{
                       color: '#1f2937',
-                      fontSize: '24px',
+                      fontSize: '18px',
                       fontWeight: 'bold'
                     }}
+                    className="mb-2"
                   />
                   
                   <div className="mt-2">
@@ -422,210 +649,284 @@ export default function DashboardContent() {
             ))}
           </Row>
 
-          <Row gutter={[24, 24]}>
-            {/* Assembly Breakdown */}
+          {/* Analytics Panel */}
+          {showAnalytics && analyticsInsights && (
+            <div className="mb-6">
+              <Card title="Financial Analytics" className="border-0 shadow-lg bg-white mb-4">
+                <Row gutter={[16, 16]}>
+                  <Col xs={12} sm={8} lg={4}>
+                    <Statistic
+                      title="Avg. Attendance"
+                      value={analyticsInsights.keyMetrics.averageAttendance}
+                      prefix={<Users size={14} className="text-blue-500" />}
+                      valueStyle={{ color: '#3b82f6', fontSize: '16px' }}
+                    />
+                  </Col>
+                  <Col xs={12} sm={8} lg={4}>
+                    <Statistic
+                      title="Avg. Income"
+                      value={analyticsInsights.keyMetrics.averageIncome}
+                      prefix={<DollarSign size={14} className="text-green-500" />}
+                      formatter={(value) => `₦${Math.round(Number(value)).toLocaleString()}`}
+                      valueStyle={{ color: '#10b981', fontSize: '16px' }}
+                    />
+                  </Col>
+                  <Col xs={12} sm={8} lg={4}>
+                    <Statistic
+                      title="Income Growth"
+                      value={Math.abs(analyticsInsights.keyMetrics.incomeGrowth)}
+                      prefix={analyticsInsights.keyMetrics.incomeGrowth >= 0 ? <TrendingUp size={14} className="text-green-500" /> : <TrendingDown size={14} className="text-red-500" />}
+                      suffix="%"
+                      valueStyle={{ 
+                        color: analyticsInsights.keyMetrics.incomeGrowth >= 0 ? '#10b981' : '#ef4444',
+                        fontSize: '16px' 
+                      }}
+                    />
+                  </Col>
+                </Row>
+              </Card>
+
+              {/* Recommendations */}
+              {analyticsInsights.recommendations.length > 0 && (
+                <Card title="Recommendations" className="border-0 shadow-lg bg-white">
+                  <List
+                    dataSource={analyticsInsights.recommendations}
+                    renderItem={(item) => (
+                      <List.Item>
+                        <List.Item.Meta
+                          avatar={
+                            <div className={`p-2 rounded-full ${
+                              item.priority === 'high' ? 'bg-red-100' : 
+                              item.priority === 'medium' ? 'bg-orange-100' : 'bg-green-100'
+                            }`}>
+                              <Target size={14} className={
+                                item.priority === 'high' ? 'text-red-600' : 
+                                item.priority === 'medium' ? 'text-orange-600' : 'text-green-600'
+                              } />
+                            </div>
+                          }
+                          title={
+                            <div className="flex items-center justify-between">
+                              <span className="text-sm lg:text-base">{item.action}</span>
+                              <Tag color={item.priority === 'high' ? 'red' : item.priority === 'medium' ? 'orange' : 'green'}>
+                                {item.priority}
+                              </Tag>
+                            </div>
+                          }
+                          description={<span className="text-xs lg:text-sm">{item.reasoning}</span>}
+                        />
+                      </List.Item>
+                    )}
+                  />
+                </Card>
+              )}
+            </div>
+          )}
+
+          <Row gutter={[16, 16]}>
+            {/* Assembly Breakdown - Mobile Optimized */}
             <Col xs={24} lg={16}>
               <Card 
                 title={
                   <div className="flex items-center">
-                    <PieChart size={20} className="mr-2" />
-                    <span className="text-lg font-semibold">Assembly Financial Breakdown</span>
+                    <PieChart size={18} className="mr-2" />
+                    <span className="text-base lg:text-lg font-semibold">Assembly Financial Breakdown</span>
                   </div>
                 }
                 className="border-0 shadow-lg bg-white"
                 extra={
                   <div className="flex items-center gap-2">
-                    <Tag color="green">{dashboardData?.assemblyBreakdown.length || 0} Assemblies with Data</Tag>
-                    <Button type="link" size="small">
-                      View All
-                    </Button>
+                    <Tag color="green" className="text-xs lg:text-sm">
+                      {dashboardData?.assemblyBreakdown.length || 0} Assemblies
+                    </Tag>
                   </div>
                 }
               >
-                <Table
-                  dataSource={dashboardData?.assemblyBreakdown || []}
-                  columns={assemblyColumns}
-                  pagination={false}
-                  size="small"
-                  scroll={{ y: 400 }}
-                  rowKey="assembly"
-                  summary={() => (
-                    <Table.Summary>
-                      <Table.Summary.Row className="bg-gray-50 font-semibold">
-                        <Table.Summary.Cell index={0}>
-                          <span className="font-bold">Total</span>
-                        </Table.Summary.Cell>
-                        <Table.Summary.Cell index={1}>
-                          <span className="font-bold text-green-600">
-                            {formatCurrency(dashboardData?.monthlyIncome || 0)}
-                          </span>
-                        </Table.Summary.Cell>
-                        <Table.Summary.Cell index={2}>
-                          <span className="font-bold">
-                            {(dashboardData?.activeMembers || 0).toLocaleString()}
-                          </span>
-                        </Table.Summary.Cell>
-                        <Table.Summary.Cell index={3}>
-                          <Tag color="blue" className="font-bold">
-                            {dashboardData?.totalRecords || 0} records
-                          </Tag>
-                        </Table.Summary.Cell>
-                        <Table.Summary.Cell index={4}></Table.Summary.Cell>
-                      </Table.Summary.Row>
-                    </Table.Summary>
-                  )}
-                />
+                <div className="overflow-x-auto">
+                  <Table
+                    dataSource={dashboardData?.assemblyBreakdown || []}
+                    columns={assemblyColumns}
+                    pagination={false}
+                    size="small"
+                    scroll={{ x: 600 }}
+                    rowKey="assembly"
+                    className="min-w-full"
+                    summary={() => (
+                      <Table.Summary>
+                        <Table.Summary.Row className="bg-gray-50 font-semibold">
+                          <Table.Summary.Cell index={0}>
+                            <span className="font-bold text-sm lg:text-base">Total</span>
+                          </Table.Summary.Cell>
+                          <Table.Summary.Cell index={1}>
+                            <span className="font-bold text-green-600 text-sm lg:text-base">
+                              {formatCurrency(dashboardData?.monthlyIncome || 0)}
+                            </span>
+                          </Table.Summary.Cell>
+                          <Table.Summary.Cell index={2}>
+                            <span className="font-bold text-sm lg:text-base">
+                              {(dashboardData?.activeMembers || 0).toLocaleString()}
+                            </span>
+                          </Table.Summary.Cell>
+                          <Table.Summary.Cell index={3}>
+                            <Tag color="blue" className="font-bold text-xs lg:text-sm">
+                              {dashboardData?.totalRecords || 0} records
+                            </Tag>
+                          </Table.Summary.Cell>
+                          <Table.Summary.Cell index={4}></Table.Summary.Cell>
+                        </Table.Summary.Row>
+                      </Table.Summary>
+                    )}
+                  />
+                </div>
               </Card>
             </Col>
 
-            {/* Recent Activity & Financial Insights */}
+            {/* Recent Activity & Financial Insights - Mobile Optimized */}
             <Col xs={24} lg={8}>
-              <Row gutter={[0, 24]}>
+              <div className="space-y-4 lg:space-y-6">
                 {/* Recent Activity */}
-                <Col span={24}>
-                  <Card 
-                    title={
-                      <div className="flex items-center">
-                        <FileText size={20} className="mr-2" />
-                        <span className="text-lg font-semibold">Recent Activity</span>
-                      </div>
-                    }
-                    className="border-0 shadow-lg bg-white"
-                    extra={
-                      <Button type="link" size="small">
-                        View All
-                      </Button>
-                    }
-                  >
-                    <List
-                      dataSource={dashboardData?.recentActivities || []}
-                      renderItem={(item) => (
-                        <List.Item className="border-0 px-0 py-3">
-                          <List.Item.Meta
-                            avatar={
-                              <Avatar 
-                                style={{ 
-                                  backgroundColor: '#3b82f6',
-                                  fontWeight: 'bold'
-                                }}
-                              >
-                                {item.avatar}
-                              </Avatar>
-                            }
-                            title={
-                              <div className="flex items-center justify-between">
-                                <span className="font-medium text-gray-900">
-                                  {item.user}
-                                </span>
-                                <span className="text-xs text-gray-500">
-                                  {item.time}
-                                </span>
-                              </div>
-                            }
-                            description={
-                              <span className="text-gray-600">
-                                {item.action} <strong>{item.target}</strong>
+                <Card 
+                  title={
+                    <div className="flex items-center">
+                      <FileText size={18} className="mr-2" />
+                      <span className="text-base lg:text-lg font-semibold">Recent Activity</span>
+                    </div>
+                  }
+                  className="border-0 shadow-lg bg-white"
+                >
+                  <List
+                    dataSource={dashboardData?.recentActivities || []}
+                    renderItem={(item) => (
+                      <List.Item className="px-0 py-2">
+                        <List.Item.Meta
+                          avatar={
+                            <Avatar 
+                              size="small"
+                              style={{ 
+                                backgroundColor: '#3b82f6',
+                                fontWeight: 'bold',
+                                fontSize: '12px'
+                              }}
+                            >
+                              {item.avatar}
+                            </Avatar>
+                          }
+                          title={
+                            <div className="flex items-center justify-between">
+                              <span className="font-medium text-gray-900 text-sm">
+                                {item.user}
                               </span>
-                            }
-                          />
-                        </List.Item>
-                      )}
-                    />
-                  </Card>
-                </Col>
+                              <span className="text-xs text-gray-500">
+                                {item.time}
+                              </span>
+                            </div>
+                          }
+                          description={
+                            <span className="text-gray-600 text-xs">
+                              {item.action} <strong>{item.target}</strong>
+                            </span>
+                          }
+                        />
+                      </List.Item>
+                    )}
+                  />
+                </Card>
 
                 {/* Financial Insights */}
-                <Col span={24}>
-                  <Card 
-                    title={
-                      <div className="flex items-center">
-                        <TrendingUp size={20} className="mr-2" />
-                        <span className="text-lg font-semibold">Financial Insights</span>
-                      </div>
-                    }
-                    className="border-0 shadow-lg bg-white"
-                  >
-                    <div className="space-y-4">
-                      <div className="flex justify-between items-center p-3 bg-blue-50 rounded-lg">
-                        <span className="text-sm font-medium">Average per Assembly</span>
-                        <span className="font-bold text-blue-600">
-                          {formatCurrency(Math.round((dashboardData?.monthlyIncome || 0) / (dashboardData?.assemblyBreakdown.length || 1)))}
-                        </span>
-                      </div>
-                      <div className="flex justify-between items-center p-3 bg-green-50 rounded-lg">
-                        <span className="text-sm font-medium">Records per Assembly</span>
-                        <span className="font-bold text-green-600">
-                          {Math.round((dashboardData?.totalRecords || 0) / (dashboardData?.assemblyBreakdown.length || 1))}
-                        </span>
-                      </div>
-                      <div className="flex justify-between items-center p-3 bg-orange-50 rounded-lg">
-                        <span className="text-sm font-medium">Attendance Rate</span>
-                        <span className="font-bold text-orange-600">
-                          {Math.round(((dashboardData?.activeMembers || 0) / 5000) * 100)}%
-                        </span>
-                      </div>
+                <Card 
+                  title={
+                    <div className="flex items-center">
+                      <TrendingUp size={18} className="mr-2" />
+                      <span className="text-base lg:text-lg font-semibold">Financial Insights</span>
                     </div>
-                  </Card>
-                </Col>
-              </Row>
+                  }
+                  className="border-0 shadow-lg bg-white"
+                >
+                  <div className="space-y-3">
+                    <div className="flex justify-between items-center p-2 lg:p-3 bg-blue-50 rounded-lg">
+                      <span className="text-xs lg:text-sm font-medium">Average per Assembly</span>
+                      <span className="font-bold text-blue-600 text-xs lg:text-sm">
+                        {formatCurrency(Math.round((dashboardData?.monthlyIncome || 0) / (dashboardData?.assemblyBreakdown.length || 1)))}
+                      </span>
+                    </div>
+                    <div className="flex justify-between items-center p-2 lg:p-3 bg-green-50 rounded-lg">
+                      <span className="text-xs lg:text-sm font-medium">Records per Assembly</span>
+                      <span className="font-bold text-green-600 text-xs lg:text-sm">
+                        {Math.round((dashboardData?.totalRecords || 0) / (dashboardData?.assemblyBreakdown.length || 1))}
+                      </span>
+                    </div>
+                    <div className="flex justify-between items-center p-2 lg:p-3 bg-orange-50 rounded-lg">
+                      <span className="text-xs lg:text-sm font-medium">Attendance Rate</span>
+                      <span className="font-bold text-orange-600 text-xs lg:text-sm">
+                        {Math.round(((dashboardData?.activeMembers || 0) / 5000) * 100)}%
+                      </span>
+                    </div>
+                  </div>
+                </Card>
+              </div>
             </Col>
           </Row>
         </>
       )}
 
-      {/* Assembly Details Modal */}
+      {/* Assembly Details Modal - Mobile Optimized */}
       <Modal
         title={
           <div className="flex items-center gap-2">
-            <Church size={20} />
-            <span>{selectedAssemblyDetails?.assembly} - Detailed Report</span>
+            <Church size={18} />
+            <span className="text-base lg:text-lg">{selectedAssemblyDetails?.assembly} - Detailed Report</span>
           </div>
         }
         open={assemblyModalVisible}
         onCancel={() => setAssemblyModalVisible(false)}
         footer={[
-          <Button key="close" onClick={() => setAssemblyModalVisible(false)}>
+          <Button key="close" onClick={() => setAssemblyModalVisible(false)} size="small">
             Close
           </Button>,
-          <Button key="export" type="primary" icon={<Download size={16} />}>
-            Export Report
+          <Button key="export" type="primary" icon={<Download size={14} />} size="small">
+            Export
           </Button>
         ]}
-        width={1000}
+        width="95%"
+        style={{ maxWidth: 1000 }}
+        className="top-4 lg:top-20"
       >
         {assemblyDetailsLoading ? (
           <div className="flex justify-center items-center h-32">
             <Spin size="large" />
-            <span className="ml-4 text-gray-600">Loading assembly details...</span>
+            <span className="ml-3 text-gray-600">Loading assembly details...</span>
           </div>
         ) : selectedAssemblyDetails ? (
-          <div className="space-y-6">
+          <div className="space-y-4 lg:space-y-6">
             {/* Summary Cards */}
-            <Row gutter={[16, 16]}>
-              <Col span={8}>
+            <Row gutter={[12, 12]}>
+              <Col xs={8}>
                 <Card size="small" className="text-center">
                   <Statistic
                     title="Total Income"
                     value={formatCurrency(selectedAssemblyDetails.income)}
-                    valueStyle={{ color: '#10b981', fontSize: '18px' }}
+                    valueStyle={{ color: '#10b981', fontSize: '14px' }}
+                    className="text-xs"
                   />
                 </Card>
               </Col>
-              <Col span={8}>
+              <Col xs={8}>
                 <Card size="small" className="text-center">
                   <Statistic
-                    title="Total Attendance"
+                    title="Attendance"
                     value={selectedAssemblyDetails.attendance}
-                    valueStyle={{ color: '#3b82f6', fontSize: '18px' }}
+                    valueStyle={{ color: '#3b82f6', fontSize: '14px' }}
+                    className="text-xs"
                   />
                 </Card>
               </Col>
-              <Col span={8}>
+              <Col xs={8}>
                 <Card size="small" className="text-center">
                   <Statistic
                     title="Records"
                     value={selectedAssemblyDetails.records}
-                    valueStyle={{ color: '#8b5cf6', fontSize: '18px' }}
+                    valueStyle={{ color: '#8b5cf6', fontSize: '14px' }}
+                    className="text-xs"
                   />
                 </Card>
               </Col>
@@ -633,50 +934,41 @@ export default function DashboardContent() {
 
             {/* Monthly Breakdown */}
             <Card title="Monthly Performance" size="small">
-              <Table
-                dataSource={selectedAssemblyDetails.monthlyData}
-                pagination={false}
-                size="small"
-                columns={[
-                  {
-                    title: 'Month',
-                    dataIndex: 'month',
-                    key: 'month',
-                  },
-                  {
-                    title: 'Income',
-                    dataIndex: 'income',
-                    key: 'income',
-                    render: (amount: number) => formatCurrency(amount),
-                  },
-                  {
-                    title: 'Attendance',
-                    dataIndex: 'attendance',
-                    key: 'attendance',
-                  },
-                  {
-                    title: 'Records',
-                    dataIndex: 'records',
-                    key: 'records',
-                  },
-                ]}
-              />
-            </Card>
-
-            {/* Recent Reports */}
-            <Card title="Recent Reports" size="small">
-              <List
-                dataSource={selectedAssemblyDetails.recentReports}
-                renderItem={(report) => (
-                  <List.Item>
-                    <List.Item.Meta
-                      title={report.month}
-                      description={`Submitted by ${report.submittedBy} on ${formatDate(report.createdAt)}`}
-                    />
-                    <div>{report.totalRecords} records</div>
-                  </List.Item>
-                )}
-              />
+              <div className="overflow-x-auto">
+                <Table
+                  dataSource={selectedAssemblyDetails.monthlyData}
+                  pagination={false}
+                  size="small"
+                  scroll={{ x: 400 }}
+                  columns={[
+                    {
+                      title: 'Month',
+                      dataIndex: 'month',
+                      key: 'month',
+                      width: 120,
+                    },
+                    {
+                      title: 'Income',
+                      dataIndex: 'income',
+                      key: 'income',
+                      render: (amount: number) => formatCurrency(amount),
+                      width: 100,
+                    },
+                    {
+                      title: 'Attendance',
+                      dataIndex: 'attendance',
+                      key: 'attendance',
+                      width: 80,
+                    },
+                    {
+                      title: 'Records',
+                      dataIndex: 'records',
+                      key: 'records',
+                      width: 60,
+                    },
+                  ]}
+                />
+              </div>
             </Card>
           </div>
         ) : (

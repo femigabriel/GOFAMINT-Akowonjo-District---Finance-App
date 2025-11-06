@@ -1,7 +1,7 @@
 "use client";
 
 import { ReactNode, useEffect, useState } from "react";
-import { Layout, Menu, Button, message, Switch } from "antd";
+import { Layout, Menu, Button, message, Switch, Drawer } from "antd";
 import { useRouter, usePathname } from "next/navigation";
 import {
   LogOut,
@@ -11,6 +11,7 @@ import {
   Church,
   Moon,
   Sun,
+  Menu as MenuIcon,
 } from "lucide-react";
 import Image from "next/image";
 import React from "react";
@@ -26,6 +27,7 @@ export default function AdminLayout({ children }: AdminLayoutProps) {
   const router = useRouter();
   const pathname = usePathname();
   const [collapsed, setCollapsed] = useState(false);
+  const [mobileOpen, setMobileOpen] = useState(false);
   const { isDarkMode, toggleTheme } = useTheme();
 
   // 🔐 Check admin authentication
@@ -43,21 +45,14 @@ export default function AdminLayout({ children }: AdminLayoutProps) {
     checkAdminAuth();
   }, [router]);
 
-  // Responsive sidebar: auto-collapse on mobile/small screens
+  // Responsive collapse state
   useEffect(() => {
-    const breakpoint = 768; // Mobile breakpoint (adjust as needed)
-
     const handleResize = () => {
-      if (window.innerWidth < breakpoint && !collapsed) {
-        setCollapsed(true);
-      } else if (window.innerWidth >= breakpoint && collapsed) {
-        setCollapsed(false);
-      }
+      if (window.innerWidth < 992 && !collapsed) setCollapsed(true);
+      if (window.innerWidth >= 992 && collapsed) setCollapsed(false);
     };
-
+    handleResize();
     window.addEventListener("resize", handleResize);
-    handleResize(); // Initial check
-
     return () => window.removeEventListener("resize", handleResize);
   }, [collapsed]);
 
@@ -74,86 +69,123 @@ export default function AdminLayout({ children }: AdminLayoutProps) {
     { key: "/admin/reports", icon: <DollarSign size={20} />, label: "Finance Reports" },
   ];
 
-  // ⚡ Instant route navigation (client-side, no lag)
   const handleMenuClick = ({ key }: { key: string }) => {
-    if (key !== pathname) {
-      router.push(key); // uses Next.js soft navigation
-    }
+    router.push(key);
+    if (mobileOpen) setMobileOpen(false); // close drawer on mobile
   };
 
   const siderWidth = collapsed ? 80 : 200;
 
+  const MenuContent = (
+    <>
+      {/* Logo */}
+      <div
+        className={`flex items-center justify-center h-16 ${
+          isDarkMode ? "bg-primary" : "bg-blue-600"
+        }`}
+      >
+        <Image
+          src="/images/Gofamint_logo.png"
+          alt="GOFAMINT Logo"
+          width={40}
+          height={40}
+          className="rounded-full object-contain"
+        />
+        {!collapsed && (
+          <span className="ml-2 text-white font-semibold text-sm">
+            Akowonjo District
+          </span>
+        )}
+      </div>
+
+      {/* Menu */}
+      <Menu
+        theme={isDarkMode ? "dark" : "light"}
+        selectedKeys={[pathname]}
+        mode="inline"
+        onClick={handleMenuClick}
+        items={menuItems}
+        style={{
+          border: "none",
+          background: isDarkMode ? "#001529" : "#fff",
+        }}
+      />
+    </>
+  );
+
   return (
-    <Layout
-      style={{ minHeight: "100vh" }}
-      className={isDarkMode ? "dark" : "light"}
-    >
+    <Layout style={{ minHeight: "100vh" }} className={isDarkMode ? "dark" : "light"}>
+      {/* Desktop Sidebar */}
       <Sider
         collapsible
         collapsed={collapsed}
         onCollapse={setCollapsed}
+        breakpoint="lg"
+        collapsedWidth="0"
         theme={isDarkMode ? "dark" : "light"}
         style={{
-          position: 'fixed',
-          height: '100vh',
+          position: "fixed",
+          height: "100vh",
           zIndex: 1000,
           left: 0,
           top: 0,
+          display: window.innerWidth >= 992 ? "block" : "none",
           background: isDarkMode ? "#001529" : "#fff",
           borderRight: isDarkMode ? "none" : "1px solid #f0f0f0",
         }}
       >
-        {/* Logo Section */}
-        <div
-          className={`flex items-center justify-center h-16 ${
-            isDarkMode ? "bg-primary" : "bg-blue-600"
-          }`}
-        >
-          <Image
-            src="/images/Gofamint_logo.png"
-            alt="GOFAMINT Logo"
-            width={40}
-            height={40}
-            className="rounded-full object-contain"
-          />
-          {!collapsed && (
-            <span className="ml-2 text-white font-semibold text-sm">
-              Akowonjo District
-            </span>
-          )}
-        </div>
-
-        {/* 🔷 Menu with Active Background Highlight */}
-        <Menu
-          theme={isDarkMode ? "dark" : "light"}
-          selectedKeys={[pathname]} // highlight current route
-          mode="inline"
-          onClick={handleMenuClick}
-          items={menuItems}
-          className="border-none"
-          style={{
-            background: isDarkMode ? "#001529" : "#fff",
-          }}
-        />
+        {MenuContent}
       </Sider>
 
-      <Layout style={{ marginLeft: siderWidth }}>
+      {/* Mobile Drawer */}
+      <Drawer
+        title={
+          <div className="flex items-center gap-2">
+            <Image
+              src="/images/Gofamint_logo.png"
+              alt="Logo"
+              width={30}
+              height={30}
+            />
+            <span className="font-semibold text-base">Akowonjo District</span>
+          </div>
+        }
+        placement="left"
+        open={mobileOpen}
+        onClose={() => setMobileOpen(false)}
+      >
+        {MenuContent}
+      </Drawer>
+
+      {/* Main Layout */}
+      <Layout style={{ marginLeft: window.innerWidth >= 992 ? siderWidth : 0 }}>
         <Header
-          className={`flex items-center justify-between px-6 ${
+          className={`flex items-center justify-between px-4 md:px-6 ${
             isDarkMode
               ? "bg-gray-800 border-b border-gray-700"
               : "bg-white shadow-sm"
           }`}
-          style={{ marginLeft: 0 }} // Ensure header spans full width after margin
+          style={{ position: "sticky", top: 0, zIndex: 999 }}
         >
-          <h1
-            className={`text-xl font-bold ${
-              isDarkMode ? "text-white" : "text-primary"
-            }`}
-          >
-            Welcome, Admin
-          </h1>
+          {/* Left section */}
+          <div className="flex items-center gap-4">
+            {/* Hamburger for mobile */}
+            <Button
+              type="text"
+              className="lg:hidden block"
+              icon={<MenuIcon size={22} />}
+              onClick={() => setMobileOpen(true)}
+            />
+            <h1
+              className={`text-sm md:text-xl font-bold ${
+                isDarkMode ? "text-white" : "text-primary"
+              }`}
+            >
+              Welcome, Admin
+            </h1>
+          </div>
 
+          {/* Right section */}
           <div className="flex items-center gap-4">
             {/* Theme Switch */}
             <div className="flex items-center gap-2">
@@ -185,8 +217,10 @@ export default function AdminLayout({ children }: AdminLayoutProps) {
         </Header>
 
         <Content
-          className={`lg:p-6 p-0 ${isDarkMode ? "bg-gray-900" : "bg-gray-50"}`}
-          style={{ margin: 0, paddingLeft: 'calc(4px + env(safe-area-inset-left))' }} // Account for padding and safe area
+          className={`p-3 sm:p-4 md:p-6 ${
+            isDarkMode ? "bg-gray-900" : "bg-gray-50"
+          }`}
+          style={{ minHeight: "100vh" }}
         >
           <div className="max-w-7xl mx-auto">{children}</div>
         </Content>
