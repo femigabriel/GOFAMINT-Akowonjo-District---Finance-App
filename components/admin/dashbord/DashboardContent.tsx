@@ -1,21 +1,22 @@
 // components/admin/DashboardContent.tsx
 "use client";
 
-import { Card, Statistic, Row, Col, Button, Tag, Progress, List, Avatar, Timeline, message, Select, Spin } from "antd";
+import { Card, Statistic, Row, Col, Button, Tag, Progress, List, Avatar, Timeline, message, Select, Spin, Table, Modal } from "antd";
 import { 
   Church, 
   Users, 
   DollarSign, 
   BarChart3, 
-  Plus, 
-  Settings, 
   Download,
   TrendingUp,
-  Bell,
   Calendar,
-  UserCheck,
   Filter,
-  Building2
+  Building2,
+  FileText,
+  PieChart,
+  Eye,
+  ArrowUp,
+  ArrowDown
 } from "lucide-react";
 import { useState, useEffect } from "react";
 import { assemblies as ASSEMBLIES } from "@/lib/assemblies";
@@ -45,6 +46,37 @@ interface DashboardData {
     time: string;
     color: string;
   }>;
+  assemblyBreakdown: Array<{
+    assembly: string;
+    income: number;
+    records: number;
+    attendance: number;
+    lastUpdated?: string;
+  }>;
+  monthlyTrends: Array<{
+    month: string;
+    income: number;
+  }>;
+  totalRecords: number;
+}
+
+interface AssemblyDetails {
+  assembly: string;
+  income: number;
+  records: number;
+  attendance: number;
+  monthlyData: Array<{
+    month: string;
+    income: number;
+    attendance: number;
+    records: number;
+  }>;
+  recentReports: Array<{
+    month: string;
+    submittedBy: string;
+    createdAt: string;
+    totalRecords: number;
+  }>;
 }
 
 export default function DashboardContent() {
@@ -56,9 +88,12 @@ export default function DashboardContent() {
 
   const [loading, setLoading] = useState(false);
   const [selectedAssembly, setSelectedAssembly] = useState<string>('all');
-  const [selectedMonth, setSelectedMonth] = useState<string>(currentMonth);
+  const [selectedMonth, setSelectedMonth] = useState<string>('all');
   const [selectedYear, setSelectedYear] = useState<string>(currentYear.toString());
   const [dashboardData, setDashboardData] = useState<DashboardData | null>(null);
+  const [assemblyModalVisible, setAssemblyModalVisible] = useState(false);
+  const [selectedAssemblyDetails, setSelectedAssemblyDetails] = useState<AssemblyDetails | null>(null);
+  const [assemblyDetailsLoading, setAssemblyDetailsLoading] = useState(false);
 
   useEffect(() => {
     fetchDashboardData();
@@ -72,7 +107,7 @@ export default function DashboardContent() {
       if (selectedMonth !== 'all') params.append('month', selectedMonth);
       if (selectedYear !== 'all') params.append('year', selectedYear);
 
-      const response = await fetch(`/api/dashboard?${params}`);
+      const response = await fetch(`/api/admin/dashboard?${params}`);
       const result = await response.json();
 
       if (result.success) {
@@ -88,71 +123,132 @@ export default function DashboardContent() {
     }
   };
 
-  const handleQuickAction = (action: string) => {
-    message.info(`${action} feature coming soon`);
+  const fetchAssemblyDetails = async (assemblyName: string) => {
+    setAssemblyDetailsLoading(true);
+    try {
+      const response = await fetch(`/api/admin/assembly-details?assembly=${encodeURIComponent(assemblyName)}`);
+      const result = await response.json();
+
+      if (result.success) {
+        setSelectedAssemblyDetails(result.data);
+        setAssemblyModalVisible(true);
+      } else {
+        message.error('Failed to fetch assembly details');
+      }
+    } catch (error) {
+      console.error('Fetch error:', error);
+      message.error('Error fetching assembly details');
+    } finally {
+      setAssemblyDetailsLoading(false);
+    }
   };
 
+  const formatCurrency = (amount: number) => {
+    return `₦${amount.toLocaleString()}`;
+  };
+
+  const formatDate = (dateString: string) => {
+    return new Date(dateString).toLocaleDateString('en-US', {
+      year: 'numeric',
+      month: 'long',
+      day: 'numeric'
+    });
+  };
+
+  // Filter stats to remove Total Assemblies
   const statsData = dashboardData ? [
     {
-      title: "Total Assemblies",
-      value: dashboardData.totalAssemblies,
-      change: "+0", // This could be calculated or fetched
-      icon: <Church size={24} />,
-      color: "#3b82f6",
-      progress: 80 // This could be dynamic
-    },
-    {
       title: "Active Members",
-      value: dashboardData.activeMembers,
-      change: "+0",
+      value: dashboardData.activeMembers.toLocaleString(),
+      change: dashboardData.activeMembers > 0 ? "+" + Math.round((dashboardData.activeMembers / 1000) * 100) + "%" : "0%",
       icon: <Users size={24} />,
       color: "#10b981",
-      progress: 65
+      progress: Math.min((dashboardData.activeMembers / 5000) * 100, 100),
+      description: "Based on service attendance"
     },
     {
-      title: "Monthly Income",
-      value: `₦${dashboardData.monthlyIncome.toLocaleString()}`,
-      change: "+0%",
+      title: "Total Income",
+      value: formatCurrency(dashboardData.monthlyIncome),
+      change: dashboardData.monthlyIncome > 0 ? "+" + Math.round((dashboardData.monthlyIncome / 1000000) * 100) + "%" : "0%",
       icon: <DollarSign size={24} />,
       color: "#f59e0b",
-      progress: 75
+      progress: Math.min((dashboardData.monthlyIncome / 5000000) * 100, 100),
+      description: "From all assemblies"
     },
     {
       title: "Reports Generated",
       value: dashboardData.reportsGenerated,
-      change: "+0",
+      change: dashboardData.reportsGenerated > 0 ? `+${dashboardData.reportsGenerated}` : "0",
       icon: <BarChart3 size={24} />,
       color: "#8b5cf6",
-      progress: 90
+      progress: Math.min((dashboardData.reportsGenerated / 50) * 100, 100),
+      description: `${dashboardData.totalRecords} individual records`
     }
   ] : [];
 
-  const quickActions = [
+  const assemblyColumns = [
     {
-      label: "Add New Member",
-      icon: <Plus size={16} />,
-      type: "primary" as const,
-      action: "Add New Member"
+      title: 'Assembly',
+      dataIndex: 'assembly',
+      key: 'assembly',
+      render: (text: string) => (
+        <div className="flex items-center gap-2">
+          <div className="w-2 h-2 bg-blue-500 rounded-full"></div>
+          <span className="font-medium">{text}</span>
+        </div>
+      )
     },
     {
-      label: "Manage Assemblies",
-      icon: <Church size={16} />,
-      type: "default" as const,
-      action: "Manage Assemblies"
+      title: 'Income',
+      dataIndex: 'income',
+      key: 'income',
+      render: (amount: number) => (
+        <span className="font-semibold text-green-600">
+          {formatCurrency(amount)}
+        </span>
+      ),
+      sorter: (a: any, b: any) => a.income - b.income,
     },
     {
-      label: "User Permissions",
-      icon: <UserCheck size={16} />,
-      type: "default" as const,
-      action: "User Permissions"
+      title: 'Attendance',
+      dataIndex: 'attendance',
+      key: 'attendance',
+      render: (count: number) => count.toLocaleString(),
+      sorter: (a: any, b: any) => a.attendance - b.attendance,
     },
     {
-      label: "Generate Report",
-      icon: <Download size={16} />,
-      type: "default" as const,
-      action: "Generate Report"
-    }
+      title: 'Records',
+      dataIndex: 'records',
+      key: 'records',
+      render: (count: number) => (
+        <Tag color="blue">{count} records</Tag>
+      ),
+      sorter: (a: any, b: any) => a.records - b.records,
+    },
+    {
+      title: 'Actions',
+      key: 'actions',
+      render: (_: any, record: any) => (
+        <Button
+          type="link"
+          icon={<Eye size={16} />}
+          onClick={() => fetchAssemblyDetails(record.assembly)}
+          className="text-blue-600"
+        >
+          View Details
+        </Button>
+      ),
+    },
   ];
+
+  // Get all assemblies with data for the dropdown
+  const assembliesWithData = dashboardData?.assemblyBreakdown.map(item => item.assembly) || [];
+  
+  // Combine all assemblies (from ASSEMBLIES) and mark which ones have data
+  const allAssembliesWithStatus = ASSEMBLIES.map(assembly => ({
+    name: assembly,
+    hasData: assembliesWithData.includes(assembly)
+  }));
 
   return (
     <div className="p-6 bg-gray-50 min-h-screen">
@@ -165,28 +261,30 @@ export default function DashboardContent() {
             </div>
             <div>
               <h1 className="text-3xl font-bold text-gray-900">
-                Church Dashboard
+                District Financial Dashboard
               </h1>
               <p className="text-lg text-gray-600">
-                Akowonjo District Overview
+                Akowonjo District - Financial Overview & Analytics
               </p>
             </div>
           </div>
           <div className="flex items-center gap-2 text-sm text-gray-500 mt-2">
             <Calendar size={14} />
-            <span>Viewing: {selectedMonth} {selectedYear}</span>
-            {selectedAssembly !== 'all' && (
-              <>
-                <span>•</span>
-                <span>Assembly: {selectedAssembly}</span>
-              </>
-            )}
+            <span>
+              Viewing: {selectedMonth === 'all' ? 'All Months' : selectedMonth} {selectedYear}
+              {selectedAssembly !== 'all' && ` • Assembly: ${selectedAssembly}`}
+            </span>
           </div>
         </div>
         <div className="flex gap-3">
-          <Button icon={<Bell size={16} />} shape="circle" />
-          <Button type="primary" icon={<Calendar size={16} />}>
-            Today's Events
+          <Button 
+            icon={<Download size={16} />} 
+            onClick={() => message.info('Export feature coming soon')}
+          >
+            Export Report
+          </Button>
+          <Button type="primary" icon={<BarChart3 size={16} />}>
+            Analytics
           </Button>
         </div>
       </div>
@@ -209,11 +307,16 @@ export default function DashboardContent() {
               size="large"
             >
               <Option value="all">All Assemblies</Option>
-              {ASSEMBLIES.map(assembly => (
-                <Option key={assembly} value={assembly}>
-                  <div className="flex items-center gap-2">
-                    <div className="w-2 h-2 bg-blue-500 rounded-full"></div>
-                    {assembly}
+              {allAssembliesWithStatus.map(assembly => (
+                <Option key={assembly.name} value={assembly.name}>
+                  <div className="flex items-center gap-2 justify-between">
+                    <div className="flex items-center gap-2">
+                      <div className={`w-2 h-2 rounded-full ${assembly.hasData ? 'bg-green-500' : 'bg-gray-300'}`}></div>
+                      <span>{assembly.name}</span>
+                    </div>
+                    {!assembly.hasData && (
+                      <Tag color="default">No Data</Tag>
+                    )}
                   </div>
                 </Option>
               ))}
@@ -265,10 +368,10 @@ export default function DashboardContent() {
         </div>
       ) : (
         <>
-          {/* Stats Grid */}
+          {/* Stats Grid - 3 cards now */}
           <Row gutter={[24, 24]} className="mb-6">
             {statsData.map((stat, index) => (
-              <Col xs={24} sm={12} lg={6} key={index}>
+              <Col xs={24} sm={12} lg={8} key={index}>
                 <Card 
                   className="border-0 shadow-lg hover:shadow-xl transition-all duration-300 bg-white"
                   bodyStyle={{ padding: '20px' }}
@@ -282,8 +385,8 @@ export default function DashboardContent() {
                         {stat.icon}
                       </div>
                     </div>
-                    <Tag color={stat.change.startsWith('+') ? 'green' : 'red'}>
-                      <TrendingUp size={12} className="mr-1" />
+                    <Tag color={stat.change.startsWith('+') ? 'green' : 'blue'}>
+                      {stat.change.startsWith('+') ? <ArrowUp size={12} /> : <ArrowDown size={12} />}
                       {stat.change}
                     </Tag>
                   </div>
@@ -302,124 +405,166 @@ export default function DashboardContent() {
                     }}
                   />
                   
-                  <Progress
-                    percent={stat.progress}
-                    showInfo={false}
-                    strokeColor={stat.color}
-                    trailColor="#f3f4f6"
-                    size="small"
-                    className="mt-3"
-                  />
+                  <div className="mt-2">
+                    <div className="text-xs text-gray-500 mb-1">
+                      {stat.description}
+                    </div>
+                    <Progress
+                      percent={Math.round(stat.progress)}
+                      showInfo={false}
+                      strokeColor={stat.color}
+                      trailColor="#f3f4f6"
+                      size="small"
+                    />
+                  </div>
                 </Card>
               </Col>
             ))}
           </Row>
 
           <Row gutter={[24, 24]}>
-            {/* Recent Activity */}
+            {/* Assembly Breakdown */}
             <Col xs={24} lg={16}>
               <Card 
                 title={
                   <div className="flex items-center">
-                    <BarChart3 size={20} className="mr-2" />
-                    <span className="text-lg font-semibold">Recent Activity</span>
+                    <PieChart size={20} className="mr-2" />
+                    <span className="text-lg font-semibold">Assembly Financial Breakdown</span>
                   </div>
                 }
                 className="border-0 shadow-lg bg-white"
                 extra={
-                  <Button type="link" size="small">
-                    View All
-                  </Button>
+                  <div className="flex items-center gap-2">
+                    <Tag color="green">{dashboardData?.assemblyBreakdown.length || 0} Assemblies with Data</Tag>
+                    <Button type="link" size="small">
+                      View All
+                    </Button>
+                  </div>
                 }
               >
-                <List
-                  dataSource={dashboardData?.recentActivities || []}
-                  renderItem={(item) => (
-                    <List.Item className="border-0 px-0 py-3">
-                      <List.Item.Meta
-                        avatar={
-                          <Avatar 
-                            style={{ 
-                              backgroundColor: '#3b82f6',
-                              fontWeight: 'bold'
-                            }}
-                          >
-                            {item.avatar}
-                          </Avatar>
-                        }
-                        title={
-                          <div className="flex items-center justify-between">
-                            <span className="font-medium text-gray-900">
-                              {item.user}
-                            </span>
-                            <span className="text-xs text-gray-500">
-                              {item.time}
-                            </span>
-                          </div>
-                        }
-                        description={
-                          <span className="text-gray-600">
-                            {item.action} <strong>{item.target}</strong>
+                <Table
+                  dataSource={dashboardData?.assemblyBreakdown || []}
+                  columns={assemblyColumns}
+                  pagination={false}
+                  size="small"
+                  scroll={{ y: 400 }}
+                  rowKey="assembly"
+                  summary={() => (
+                    <Table.Summary>
+                      <Table.Summary.Row className="bg-gray-50 font-semibold">
+                        <Table.Summary.Cell index={0}>
+                          <span className="font-bold">Total</span>
+                        </Table.Summary.Cell>
+                        <Table.Summary.Cell index={1}>
+                          <span className="font-bold text-green-600">
+                            {formatCurrency(dashboardData?.monthlyIncome || 0)}
                           </span>
-                        }
-                      />
-                    </List.Item>
+                        </Table.Summary.Cell>
+                        <Table.Summary.Cell index={2}>
+                          <span className="font-bold">
+                            {(dashboardData?.activeMembers || 0).toLocaleString()}
+                          </span>
+                        </Table.Summary.Cell>
+                        <Table.Summary.Cell index={3}>
+                          <Tag color="blue" className="font-bold">
+                            {dashboardData?.totalRecords || 0} records
+                          </Tag>
+                        </Table.Summary.Cell>
+                        <Table.Summary.Cell index={4}></Table.Summary.Cell>
+                      </Table.Summary.Row>
+                    </Table.Summary>
                   )}
                 />
               </Card>
             </Col>
 
-            {/* Quick Actions & Upcoming Events */}
+            {/* Recent Activity & Financial Insights */}
             <Col xs={24} lg={8}>
               <Row gutter={[0, 24]}>
-                {/* Quick Actions */}
+                {/* Recent Activity */}
                 <Col span={24}>
                   <Card 
                     title={
                       <div className="flex items-center">
-                        <Settings size={20} className="mr-2" />
-                        <span className="text-lg font-semibold">Quick Actions</span>
+                        <FileText size={20} className="mr-2" />
+                        <span className="text-lg font-semibold">Recent Activity</span>
                       </div>
                     }
                     className="border-0 shadow-lg bg-white"
+                    extra={
+                      <Button type="link" size="small">
+                        View All
+                      </Button>
+                    }
                   >
-                    <div className="space-y-3">
-                      {quickActions.map((action, index) => (
-                        <Button
-                          key={index}
-                          type={action.type}
-                          icon={action.icon}
-                          block
-                          size="large"
-                          className="flex items-center justify-center h-12"
-                          onClick={() => handleQuickAction(action.action)}
-                        >
-                          {action.label}
-                        </Button>
-                      ))}
-                    </div>
+                    <List
+                      dataSource={dashboardData?.recentActivities || []}
+                      renderItem={(item) => (
+                        <List.Item className="border-0 px-0 py-3">
+                          <List.Item.Meta
+                            avatar={
+                              <Avatar 
+                                style={{ 
+                                  backgroundColor: '#3b82f6',
+                                  fontWeight: 'bold'
+                                }}
+                              >
+                                {item.avatar}
+                              </Avatar>
+                            }
+                            title={
+                              <div className="flex items-center justify-between">
+                                <span className="font-medium text-gray-900">
+                                  {item.user}
+                                </span>
+                                <span className="text-xs text-gray-500">
+                                  {item.time}
+                                </span>
+                              </div>
+                            }
+                            description={
+                              <span className="text-gray-600">
+                                {item.action} <strong>{item.target}</strong>
+                              </span>
+                            }
+                          />
+                        </List.Item>
+                      )}
+                    />
                   </Card>
                 </Col>
 
-                {/* Upcoming Events */}
+                {/* Financial Insights */}
                 <Col span={24}>
                   <Card 
                     title={
                       <div className="flex items-center">
-                        <Calendar size={20} className="mr-2" />
-                        <span className="text-lg font-semibold">Upcoming Events</span>
+                        <TrendingUp size={20} className="mr-2" />
+                        <span className="text-lg font-semibold">Financial Insights</span>
                       </div>
                     }
                     className="border-0 shadow-lg bg-white"
                   >
-                    <Timeline>
-                      {dashboardData?.upcomingEvents.map((event, index) => (
-                        <Timeline.Item key={index} color={event.color}>
-                          <div className="text-sm font-medium">{event.title}</div>
-                          <div className="text-xs text-gray-500">{event.time}</div>
-                        </Timeline.Item>
-                      ))}
-                    </Timeline>
+                    <div className="space-y-4">
+                      <div className="flex justify-between items-center p-3 bg-blue-50 rounded-lg">
+                        <span className="text-sm font-medium">Average per Assembly</span>
+                        <span className="font-bold text-blue-600">
+                          {formatCurrency(Math.round((dashboardData?.monthlyIncome || 0) / (dashboardData?.assemblyBreakdown.length || 1)))}
+                        </span>
+                      </div>
+                      <div className="flex justify-between items-center p-3 bg-green-50 rounded-lg">
+                        <span className="text-sm font-medium">Records per Assembly</span>
+                        <span className="font-bold text-green-600">
+                          {Math.round((dashboardData?.totalRecords || 0) / (dashboardData?.assemblyBreakdown.length || 1))}
+                        </span>
+                      </div>
+                      <div className="flex justify-between items-center p-3 bg-orange-50 rounded-lg">
+                        <span className="text-sm font-medium">Attendance Rate</span>
+                        <span className="font-bold text-orange-600">
+                          {Math.round(((dashboardData?.activeMembers || 0) / 5000) * 100)}%
+                        </span>
+                      </div>
+                    </div>
                   </Card>
                 </Col>
               </Row>
@@ -427,6 +572,119 @@ export default function DashboardContent() {
           </Row>
         </>
       )}
+
+      {/* Assembly Details Modal */}
+      <Modal
+        title={
+          <div className="flex items-center gap-2">
+            <Church size={20} />
+            <span>{selectedAssemblyDetails?.assembly} - Detailed Report</span>
+          </div>
+        }
+        open={assemblyModalVisible}
+        onCancel={() => setAssemblyModalVisible(false)}
+        footer={[
+          <Button key="close" onClick={() => setAssemblyModalVisible(false)}>
+            Close
+          </Button>,
+          <Button key="export" type="primary" icon={<Download size={16} />}>
+            Export Report
+          </Button>
+        ]}
+        width={1000}
+      >
+        {assemblyDetailsLoading ? (
+          <div className="flex justify-center items-center h-32">
+            <Spin size="large" />
+            <span className="ml-4 text-gray-600">Loading assembly details...</span>
+          </div>
+        ) : selectedAssemblyDetails ? (
+          <div className="space-y-6">
+            {/* Summary Cards */}
+            <Row gutter={[16, 16]}>
+              <Col span={8}>
+                <Card size="small" className="text-center">
+                  <Statistic
+                    title="Total Income"
+                    value={formatCurrency(selectedAssemblyDetails.income)}
+                    valueStyle={{ color: '#10b981', fontSize: '18px' }}
+                  />
+                </Card>
+              </Col>
+              <Col span={8}>
+                <Card size="small" className="text-center">
+                  <Statistic
+                    title="Total Attendance"
+                    value={selectedAssemblyDetails.attendance}
+                    valueStyle={{ color: '#3b82f6', fontSize: '18px' }}
+                  />
+                </Card>
+              </Col>
+              <Col span={8}>
+                <Card size="small" className="text-center">
+                  <Statistic
+                    title="Records"
+                    value={selectedAssemblyDetails.records}
+                    valueStyle={{ color: '#8b5cf6', fontSize: '18px' }}
+                  />
+                </Card>
+              </Col>
+            </Row>
+
+            {/* Monthly Breakdown */}
+            <Card title="Monthly Performance" size="small">
+              <Table
+                dataSource={selectedAssemblyDetails.monthlyData}
+                pagination={false}
+                size="small"
+                columns={[
+                  {
+                    title: 'Month',
+                    dataIndex: 'month',
+                    key: 'month',
+                  },
+                  {
+                    title: 'Income',
+                    dataIndex: 'income',
+                    key: 'income',
+                    render: (amount: number) => formatCurrency(amount),
+                  },
+                  {
+                    title: 'Attendance',
+                    dataIndex: 'attendance',
+                    key: 'attendance',
+                  },
+                  {
+                    title: 'Records',
+                    dataIndex: 'records',
+                    key: 'records',
+                  },
+                ]}
+              />
+            </Card>
+
+            {/* Recent Reports */}
+            <Card title="Recent Reports" size="small">
+              <List
+                dataSource={selectedAssemblyDetails.recentReports}
+                renderItem={(report) => (
+                  <List.Item>
+                    <List.Item.Meta
+                      title={report.month}
+                      description={`Submitted by ${report.submittedBy} on ${formatDate(report.createdAt)}`}
+                    />
+                    <div>{report.totalRecords} records</div>
+                  </List.Item>
+                )}
+              />
+            </Card>
+          </div>
+        ) : (
+          <div className="text-center text-gray-500 py-8">
+            No details available for this assembly.
+          </div>
+        )}
+      </Modal>
     </div>
   );
 }
