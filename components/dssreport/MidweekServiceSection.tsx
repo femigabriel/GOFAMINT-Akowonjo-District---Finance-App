@@ -262,25 +262,29 @@ const MidweekServiceReport: React.FC<MidweekServiceReportProps> = ({ assembly })
   useEffect(() => {
     fetchInitialRecords();
   }, [fetchInitialRecords]);
+  
+const afterChange = useCallback(
+  (changes: CellChange[] | null, source: ChangeSource) => {
+    if (!changes || source === "loadData") return;
 
-  const afterChange = useCallback(
-    (changes: CellChange[] | null, source: ChangeSource) => {
-      if (!changes || source === "loadData") return;
-      setData((prev) => {
-        const copy = prev.map((r) => [...r]);
-        changes.forEach(([row, col, , newVal]) => {
-          copy[row][col] = Number(newVal) || 0;
-        });
-        // Update totals (total = offering for each column)
-        for (let c = 0; c < copy[0].length; c++) {
-          copy[2][c] = copy[1][c];
-        }
-        return copy;
+    setData((prev) => {
+      const copy = prev.map((r) => [...r]);
+
+      changes.forEach(([row, col, , newVal]) => {
+        const colIndex = col as number; // Explicit cast
+        copy[row][colIndex] = Number(newVal) || 0;
       });
-    },
-    []
-  );
 
+      // Update totals (total = offering for each column)
+      for (let c = 0; c < copy[0].length; c++) {
+        copy[2][c] = copy[1][c];
+      }
+
+      return copy;
+    });
+  },
+  []
+);
   const summaryStats = useMemo(() => {
     return {
       totalAttendance: data[0]?.reduce((a, v) => a + v, 0) || 0,

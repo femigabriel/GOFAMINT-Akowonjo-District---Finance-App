@@ -31,8 +31,8 @@ export default function Sidebar({ onItemClick, isMobileOpen, onCloseMobile }: Si
     { key: "dashboard", label: "Dashboard", icon: <Home size={20} />, path: "/dashboard" },
     { key: "reports", label: "Reports", icon: <FileText size={20} />, path: "/reports" },
     { key: "submissions", label: "Add Submission", icon: <Plus size={20} />, path: "/submissions" },
-    { key: "history", label: "History", icon: <History size={20} />, path: "/history" },
-    { key: "settings", label: "Settings", icon: <Settings size={20} />, path: "/settings" },
+    // { key: "history", label: "History", icon: <History size={20} />, path: "/history" },
+    // { key: "settings", label: "Settings", icon: <Settings size={20} />, path: "/settings" },
   ];
 
   const handleLogout = () => {
