@@ -101,7 +101,12 @@ export default function Sidebar({ onItemClick, isMobileOpen, onCloseMobile }: Si
               height={36}
               className="rounded-full"
             />
-            {!isCollapsed && <span className="font-semibold text-sm">GOFAMINT Finance</span>}
+{!isCollapsed && (
+  <div className="flex flex-col leading-tight">
+    <span className="font-semibold text-sm">GOFAMINT Finance</span>
+    <span className="text-xs text-gray-500">Akowonjo District</span>
+  </div>
+)}
           </div>
           <button
             className="hidden md:flex items-center justify-center text-black"
