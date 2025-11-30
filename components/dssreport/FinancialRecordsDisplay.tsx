@@ -13,7 +13,8 @@ import {
   Grid,
   DatePicker,
   notification,
-  Modal
+  Modal,
+  Input
 } from 'antd';
 import { 
   FileExcelOutlined, 
@@ -23,6 +24,7 @@ import {
   UserOutlined,
   CalendarOutlined 
 } from '@ant-design/icons';
+import { useAuth } from "@/context/AuthContext";
 import moment from 'moment';
 
 const { useBreakpoint } = Grid;
@@ -195,7 +197,7 @@ export default function FinancialRecordsDisplay({ assembly }: FinancialRecordsDi
       const headers = ['Date', 'Description', 'Category', 'Type', 'Amount', 'Payment Method', 'Reference'];
       const csvData = financialData.records.map(record => [
         record.date,
-        `"${record.description.replace(/"/g, '""')}"`, // Escape quotes for CSV
+        `"${record.description.replace(/"/g, '""')}"`,
         record.category,
         record.type,
         record.amount.toString(),
@@ -212,7 +214,7 @@ export default function FinancialRecordsDisplay({ assembly }: FinancialRecordsDi
       const url = URL.createObjectURL(blob);
       const link = document.createElement('a');
       link.href = url;
-      link.download = `financial-records-${monthKey(currentMonth)}.csv`;
+      link.download = `financial-records-${monthKey(currentMonth)}-${assembly}.csv`;
       document.body.appendChild(link);
       link.click();
       document.body.removeChild(link);
@@ -238,7 +240,6 @@ export default function FinancialRecordsDisplay({ assembly }: FinancialRecordsDi
       return;
     }
     
-    // Simple print-based PDF export
     const printContent = document.getElementById('financial-records-content');
     if (printContent) {
       const originalContents = document.body.innerHTML;
@@ -255,19 +256,6 @@ export default function FinancialRecordsDisplay({ assembly }: FinancialRecordsDi
     if (date) {
       setCurrentMonth(date.toDate());
     }
-  };
-
-  const generateMonths = () => {
-    const months = [];
-    const current = new Date();
-    for (let i = 0; i < 12; i++) {
-      const date = new Date(current.getFullYear(), current.getMonth() - i, 1);
-      months.push({
-        value: moment(date),
-        label: format(date, 'MMMM yyyy')
-      });
-    }
-    return months;
   };
 
   if (!assembly) {
@@ -514,12 +502,12 @@ export default function FinancialRecordsDisplay({ assembly }: FinancialRecordsDi
             <label className="block text-sm font-medium text-gray-700 mb-2">
               Submitted By <span className="text-red-500">*</span>
             </label>
-            <input
-              type="text"
+            <Input
               value={submittedBy}
               onChange={(e) => setSubmittedBy(e.target.value)}
               placeholder="Enter your full name"
-              className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+              prefix={<UserOutlined />}
+              size="large"
             />
           </div>
           
