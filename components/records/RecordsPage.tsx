@@ -7,6 +7,7 @@ import { useRouter } from "next/navigation";
 import MainLayout from "@/components/layout/DashboardLayout";
 import FinancialRecordsDisplay from "../dssreport/FinancialRecordsDisplay";
 import { useAuth } from "@/context/AuthContext";
+import RecordsDashboard from "./RecordsDashboard";
 
 export default function RecordsPage() {
   const { assembly } = useAuth();
@@ -30,8 +31,8 @@ export default function RecordsPage() {
       dateRange={dateRange}
       onRangeChange={onRangeChange}
     >
-      {/* <RecordsDashboard /> */}
-      <FinancialRecordsDisplay assembly={assembly} />
+      <RecordsDashboard />
+      {/* <FinancialRecordsDisplay assembly={assembly} /> */}
     </MainLayout>
   );
 }
