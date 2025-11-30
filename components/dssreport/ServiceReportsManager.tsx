@@ -3,10 +3,17 @@
 
 import { useState } from "react";
 import { Tabs, Card } from "antd";
-import { CalendarOutlined, TeamOutlined } from "@ant-design/icons";
+import { 
+  CalendarOutlined, 
+  TeamOutlined, 
+  StarOutlined, 
+  FileTextOutlined 
+} from "@ant-design/icons";
 import { useAuth } from "@/context/AuthContext";
 import DistrictSundayServiceReport from "./DistrictSundayServiceReport";
 import MidweekServiceReport from "./MidweekServiceSection";
+import SpecialServiceReport from "./SpecialServiceReport";
+import FinancialReportsManager from "./FinancialReportsManager";
 
 const ServiceReportsManager: React.FC = () => {
   const { assembly } = useAuth();
@@ -18,7 +25,7 @@ const ServiceReportsManager: React.FC = () => {
       label: (
         <span className="flex items-center gap-2">
           <CalendarOutlined />
-          Sunday Services
+          <span className="hidden sm:inline">Sunday Services</span>
         </span>
       ),
       children: <DistrictSundayServiceReport />,
@@ -28,11 +35,22 @@ const ServiceReportsManager: React.FC = () => {
       label: (
         <span className="flex items-center gap-2">
           <TeamOutlined />
-          Midweek Services
+          <span className="hidden sm:inline">Midweek Services</span>
         </span>
       ),
       children: <MidweekServiceReport assembly={assembly} />,
     },
+    {
+      key: "special",
+      label: (
+        <span className="flex items-center gap-2">
+          <StarOutlined />
+          <span className="hidden sm:inline">Special Services</span>
+        </span>
+      ),
+      children: <SpecialServiceReport assembly={assembly} />,
+    },
+   
   ];
 
   return (
@@ -42,7 +60,11 @@ const ServiceReportsManager: React.FC = () => {
         onChange={setActiveTab}
         items={tabItems}
         size="large"
-        className="p-4"
+        className="p-3 sm:p-4"
+        tabBarStyle={{ 
+          paddingLeft: '8px',
+          paddingRight: '8px'
+        }}
       />
     </div>
   );

@@ -17,7 +17,6 @@ export default function Dssreportpage() {
   const router = useRouter();
 
   useEffect(() => {
-    // Delay slightly to smooth out hydration and localStorage read
     const timer = setTimeout(() => {
       try {
         const storedAssembly = localStorage.getItem("assembly");

@@ -67,15 +67,13 @@ const MidweekServiceReport: React.FC<MidweekServiceReportProps> = ({ assembly })
   const [selectedDate, setSelectedDate] = useState<Date>(new Date());
   const screens = useBreakpoint();
 
-  /* --------------------------------------------------------------
-     1. Only Tuesdays and Thursdays that fall INSIDE the selected month
-     -------------------------------------------------------------- */
+
   const monthMidweekDays = useMemo(() => {
     const start = startOfMonth(selectedDate);
     const end = endOfMonth(selectedDate);
     return eachDayOfInterval({ start, end })
       .filter((date): boolean => isTuesday(date) || isThursday(date))
-      .slice(0, 10); // max 10 (approx 2 days per week)
+      .slice(0, 10); 
   }, [selectedDate]);
 
   const colCount = monthMidweekDays.length;

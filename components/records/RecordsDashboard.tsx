@@ -33,7 +33,7 @@ import {
 } from "@ant-design/icons";
 import { useRouter } from "next/navigation";
 
-// Types
+
 interface OfferingRecordData {
   week1: number;
   week2: number;
@@ -92,7 +92,7 @@ type TabKey = "offerings" | "tithes";
 
 const { useBreakpoint } = Grid;
 
-const RecordsDashboard: React.FC = () => {
+const RecordsDashboard = () => {
   const { assembly, loading: authLoading } = useAuth();
   const [loading, setLoading] = useState<boolean>(false);
   const [offeringRecords, setOfferingRecords] = useState<OfferingRecord[]>([]);

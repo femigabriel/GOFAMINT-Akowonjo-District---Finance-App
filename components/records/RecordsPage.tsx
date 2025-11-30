@@ -5,7 +5,7 @@ import dayjs from "dayjs";
 import { message } from "antd";
 import { useRouter } from "next/navigation";
 import MainLayout from "@/components/layout/DashboardLayout";
-import RecordsDashboard from "./RecordsDashboard";
+import FinancialRecordsDisplay from "../dssreport/FinancialRecordsDisplay";
 
 export default function RecordsPage() {
   const [assembly, setAssembly] = useState<string | null>(null);
@@ -38,7 +38,8 @@ export default function RecordsPage() {
       onRangeChange={onRangeChange}
     >
       
-      <RecordsDashboard />
+      {/* <RecordsDashboard /> */}
+      <FinancialRecordsDisplay />
     </MainLayout>
   );
 }

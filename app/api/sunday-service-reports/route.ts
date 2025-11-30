@@ -1,9 +1,10 @@
 // app/api/sunday-service-reports/route.ts
-import { NextResponse } from "next/server";
+import { NextRequest, NextResponse } from "next/server";
 import dbConnect from "@/lib/mongodb";
 import SundayServiceReport from "@/models/SundayServiceReport";
-import { format } from "date-fns";
 import MidweekServiceReport from "@/models/MidweekServiceReport";
+import SpecialServiceReport from "@/models/SpecialServiceReport";
+import { format } from "date-fns";
 
 /* ---------- Helper to calculate totals for Sunday ---------- */
 function calcSundayTotals(r: any) {
@@ -67,7 +68,7 @@ function generateDateForWeek(week: string, month: string): string {
 }
 
 /* ---------- POST – save report ---------- */
-export async function POST(request: Request) {
+export async function POST(request: NextRequest): Promise<NextResponse> {
   try {
     await dbConnect();
     console.log("Connected to MongoDB (POST)");
@@ -81,7 +82,61 @@ export async function POST(request: Request) {
       );
     }
 
-    if (serviceType === "midweek") {
+    // Handle Special Service Reports
+    if (serviceType === "special") {
+      /* Filter out completely empty rows for special services */
+      const validRecords = records
+        .filter((r: any) => {
+          const hasValue =
+            r.attendance > 0 ||
+            r.offering > 0 ||
+            (r.serviceName && r.serviceName.trim() !== '');
+          return hasValue;
+        })
+        .map((r: any) => ({
+          serviceName: r.serviceName?.trim() || 'Unnamed Service',
+          date: r.date,
+          attendance: Number(r.attendance) || 0,
+          offering: Number(r.offering) || 0,
+        }));
+
+      if (validRecords.length === 0) {
+        return NextResponse.json(
+          { error: "No valid records to save" },
+          { status: 400 }
+        );
+      }
+
+      // Use findOneAndUpdate with upsert to create or update the report
+      const report = await SpecialServiceReport.findOneAndUpdate(
+        { assembly, month },
+        {
+          assembly,
+          submittedBy,
+          month,
+          records: validRecords,
+        },
+        {
+          new: true,
+          upsert: true,
+          runValidators: true
+        }
+      );
+
+      console.log("Saved special service report – records:", validRecords.length);
+      console.log("Saved special service records:", validRecords.map(r => ({ 
+        serviceName: r.serviceName, 
+        date: r.date 
+      })));
+
+      return NextResponse.json({
+        success: true,
+        message: `${validRecords.length} special service record(s) saved`,
+        data: report
+      });
+    }
+    // Handle Midweek Service Reports
+    else if (serviceType === "midweek") {
       /* Filter out completely empty rows & calculate totals for midweek */
       const validRecords = records
         .filter((r: any) => {
@@ -105,14 +160,21 @@ export async function POST(request: Request) {
         );
       }
 
-      const report = new MidweekServiceReport({
-        assembly,
-        submittedBy,
-        month,
-        records: validRecords,
-      });
+      const report = await MidweekServiceReport.findOneAndUpdate(
+        { assembly, month },
+        {
+          assembly,
+          submittedBy,
+          month,
+          records: validRecords,
+        },
+        {
+          new: true,
+          upsert: true,
+          runValidators: true
+        }
+      );
 
-      await report.save();
       console.log("Saved midweek report – records:", validRecords.length);
       console.log("Saved midweek records with dates:", validRecords.map(r => ({ date: r.date, day: r.day })));
 
@@ -120,7 +182,9 @@ export async function POST(request: Request) {
         success: true,
         message: `${validRecords.length} record(s) saved`,
       });
-    } else {
+    }
+    // Handle Sunday Service Reports (default)
+    else {
       /* Filter out completely empty rows & calculate totals for sunday */
       const validRecords = records
         .filter((r: any) => {
@@ -180,14 +244,21 @@ export async function POST(request: Request) {
         );
       }
 
-      const report = new SundayServiceReport({
-        assembly,
-        submittedBy,
-        month,
-        records: validRecords,
-      });
+      const report = await SundayServiceReport.findOneAndUpdate(
+        { assembly, month },
+        {
+          assembly,
+          submittedBy,
+          month,
+          records: validRecords,
+        },
+        {
+          new: true,
+          upsert: true,
+          runValidators: true
+        }
+      );
 
-      await report.save();
       console.log("Saved sunday report – records:", validRecords.length);
       console.log("Saved sunday records with dates:", validRecords.map(r => ({ week: r.week, date: r.date })));
 
@@ -198,12 +269,15 @@ export async function POST(request: Request) {
     }
   } catch (err: any) {
     console.error("POST error:", err);
-    return NextResponse.json({ error: err.message || "Server error" }, { status: 500 });
+    return NextResponse.json(
+      { error: err.message || "Server error" }, 
+      { status: 500 }
+    );
   }
 }
 
 /* ---------- GET – fetch latest report for assembly+month ---------- */
-export async function GET(request: Request) {
+export async function GET(request: NextRequest): Promise<NextResponse> {
   try {
     await dbConnect();
     console.log("Connected to MongoDB (GET)");
@@ -220,52 +294,60 @@ export async function GET(request: Request) {
       );
     }
 
-    if (serviceType === "midweek") {
+    // Return empty structure template
+    const emptyResponse = {
+      _id: null,
+      assembly,
+      submittedBy: "",
+      month,
+      records: [],
+      createdAt: null,
+      updatedAt: null,
+      __v: 0
+    };
+
+    // Handle Special Service Reports
+    if (serviceType === "special") {
+      const doc = await SpecialServiceReport.findOne({ assembly, month })
+        .sort({ createdAt: -1 })
+        .lean();
+
+      if (!doc) {
+        return NextResponse.json(emptyResponse);
+      }
+
+      return NextResponse.json(doc);
+    }
+    // Handle Midweek Service Reports
+    else if (serviceType === "midweek") {
       const doc = await MidweekServiceReport.findOne({ assembly, month })
         .sort({ createdAt: -1 })
         .lean();
 
       if (!doc) {
-        // Return empty structure with the requested month
-        return NextResponse.json({
-          _id: null,
-          assembly,
-          submittedBy: "",
-          month,
-          records: [],
-          createdAt: null,
-          updatedAt: null,
-          __v: 0
-        });
+        return NextResponse.json(emptyResponse);
       }
 
-      // Return the ENTIRE document, not just records
       return NextResponse.json(doc);
-    } else {
+    }
+    // Handle Sunday Service Reports (default)
+    else {
       const doc = await SundayServiceReport.findOne({ assembly, month })
         .sort({ createdAt: -1 })
         .lean();
 
       if (!doc) {
-        // Return empty structure with the requested month
-        return NextResponse.json({
-          _id: null,
-          assembly,
-          submittedBy: "",
-          month,
-          records: [],
-          createdAt: null,
-          updatedAt: null,
-          __v: 0
-        });
+        return NextResponse.json(emptyResponse);
       }
 
-      // Return the ENTIRE document, not just records
       return NextResponse.json(doc);
     }
     
   } catch (err: any) {
     console.error("GET error:", err);
-    return NextResponse.json({ error: err.message || "Server error" }, { status: 500 });
+    return NextResponse.json(
+      { error: err.message || "Server error" }, 
+      { status: 500 }
+    );
   }
 }

@@ -13,6 +13,7 @@ import {
   Church,
   MapPin,
   User,
+  FileSpreadsheet
 } from "lucide-react";
 import { Typography, Dropdown, Avatar } from "antd";
 import { motion, AnimatePresence } from "framer-motion";
@@ -42,8 +43,8 @@ export default function DashboardHeader({
     { key: "dashboard", label: "Dashboard", icon: <Home size={18} />, path: "/dashboard" },
     { key: "reports", label: "Reports", icon: <FileText size={18} />, path: "/reports" },
     { key: "submissions", label: "Add Submission", icon: <Plus size={18} />, path: "/submissions" },
-    { key: "history", label: "History", icon: <History size={18} />, path: "/history" },
-    { key: "settings", label: "Settings", icon: <Settings size={18} />, path: "/settings" },
+    { key: "records", label: "Records", icon: <FileSpreadsheet size={18} />, path: "/records" },
+    // { key: "settings", label: "Settings", icon: <Settings size={18} />, path: "/settings" },
   ];
 
   const handleLogout = () => {
