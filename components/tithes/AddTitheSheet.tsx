@@ -13,17 +13,18 @@ import {
   Input,
   Form,
   Card,
-  Row,
-  Col,
+  Dropdown,
 } from "antd";
 import {
   SaveOutlined,
   ReloadOutlined,
   FileExcelOutlined,
+  FilePdfOutlined,
   CalendarOutlined,
   RollbackOutlined,
   DatabaseOutlined,
   UserOutlined,
+  DownOutlined,
 } from "@ant-design/icons";
 import { format, startOfMonth, endOfMonth, eachWeekOfInterval } from "date-fns";
 import moment from "moment";
@@ -32,8 +33,19 @@ import type { CellChange, ChangeSource } from "handsontable/common";
 import { useAuth } from "@/context/AuthContext";
 import Link from "next/link";
 import { titheData } from "@/lib/tithe-data";
+import jsPDF from "jspdf";
+import autoTable from "jspdf-autotable";
 
 registerAllCellTypes();
+
+// Define district mapping with type safety
+const districtMapping: Record<string, string> = {
+  "Jubilee": "Akowonjo",
+  "RCCG": "Akowonjo",
+  "Victory": "Akowonjo",
+  "Dominion": "Akowonjo",
+  // Add more assemblies as needed
+};
 
 interface TitheRowInternal {
   _sn: number;
@@ -68,15 +80,15 @@ const AddTitheSheet = () => {
   const [submittedBy, setSubmittedBy] = useState<string>("");
   const { assembly } = useAuth();
   const [form] = Form.useForm();
-  const [existingRecord, setExistingRecord] = useState<DatabaseRecord | null>(
-    null
-  );
+  const [existingRecord, setExistingRecord] = useState<DatabaseRecord | null>(null);
   const [isEditing, setIsEditing] = useState(false);
   const [stats, setStats] = useState({
     totalTithe: 0,
     totalMembers: 0,
     averageTithe: 0,
     savedRecords: 0,
+    paidMembers: 0,
+    unpaidMembers: 0,
   });
 
   const getSundays = useCallback((date: Date) => {
@@ -159,92 +171,85 @@ const AddTitheSheet = () => {
       const response = await fetch(
         `/api/tithes?assembly=${encodeURIComponent(assembly)}&month=${monthStr}`
       );
-
+      
       const result = await response.json();
-
+      
       if (result.success && result.data.length > 0) {
         const savedRecord = result.data[0];
         setExistingRecord(savedRecord);
         setSubmittedBy(savedRecord.submittedBy);
         setIsEditing(true);
-
+        
         // Convert saved records to internal format
-        const savedRecords: TitheRowInternal[] = savedRecord.records.map(
-          (record: any, index: number) => ({
-            _sn: index + 1,
-            name: record.name || "",
-            titheNumber: record.titheNumber || "",
-            week1: Number(record.week1) || 0,
-            week2: Number(record.week2) || 0,
-            week3: Number(record.week3) || 0,
-            week4: Number(record.week4) || 0,
-            week5: Number(record.week5) || 0,
-            total: Number(record.total) || 0,
-          })
-        );
-
+        const savedRecords: TitheRowInternal[] = savedRecord.records.map((record: any, index: number) => ({
+          _sn: index + 1,
+          name: record.name || "",
+          titheNumber: record.titheNumber || "",
+          week1: Number(record.week1) || 0,
+          week2: Number(record.week2) || 0,
+          week3: Number(record.week3) || 0,
+          week4: Number(record.week4) || 0,
+          week5: Number(record.week5) || 0,
+          total: Number(record.total) || 0,
+        }));
+        
         // Calculate stats from saved data
-        const totalTithe = savedRecord.records.reduce(
-          (sum: number, record: any) => sum + (Number(record.total) || 0),
-          0
+        const totalTithe = savedRecord.records.reduce((sum: number, record: any) => 
+          sum + (Number(record.total) || 0), 0
         );
         const totalMembers = savedRecord.records.length;
-        const averageTithe = totalMembers > 0 ? totalTithe / totalMembers : 0;
-
+        const paidMembers = savedRecord.records.filter((r: any) => Number(r.total) > 0).length;
+        const unpaidMembers = totalMembers - paidMembers;
+        const averageTithe = paidMembers > 0 ? totalTithe / paidMembers : 0;
+        
         setStats({
           totalTithe,
           totalMembers,
           averageTithe,
           savedRecords: savedRecord.records.length,
+          paidMembers,
+          unpaidMembers,
         });
-
+        
         // Fill remaining rows with empty data or member list
         const remainingRows = 200 - savedRecords.length;
         let filledData = [...savedRecords];
-
+        
         if (remainingRows > 0) {
-          // Check if we should add member list for empty rows
           const titherList = getTitherListFromData();
           if (titherList.length > 0) {
-            // Filter out members already in saved data
-            const existingNames = new Set(
-              savedRecords.map((r) => r.name.toLowerCase())
-            );
+            const existingNames = new Set(savedRecords.map(r => r.name.toLowerCase()));
             const newMembers = titherList
-              .filter((member) => !existingNames.has(member.name.toLowerCase()))
+              .filter(member => !existingNames.has(member.name.toLowerCase()))
               .slice(0, remainingRows);
-
+            
             filledData = [...filledData, ...newMembers];
-
-            // Fill remaining with empty rows
+            
             const stillRemaining = 200 - filledData.length;
             if (stillRemaining > 0) {
-              filledData.push(
-                ...initializeEmptyData().slice(0, stillRemaining)
-              );
+              filledData.push(...initializeEmptyData().slice(0, stillRemaining));
             }
           } else {
             filledData.push(...initializeEmptyData().slice(0, remainingRows));
           }
         }
-
+        
         setData(filledData.slice(0, 200));
-
+        
         notification.info({
-          message: "Saved Data Loaded",
-          description: `Loaded ${savedRecord.records.length} saved records for ${savedRecord.month}`,
+          message: 'Saved Data Loaded',
+          description: `Loaded ${savedRecord.records.length} saved records for ${savedRecord.month}`
         });
-
+        
         return savedRecord;
       }
-
-      // No saved data found, load member list
+      
       return null;
     } catch (error) {
-      console.error("Error loading saved data:", error);
+      console.error('Error loading saved data:', error);
       notification.error({
-        message: "Error Loading Data",
-        description: "Failed to load saved data from database",
+        message: 'Error Loading Data',
+        description: 'Failed to load saved data from database'
       });
       return null;
     } finally {
@@ -261,6 +266,8 @@ const AddTitheSheet = () => {
         totalMembers: 0,
         averageTithe: 0,
         savedRecords: 0,
+        paidMembers: 0,
+        unpaidMembers: 0,
       });
       return;
     }
@@ -289,6 +296,8 @@ const AddTitheSheet = () => {
         totalMembers: titherList.length,
         averageTithe: 0,
         savedRecords: 0,
+        paidMembers: 0,
+        unpaidMembers: titherList.length,
       });
     } catch (err) {
       notification.error({ message: "Error loading members" });
@@ -309,19 +318,12 @@ const AddTitheSheet = () => {
     const loadData = async () => {
       const savedData = await loadSavedData();
       if (!savedData) {
-        // No saved data found, load member list
         loadMemberList();
       }
     };
 
     loadData();
-  }, [
-    assembly,
-    selectedDate,
-    loadSavedData,
-    loadMemberList,
-    initializeEmptyData,
-  ]);
+  }, [assembly, selectedDate, loadSavedData, loadMemberList, initializeEmptyData]);
 
   // Fixed: Type-safe afterChange
   const afterChange = useCallback(
@@ -339,8 +341,7 @@ const AddTitheSheet = () => {
             prop === "titheNumber" ||
             prop.startsWith("week")
           ) {
-            const numValue =
-              newValue === null || newValue === "" ? 0 : Number(newValue);
+            const numValue = newValue === null || newValue === "" ? 0 : Number(newValue);
             (newData[row] as any)[prop] = isNaN(numValue) ? 0 : numValue;
           }
 
@@ -354,20 +355,20 @@ const AddTitheSheet = () => {
         }
 
         // Update stats
-        const grandTotal = newData.reduce(
-          (sum, row) => sum + Number(row.total || 0),
-          0
-        );
-        const activeMembers = newData.filter(
-          (r) => r.name?.trim() && (r.total || 0) > 0
-        ).length;
-        const avgTithe = activeMembers > 0 ? grandTotal / activeMembers : 0;
-
-        setStats((prev) => ({
+        const activeData = newData.filter(r => r.name?.trim());
+        const grandTotal = activeData.reduce((sum, row) => sum + Number(row.total || 0), 0);
+        const totalMembers = activeData.length;
+        const paidMembers = activeData.filter(r => (r.total || 0) > 0).length;
+        const unpaidMembers = totalMembers - paidMembers;
+        const avgTithe = paidMembers > 0 ? grandTotal / paidMembers : 0;
+        
+        setStats(prev => ({
           ...prev,
           totalTithe: grandTotal,
-          totalMembers: newData.filter((r) => r.name?.trim()).length,
+          totalMembers,
           averageTithe: avgTithe,
+          paidMembers,
+          unpaidMembers,
           savedRecords: existingRecord?.records.length || 0,
         }));
 
@@ -413,23 +414,20 @@ const AddTitheSheet = () => {
           submittedBy,
           month: moment(selectedDate).format("MMMM-YYYY"),
           records: filledData,
-          ...(existingRecord && { id: existingRecord._id }),
+          ...(existingRecord && { id: existingRecord._id })
         }),
       });
 
       const result = await res.json();
       if (res.ok && result.success) {
-        notification.success({
-          message: result.isUpdate
-            ? "Updated successfully!"
-            : "Saved successfully!",
+        notification.success({ 
+          message: result.isUpdate ? "Updated successfully!" : "Saved successfully!" 
         });
         setIsModalOpen(false);
         form.resetFields();
         setSubmittedBy("");
         setIsEditing(result.isUpdate);
-
-        // Reload the saved data
+        
         await loadSavedData();
       } else {
         throw new Error(result.error || "Save failed");
@@ -459,35 +457,239 @@ const AddTitheSheet = () => {
           totalMembers: list.length,
           averageTithe: 0,
           savedRecords: 0,
+          paidMembers: 0,
+          unpaidMembers: list.length,
         });
       },
     });
   };
 
-  const handleExport = () => {
-    const rows = data.map((r) => [
-      `"${r.name}"`,
-      r.titheNumber,
-      r.week1,
-      r.week2,
-      r.week3,
-      r.week4,
-      sundays.length === 5 ? r.week5 ?? "" : "",
-      r.total,
-    ]);
+  // Function to export as CSV/Excel
+  const exportToExcel = () => {
+    try {
+      // Filter data with actual content
+      const filteredData = data.filter(row => 
+        row.name?.trim() && row.titheNumber?.trim()
+      );
 
-    const csv = [colHeaders.join(","), ...rows.map((r) => r.join(","))].join(
-      "\n"
-    );
-    const blob = new Blob([csv], { type: "text/csv" });
-    const url = URL.createObjectURL(blob);
-    const a = document.createElement("a");
-    a.href = url;
-    a.download = `Tithes-${assembly}-${moment(selectedDate).format(
-      "MMMM-YYYY"
-    )}.csv`;
-    a.click();
+      if (filteredData.length === 0) {
+        notification.warning({
+          message: "No Data to Export",
+          description: "There are no records to export"
+        });
+        return;
+      }
+
+      // Create headers with metadata
+      const metadata = [
+        ["GOFAMINT MONTHLY TITHE RETURNS"],
+        [`Assembly: ${assembly}   District: ${districtMapping[assembly as keyof typeof districtMapping] || "N/A"}, Region 26`],
+        [`Month: ${moment(selectedDate).format("MMMM YYYY")}, Total Attendance: ${stats.totalMembers}, Paid: ${stats.paidMembers}, Unpaid: ${stats.unpaidMembers}`],
+        [], // Empty row
+      ];
+
+      // Create table headers
+      const excelHeaders = ["SN", "Name", "Tithe Number", ...sundays.map((_, i) => `Week ${i + 1}`), "Total"];
+
+      // Create data rows
+      const rows = filteredData.map((row, index) => [
+        index + 1,
+        `"${row.name}"`, // Wrap in quotes to handle commas in names
+        row.titheNumber,
+        row.week1,
+        row.week2,
+        row.week3,
+        row.week4,
+        ...(sundays.length === 5 ? [row.week5 ?? 0] : []),
+        row.total,
+      ]);
+
+      // Add summary row
+      const summaryRow = [
+        "",
+        "GRAND TOTAL",
+        "",
+        ...sundays.map(() => ""),
+        stats.totalTithe,
+      ];
+
+      // Combine all parts
+      const csvContent = [
+        ...metadata.map(row => row.join(",")),
+        excelHeaders.join(","),
+        ...rows.map(row => row.join(",")),
+        summaryRow.join(","),
+      ].join("\n");
+
+      // Create and download file
+      const blob = new Blob([csvContent], { type: "text/csv;charset=utf-8;" });
+      const url = URL.createObjectURL(blob);
+      const link = document.createElement("a");
+      link.href = url;
+      link.setAttribute("download", `Tithe_Report_${assembly}_${moment(selectedDate).format("MMMM_YYYY")}.csv`);
+      document.body.appendChild(link);
+      link.click();
+      document.body.removeChild(link);
+
+      notification.success({
+        message: "Export Successful",
+        description: "Excel (CSV) file downloaded successfully"
+      });
+    } catch (error) {
+      console.error("Export error:", error);
+      notification.error({
+        message: "Export Failed",
+        description: "Failed to export Excel file"
+      });
+    }
   };
+
+  // Function to export as PDF
+  const exportToPDF = () => {
+    try {
+      // Filter data with actual content
+      const filteredData = data.filter(row => 
+        row.name?.trim() && row.titheNumber?.trim()
+      );
+
+      if (filteredData.length === 0) {
+        notification.warning({
+          message: "No Data to Export",
+          description: "There are no records to export"
+        });
+        return;
+      }
+
+      // Create PDF document
+      const doc = new jsPDF({
+        orientation: 'landscape',
+        unit: 'mm',
+        format: 'a4'
+      });
+
+      // Add title
+      doc.setFontSize(16);
+      doc.setFont("helvetica", "bold");
+      doc.text("GOFAMINT MONTHLY TITHE RETURNS", 14, 20);
+
+      // Add assembly and district info
+      doc.setFontSize(12);
+      doc.setFont("helvetica", "normal");
+      doc.text(`Assembly: ${assembly}`, 14, 30);
+      doc.text(`District: ${districtMapping[assembly as keyof typeof districtMapping] || "N/A"}, Region 26`, 14, 36);
+
+      // Add month and statistics
+      doc.text(`Month: ${moment(selectedDate).format("MMMM YYYY")}`, 14, 42);
+      doc.text(`Total Attendance: ${stats.totalMembers}`, 70, 42);
+      doc.text(`Paid: ${stats.paidMembers}`, 110, 42);
+      doc.text(`Unpaid: ${stats.unpaidMembers}`, 140, 42);
+      doc.text(`Total Tithe: ₦${stats.totalTithe.toLocaleString()}`, 170, 42);
+
+      // Add submitted by and date
+      doc.setFont("helvetica", "italic");
+      doc.setFontSize(10);
+      doc.text(`Submitted by: ${submittedBy || "Not specified"}`, 14, 48);
+      doc.text(`Generated: ${moment().format("DD/MM/YYYY HH:mm")}`, 200, 48);
+
+      // Prepare table data
+      const tableHeaders = ["SN", "Name", "Tithe No.", ...sundays.map((_, i) => `Week ${i + 1}`), "Total"];
+      
+      const tableData = filteredData.map((row, index) => [
+        index + 1,
+        row.name,
+        row.titheNumber,
+        row.week1 === 0 ? "-" : `₦${row.week1.toLocaleString()}`,
+        row.week2 === 0 ? "-" : `₦${row.week2.toLocaleString()}`,
+        row.week3 === 0 ? "-" : `₦${row.week3.toLocaleString()}`,
+        row.week4 === 0 ? "-" : `₦${row.week4.toLocaleString()}`,
+        ...(sundays.length === 5 ? [row.week5 === 0 ? "-" : `₦${row.week5?.toLocaleString()}`] : []),
+        `₦${row.total.toLocaleString()}`,
+      ]);
+
+      // Add summary row
+      tableData.push([
+        "",
+        "GRAND TOTAL",
+        "",
+        ...sundays.map(() => ""),
+        `₦${stats.totalTithe.toLocaleString()}`,
+      ]);
+
+      // Prepare column styles - FIXED: Remove array spread issue
+      const columnStyles: Record<string, any> = {
+        0: { cellWidth: 15 }, // SN
+        1: { cellWidth: 50 }, // Name
+        2: { cellWidth: 25 }, // Tithe No.
+      };
+
+      // Add dynamic column styles for week columns
+      sundays.forEach((_, index) => {
+        columnStyles[3 + index] = { cellWidth: 25, halign: 'right' };
+      });
+
+      // Add total column style
+      columnStyles[3 + sundays.length] = { cellWidth: 30, halign: 'right' };
+
+      // Generate table
+      autoTable(doc, {
+        head: [tableHeaders],
+        body: tableData,
+        startY: 55,
+        theme: 'grid',
+        styles: {
+          fontSize: 9,
+          cellPadding: 3,
+        },
+        headStyles: {
+          fillColor: [41, 128, 185],
+          textColor: 255,
+          fontStyle: 'bold',
+        },
+        alternateRowStyles: {
+          fillColor: [245, 245, 245]
+        },
+        columnStyles: columnStyles,
+        margin: { left: 14, right: 14 },
+        didDrawPage: (data) => {
+          // Add footer with page number
+          doc.setFontSize(8);
+          doc.setFont("helvetica", "italic");
+          const pageCount = doc.getNumberOfPages();
+          doc.text(`Page ${data.pageNumber} of ${pageCount}`, data.settings.margin.left, doc.internal.pageSize.height - 10);
+        }
+      });
+
+      // Save PDF
+      doc.save(`Tithe_Report_${assembly}_${moment(selectedDate).format("MMMM_YYYY")}.pdf`);
+
+      notification.success({
+        message: "Export Successful",
+        description: "PDF file downloaded successfully"
+      });
+    } catch (error) {
+      console.error("PDF export error:", error);
+      notification.error({
+        message: "PDF Export Failed",
+        description: "Failed to generate PDF file"
+      });
+    }
+  };
+
+  // Dropdown menu items for export
+  const exportMenuItems = [
+    {
+      key: 'excel',
+      label: 'Export as Excel (CSV)',
+      icon: <FileExcelOutlined />,
+      onClick: exportToExcel,
+    },
+    {
+      key: 'pdf',
+      label: 'Export as PDF',
+      icon: <FilePdfOutlined />,
+      onClick: exportToPDF,
+    },
+  ];
 
   return (
     <div className="container mx-auto p-4 sm:p-6 bg-gray-50 min-h-screen">
@@ -513,9 +715,14 @@ const AddTitheSheet = () => {
             <Button icon={<ReloadOutlined />} danger onClick={handleClear}>
               Reset
             </Button>
-            <Button icon={<FileExcelOutlined />} onClick={handleExport}>
-              Export
-            </Button>
+            <Dropdown 
+              menu={{ items: exportMenuItems }}
+              trigger={['click']}
+            >
+              <Button icon={<FileExcelOutlined />}>
+                Export <DownOutlined />
+              </Button>
+            </Dropdown>
             <Button
               type="primary"
               icon={<SaveOutlined />}
@@ -528,15 +735,15 @@ const AddTitheSheet = () => {
         </div>
       </div>
 
-      {/* Stats Cards Section */}
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4 mb-6">
+      {/* Stats Cards Section - Reduced to 3 cards */}
+      <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-6">
         <Card className="shadow-sm">
           <Statistic
             title="Total Tithe"
             value={stats.totalTithe}
             prefix="₦"
             precision={2}
-            valueStyle={{ color: "#3f8600" }}
+            valueStyle={{ color: '#3f8600' }}
           />
           <div className="text-sm text-gray-500 mt-2">
             {moment(selectedDate).format("MMMM YYYY")}
@@ -548,12 +755,10 @@ const AddTitheSheet = () => {
             title="Total Members"
             value={stats.totalMembers}
             prefix={<UserOutlined />}
-            valueStyle={{ color: "#1890ff" }}
+            valueStyle={{ color: '#1890ff' }}
           />
           <div className="text-sm text-gray-500 mt-2">
-            {stats.savedRecords > 0
-              ? `${stats.savedRecords} saved`
-              : "No saved data"}
+            {stats.paidMembers} paid • {stats.unpaidMembers} unpaid
           </div>
         </Card>
 
@@ -563,12 +768,12 @@ const AddTitheSheet = () => {
             value={stats.averageTithe}
             prefix="₦"
             precision={2}
-            valueStyle={{ color: "#722ed1" }}
+            valueStyle={{ color: '#722ed1' }}
           />
-          <div className="text-sm text-gray-500 mt-2">Per member</div>
+          <div className="text-sm text-gray-500 mt-2">
+            Per paid member
+          </div>
         </Card>
-
-       
       </div>
 
       {/* Main Data Table */}
@@ -614,27 +819,21 @@ const AddTitheSheet = () => {
       >
         <p>
           {isEditing ? (
-            <>
-              Update tithe records for <strong>{assembly}</strong> -{" "}
-              {moment(selectedDate).format("MMMM YYYY")}?
-            </>
+            <>Update tithe records for <strong>{assembly}</strong> - {moment(selectedDate).format("MMMM YYYY")}?</>
           ) : (
-            <>
-              Save tithe records for <strong>{assembly}</strong> -{" "}
-              {moment(selectedDate).format("MMMM YYYY")}?
-            </>
+            <>Save tithe records for <strong>{assembly}</strong> - {moment(selectedDate).format("MMMM YYYY")}?</>
           )}
         </p>
-        <Form
-          form={form}
-          layout="vertical"
+        <Form 
+          form={form} 
+          layout="vertical" 
           className="mt-4"
           initialValues={{ submittedBy }}
         >
           <Form.Item
             name="submittedBy"
             label="Submitted By"
-            rules={[{ required: true, message: "Please enter your name" }]}
+            rules={[{ required: true, message: 'Please enter your name' }]}
           >
             <Input
               placeholder="Your full name"
