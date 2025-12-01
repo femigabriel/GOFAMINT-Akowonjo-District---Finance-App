@@ -1,4 +1,3 @@
-// components/AddTitheSheet.tsx
 "use client";
 
 import { useRef, useState, useEffect, useCallback, useMemo } from "react";
@@ -11,17 +10,20 @@ import {
   notification,
   Space,
   Statistic,
-  Tooltip,
   Input,
   Form,
+  Card,
+  Row,
+  Col,
 } from "antd";
 import {
   SaveOutlined,
   ReloadOutlined,
   FileExcelOutlined,
-  PlusOutlined,
   CalendarOutlined,
   RollbackOutlined,
+  DatabaseOutlined,
+  UserOutlined,
 } from "@ant-design/icons";
 import { format, startOfMonth, endOfMonth, eachWeekOfInterval } from "date-fns";
 import moment from "moment";
@@ -29,10 +31,12 @@ import { registerAllCellTypes } from "handsontable/cellTypes";
 import type { CellChange, ChangeSource } from "handsontable/common";
 import { useAuth } from "@/context/AuthContext";
 import Link from "next/link";
+import { titheData } from "@/lib/tithe-data";
 
 registerAllCellTypes();
 
-interface TitheRow {
+interface TitheRowInternal {
+  _sn: number;
   name: string;
   titheNumber: string;
   week1: number;
@@ -43,25 +47,44 @@ interface TitheRow {
   total: number;
 }
 
+interface TitheRow extends Omit<TitheRowInternal, "_sn"> {}
+
+interface DatabaseRecord {
+  _id: string;
+  assembly: string;
+  submittedBy: string;
+  month: string;
+  records: TitheRow[];
+  createdAt: string;
+  updatedAt?: string;
+}
+
 const AddTitheSheet = () => {
   const hotRef = useRef<HotTableClass>(null);
   const [selectedDate, setSelectedDate] = useState<Date>(new Date());
   const [isModalOpen, setIsModalOpen] = useState(false);
-  const [data, setData] = useState<TitheRow[]>([]);
+  const [data, setData] = useState<TitheRowInternal[]>([]);
   const [loading, setLoading] = useState(true);
   const [submittedBy, setSubmittedBy] = useState<string>("");
   const { assembly } = useAuth();
   const [form] = Form.useForm();
+  const [existingRecord, setExistingRecord] = useState<DatabaseRecord | null>(
+    null
+  );
+  const [isEditing, setIsEditing] = useState(false);
+  const [stats, setStats] = useState({
+    totalTithe: 0,
+    totalMembers: 0,
+    averageTithe: 0,
+    savedRecords: 0,
+  });
 
-  // Get Sundays of month
   const getSundays = useCallback((date: Date) => {
     const start = startOfMonth(date);
     const end = endOfMonth(date);
-    const sundays = eachWeekOfInterval(
-      { start, end },
-      { weekStartsOn: 0 }
-    ).filter((date) => date >= start && date <= end);
-    return sundays.map((sunday) => format(sunday, "d/M"));
+    return eachWeekOfInterval({ start, end }, { weekStartsOn: 0 })
+      .filter((d) => d >= start && d <= end)
+      .map((sunday) => format(sunday, "d/M"));
   }, []);
 
   const sundays = useMemo(
@@ -69,7 +92,6 @@ const AddTitheSheet = () => {
     [selectedDate, getSundays]
   );
 
-  // Build headers dynamically
   const colHeaders = useMemo(
     () => [
       "Full Name",
@@ -80,131 +102,310 @@ const AddTitheSheet = () => {
     [sundays]
   );
 
-  // Initialize empty data for 200 rows
-  const initializeEmptyData = useCallback(
-    () =>
-      Array.from({ length: 200 }, () => ({
-        name: "",
-        titheNumber: "",
-        week1: 0,
-        week2: 0,
-        week3: 0,
-        week4: 0,
-        ...(sundays.length === 5 ? { week5: 0 } : {}),
-        total: 0,
-      })),
-    [sundays]
-  );
+  const initializeEmptyData = useCallback(() => {
+    const base = {
+      _sn: 0,
+      name: "",
+      titheNumber: "",
+      week1: 0,
+      week2: 0,
+      week3: 0,
+      week4: 0,
+      total: 0,
+    } as TitheRowInternal;
 
-  // Fetch tither list from database
-  const fetchTitherList = useCallback(async () => {
-    if (!assembly) return;
+    if (sundays.length === 5) {
+      base.week5 = 0;
+    }
+
+    return Array.from({ length: 200 }, () => ({ ...base }));
+  }, [sundays]);
+
+  const getTitherListFromData = useCallback(() => {
+    if (!assembly) return [];
+
+    const assemblyData = titheData.find(
+      (item) => item.assembly.toUpperCase() === assembly.toUpperCase()
+    );
+
+    if (!assemblyData) {
+      notification.warning({
+        message: "No Data Found",
+        description: `No member list found for ${assembly} assembly`,
+      });
+      return [];
+    }
+
+    return assemblyData.members.map((member) => ({
+      _sn: member.sn,
+      name: member.name,
+      titheNumber: String(member.sn).padStart(3, "0"),
+      week1: 0,
+      week2: 0,
+      week3: 0,
+      week4: 0,
+      ...(sundays.length === 5 ? { week5: 0 } : {}),
+      total: 0,
+    }));
+  }, [assembly, sundays]);
+
+  // Load saved data from database
+  const loadSavedData = useCallback(async () => {
+    if (!assembly) return null;
+
+    try {
+      setLoading(true);
+      const monthStr = moment(selectedDate).format("MMMM-YYYY");
+      const response = await fetch(
+        `/api/tithes?assembly=${encodeURIComponent(assembly)}&month=${monthStr}`
+      );
+
+      const result = await response.json();
+
+      if (result.success && result.data.length > 0) {
+        const savedRecord = result.data[0];
+        setExistingRecord(savedRecord);
+        setSubmittedBy(savedRecord.submittedBy);
+        setIsEditing(true);
+
+        // Convert saved records to internal format
+        const savedRecords: TitheRowInternal[] = savedRecord.records.map(
+          (record: any, index: number) => ({
+            _sn: index + 1,
+            name: record.name || "",
+            titheNumber: record.titheNumber || "",
+            week1: Number(record.week1) || 0,
+            week2: Number(record.week2) || 0,
+            week3: Number(record.week3) || 0,
+            week4: Number(record.week4) || 0,
+            week5: Number(record.week5) || 0,
+            total: Number(record.total) || 0,
+          })
+        );
+
+        // Calculate stats from saved data
+        const totalTithe = savedRecord.records.reduce(
+          (sum: number, record: any) => sum + (Number(record.total) || 0),
+          0
+        );
+        const totalMembers = savedRecord.records.length;
+        const averageTithe = totalMembers > 0 ? totalTithe / totalMembers : 0;
+
+        setStats({
+          totalTithe,
+          totalMembers,
+          averageTithe,
+          savedRecords: savedRecord.records.length,
+        });
+
+        // Fill remaining rows with empty data or member list
+        const remainingRows = 200 - savedRecords.length;
+        let filledData = [...savedRecords];
+
+        if (remainingRows > 0) {
+          // Check if we should add member list for empty rows
+          const titherList = getTitherListFromData();
+          if (titherList.length > 0) {
+            // Filter out members already in saved data
+            const existingNames = new Set(
+              savedRecords.map((r) => r.name.toLowerCase())
+            );
+            const newMembers = titherList
+              .filter((member) => !existingNames.has(member.name.toLowerCase()))
+              .slice(0, remainingRows);
+
+            filledData = [...filledData, ...newMembers];
+
+            // Fill remaining with empty rows
+            const stillRemaining = 200 - filledData.length;
+            if (stillRemaining > 0) {
+              filledData.push(
+                ...initializeEmptyData().slice(0, stillRemaining)
+              );
+            }
+          } else {
+            filledData.push(...initializeEmptyData().slice(0, remainingRows));
+          }
+        }
+
+        setData(filledData.slice(0, 200));
+
+        notification.info({
+          message: "Saved Data Loaded",
+          description: `Loaded ${savedRecord.records.length} saved records for ${savedRecord.month}`,
+        });
+
+        return savedRecord;
+      }
+
+      // No saved data found, load member list
+      return null;
+    } catch (error) {
+      console.error("Error loading saved data:", error);
+      notification.error({
+        message: "Error Loading Data",
+        description: "Failed to load saved data from database",
+      });
+      return null;
+    } finally {
+      setLoading(false);
+    }
+  }, [assembly, selectedDate, getTitherListFromData, initializeEmptyData]);
+
+  // Load member list when no saved data exists
+  const loadMemberList = useCallback(() => {
+    if (!assembly) {
+      setData(initializeEmptyData());
+      setStats({
+        totalTithe: 0,
+        totalMembers: 0,
+        averageTithe: 0,
+        savedRecords: 0,
+      });
+      return;
+    }
+
     setLoading(true);
     try {
-      const response = await fetch(
-        `/api/tithes?assembly=${encodeURIComponent(assembly)}`
-      );
-      const { titherList } = await response.json();
-      if (titherList) {
-        // Ensure exactly 200 rows
-        const filledData = titherList.slice(0, 200);
-        const remainingRows = 200 - filledData.length;
-        if (remainingRows > 0) {
-          filledData.push(...initializeEmptyData().slice(0, remainingRows));
-        }
-        setData(filledData);
-      } else {
-        setData(initializeEmptyData());
+      const titherList = getTitherListFromData();
+      let filledData: TitheRowInternal[] =
+        titherList.length > 0 ? [...titherList] : [];
+
+      const remaining = 200 - filledData.length;
+      if (remaining > 0) {
+        filledData.push(...initializeEmptyData().slice(0, remaining));
       }
-    } catch (error) {
-      console.error("Error fetching tither list:", error);
-      notification.error({
-        message: "Error",
-        description: "Failed to load tither list. Starting with empty sheet.",
+
+      if (titherList.length > 0) {
+        notification.success({
+          message: "Members Loaded",
+          description: `Loaded ${titherList.length} members from ${assembly}`,
+        });
+      }
+
+      setData(filledData.slice(0, 200));
+      setStats({
+        totalTithe: 0,
+        totalMembers: titherList.length,
+        averageTithe: 0,
+        savedRecords: 0,
       });
+    } catch (err) {
+      notification.error({ message: "Error loading members" });
       setData(initializeEmptyData());
     } finally {
       setLoading(false);
     }
-  }, [assembly, initializeEmptyData]);
+  }, [assembly, getTitherListFromData, initializeEmptyData]);
 
-  // Initialize data on mount or when month/assembly changes
+  // Main data loading effect
   useEffect(() => {
-    fetchTitherList();
-  }, [selectedDate, fetchTitherList]);
-
-  // Handle changes and recalc totals
-  const afterChange = useCallback(
-    (changes: CellChange[] | null, source: ChangeSource) => {
-      if (changes && source !== "loadData") {
-        setData((prevData) => {
-          const newData = [...prevData];
-          changes.forEach(([row, prop, , newValue]) => {
-            const key = prop as keyof TitheRow;
-            newData[row] = { ...newData[row], [key]: newValue };
-            const {
-              week1 = 0,
-              week2 = 0,
-              week3 = 0,
-              week4 = 0,
-              week5 = 0,
-            } = newData[row];
-            newData[row].total =
-              Number(week1) +
-              Number(week2) +
-              Number(week3) +
-              Number(week4) +
-              (sundays.length === 5 ? Number(week5) : 0);
-          });
-          return newData;
-        });
-      }
-    },
-    [sundays]
-  );
-
-  // Compute grand total
-  const grandTotal = useMemo(
-    () => data.reduce((sum, row) => sum + (Number(row.total) || 0), 0),
-    [data]
-  );
-
-  // Save confirmation
-  const handleSave = () => {
     if (!assembly) {
-      notification.error({
-        message: "Error",
-        description: "No assembly selected. Please log in again.",
-      });
+      setData(initializeEmptyData());
+      setLoading(false);
       return;
     }
+
+    const loadData = async () => {
+      const savedData = await loadSavedData();
+      if (!savedData) {
+        // No saved data found, load member list
+        loadMemberList();
+      }
+    };
+
+    loadData();
+  }, [
+    assembly,
+    selectedDate,
+    loadSavedData,
+    loadMemberList,
+    initializeEmptyData,
+  ]);
+
+  // Fixed: Type-safe afterChange
+  const afterChange = useCallback(
+    (changes: CellChange[] | null, source: ChangeSource) => {
+      if (!changes || source === "loadData") return;
+
+      setData((prev) => {
+        const newData = [...prev];
+
+        for (const [row, prop, , newValue] of changes) {
+          if (typeof prop !== "string") continue;
+
+          if (
+            prop === "name" ||
+            prop === "titheNumber" ||
+            prop.startsWith("week")
+          ) {
+            const numValue =
+              newValue === null || newValue === "" ? 0 : Number(newValue);
+            (newData[row] as any)[prop] = isNaN(numValue) ? 0 : numValue;
+          }
+
+          const r = newData[row];
+          r.total =
+            Number(r.week1 || 0) +
+            Number(r.week2 || 0) +
+            Number(r.week3 || 0) +
+            Number(r.week4 || 0) +
+            (sundays.length === 5 ? Number(r.week5 ?? 0) : 0);
+        }
+
+        // Update stats
+        const grandTotal = newData.reduce(
+          (sum, row) => sum + Number(row.total || 0),
+          0
+        );
+        const activeMembers = newData.filter(
+          (r) => r.name?.trim() && (r.total || 0) > 0
+        ).length;
+        const avgTithe = activeMembers > 0 ? grandTotal / activeMembers : 0;
+
+        setStats((prev) => ({
+          ...prev,
+          totalTithe: grandTotal,
+          totalMembers: newData.filter((r) => r.name?.trim()).length,
+          averageTithe: avgTithe,
+          savedRecords: existingRecord?.records.length || 0,
+        }));
+
+        return newData;
+      });
+    },
+    [sundays.length, existingRecord]
+  );
+
+  const handleSave = () => {
+    if (!assembly)
+      return notification.error({ message: "No assembly selected" });
     setIsModalOpen(true);
   };
 
   const confirmSave = async () => {
     try {
       await form.validateFields();
-      const filledData = data.filter(
-        (r) =>
-          r.name?.trim() &&
-          r.titheNumber?.trim() &&
-          (r.week1 > 0 ||
+
+      const filledData: TitheRow[] = data
+        .filter((r) => r.name?.trim() && r.titheNumber?.trim())
+        .map(({ _sn, ...rest }) => rest as TitheRow)
+        .filter((r) => {
+          return (
+            r.week1 > 0 ||
             r.week2 > 0 ||
             r.week3 > 0 ||
             r.week4 > 0 ||
-            (r.week5 ?? 0) > 0)
-      );
+            (sundays.length === 5 && (r.week5 ?? 0) > 0)
+          );
+        });
 
       if (filledData.length === 0) {
-        notification.error({
-          message: "Error",
-          description: "No valid records to save.",
-        });
-        return;
+        return notification.error({ message: "No valid records to save." });
       }
 
       setLoading(true);
-      const response = await fetch("/api/tithes", {
+      const res = await fetch("/api/tithes", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
@@ -212,221 +413,231 @@ const AddTitheSheet = () => {
           submittedBy,
           month: moment(selectedDate).format("MMMM-YYYY"),
           records: filledData,
+          ...(existingRecord && { id: existingRecord._id }),
         }),
       });
 
-      const result = await response.json();
-      if (response.ok && result.success) {
+      const result = await res.json();
+      if (res.ok && result.success) {
         notification.success({
-          message: "Data Saved Successfully",
-          description: result.message,
-          placement: "topRight",
+          message: result.isUpdate
+            ? "Updated successfully!"
+            : "Saved successfully!",
         });
         setIsModalOpen(false);
         form.resetFields();
         setSubmittedBy("");
+        setIsEditing(result.isUpdate);
+
+        // Reload the saved data
+        await loadSavedData();
       } else {
-        throw new Error(result.error || "Failed to save data");
+        throw new Error(result.error || "Save failed");
       }
-    } catch (error) {
-      console.error("Error saving data:", error);
-      notification.error({
-        message: "Error",
-        description: "Failed to save data. Please try again.",
-      });
+    } catch (err: any) {
+      notification.error({ message: "Save failed", description: err.message });
     } finally {
       setLoading(false);
     }
   };
 
-  // Toolbar actions
-  const handleAddRows = () => {
-    setData((prev) => {
-      const newData = [...prev];
-      if (newData.length < 200) {
-        newData.push(...initializeEmptyData().slice(0, 200 - newData.length));
-      }
-      return newData.slice(0, 200); // Ensure exactly 200 rows
-    });
-  };
-
   const handleClear = () => {
     Modal.confirm({
-      title: "Clear All Data",
-      content:
-        "This will reset the sheet to the initial tither list. Are you sure?",
-      okText: "Yes, Clear",
-      cancelText: "Cancel",
-      okButtonProps: { danger: true },
-      onOk: () => fetchTitherList(),
+      title: "Reset Sheet",
+      content: "Reload all members from this assembly?",
+      onOk: () => {
+        const list = getTitherListFromData();
+        const padded =
+          list.length < 200
+            ? [...list, ...initializeEmptyData().slice(0, 200 - list.length)]
+            : list.slice(0, 200);
+        setData(padded);
+        setExistingRecord(null);
+        setIsEditing(false);
+        setStats({
+          totalTithe: 0,
+          totalMembers: list.length,
+          averageTithe: 0,
+          savedRecords: 0,
+        });
+      },
     });
   };
 
   const handleExport = () => {
-    const csvData = [
-      colHeaders.join(","),
-      ...data.map((r) =>
-        [
-          r.name,
-          r.titheNumber,
-          r.week1,
-          r.week2,
-          r.week3,
-          r.week4,
-          sundays.length === 5 ? r.week5 : "",
-          r.total,
-        ].join(",")
-      ),
-    ].join("\n");
+    const rows = data.map((r) => [
+      `"${r.name}"`,
+      r.titheNumber,
+      r.week1,
+      r.week2,
+      r.week3,
+      r.week4,
+      sundays.length === 5 ? r.week5 ?? "" : "",
+      r.total,
+    ]);
 
-    const blob = new Blob([csvData], { type: "text/csv;charset=utf-8;" });
-    const url = URL.createObjectURL(blob);
-    const link = document.createElement("a");
-    link.href = url;
-    link.setAttribute(
-      "download",
-      `Tithes-${moment(selectedDate).format("MMMM-YYYY")}.csv`
+    const csv = [colHeaders.join(","), ...rows.map((r) => r.join(","))].join(
+      "\n"
     );
-    link.click();
+    const blob = new Blob([csv], { type: "text/csv" });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement("a");
+    a.href = url;
+    a.download = `Tithes-${assembly}-${moment(selectedDate).format(
+      "MMMM-YYYY"
+    )}.csv`;
+    a.click();
   };
 
   return (
-    <div className="container mx-auto p-4 sm:p-6 bg-gray-50 rounded-t-md min-h-screen">
-      {/* Header */}
-      <div className="flex flex-col gap-4 mb-6">
-      
-        <div className="flex justify-between">
-          <h2 className="text-base lg:text-3xl font-bold  text-gray-800 flex items-center gap-3 mb-4">
-            <CalendarOutlined /> Tithe Management Sheet
+    <div className="container mx-auto p-4 sm:p-6 bg-gray-50 min-h-screen">
+      <div className="flex flex-col gap-6 mb-6">
+        <div className="flex justify-between items-start">
+          <h2 className="text-2xl lg:text-3xl font-bold flex items-center gap-3">
+            <CalendarOutlined /> Tithe Sheet - {assembly || "Loading..."}
           </h2>
           <Link href="/submissions">
-            <Button className="shadow-md border-blue-100">
+            <Button>
               Back <RollbackOutlined />
             </Button>
           </Link>
         </div>
-        <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
+
+        <div className="flex flex-col sm:flex-row gap-4 justify-between items-center">
           <DatePicker.MonthPicker
             value={moment(selectedDate)}
-            onChange={(date) => date && setSelectedDate(date.toDate())}
+            onChange={(d) => d && setSelectedDate(d.toDate())}
             format="MMMM YYYY"
-            className="w-full sm:w-auto"
           />
-          <Space
-            wrap
-            size={[8, 8]}
-            className="flex justify-end flex-wrap gap-2"
-          >
-            <Tooltip title="Add more rows (up to 200)">
-              <Link href="/submissions/add/offerings">
-                <Button icon={<PlusOutlined />}>Add Offerings</Button>
-              </Link>
-            </Tooltip>
-            <Tooltip title="Add more rows (up to 200)">
-              <Button
-                icon={<PlusOutlined />}
-                onClick={handleAddRows}
-                disabled={data.length >= 200}
-              >
-                Add Rows
-              </Button>
-            </Tooltip>
-            <Tooltip title="Export to Excel">
-              <Button icon={<FileExcelOutlined />} onClick={handleExport}>
-                Export
-              </Button>
-            </Tooltip>
-            <Tooltip title="Reset to initial tither list">
-              <Button icon={<ReloadOutlined />} danger onClick={handleClear}>
-                Reset
-              </Button>
-            </Tooltip>
+          <Space wrap>
+            <Button icon={<ReloadOutlined />} danger onClick={handleClear}>
+              Reset
+            </Button>
+            <Button icon={<FileExcelOutlined />} onClick={handleExport}>
+              Export
+            </Button>
             <Button
               type="primary"
               icon={<SaveOutlined />}
               onClick={handleSave}
               loading={loading}
             >
-              Save Data
+              {isEditing ? "Update Data" : "Save Data"}
             </Button>
           </Space>
         </div>
       </div>
 
-      {/* Summary */}
-      <div className="bg-white border rounded-lg shadow-sm mb-4 p-4 flex flex-col sm:flex-row sm:justify-between sm:items-center gap-2">
-        <Statistic
-          title="Total Amount Recorded"
-          value={grandTotal}
-          prefix="₦"
-          precision={2}
-        />
-        <span className="text-sm text-gray-500">
-          Showing {data.length} rows —{" "}
-          {moment(selectedDate).format("MMMM YYYY")}
-        </span>
+      {/* Stats Cards Section */}
+      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4 mb-6">
+        <Card className="shadow-sm">
+          <Statistic
+            title="Total Tithe"
+            value={stats.totalTithe}
+            prefix="₦"
+            precision={2}
+            valueStyle={{ color: "#3f8600" }}
+          />
+          <div className="text-sm text-gray-500 mt-2">
+            {moment(selectedDate).format("MMMM YYYY")}
+          </div>
+        </Card>
+
+        <Card className="shadow-sm">
+          <Statistic
+            title="Total Members"
+            value={stats.totalMembers}
+            prefix={<UserOutlined />}
+            valueStyle={{ color: "#1890ff" }}
+          />
+          <div className="text-sm text-gray-500 mt-2">
+            {stats.savedRecords > 0
+              ? `${stats.savedRecords} saved`
+              : "No saved data"}
+          </div>
+        </Card>
+
+        <Card className="shadow-sm">
+          <Statistic
+            title="Average Tithe"
+            value={stats.averageTithe}
+            prefix="₦"
+            precision={2}
+            valueStyle={{ color: "#722ed1" }}
+          />
+          <div className="text-sm text-gray-500 mt-2">Per member</div>
+        </Card>
+
+       
       </div>
 
-      {/* Table */}
+      {/* Main Data Table */}
       <div
-        className="handsontable-container border rounded-lg shadow-sm bg-white"
-        style={{ height: "calc(100vh - 260px)", overflow: "auto" }}
+        className="border rounded-lg shadow-sm bg-white overflow-auto"
+        style={{ height: "calc(100vh - 400px)" }}
       >
         <HotTable
           ref={hotRef}
           data={data}
           colHeaders={colHeaders}
           columns={[
-            { data: "name", type: "text", width: 200 },
-            { data: "titheNumber", type: "text", width: 150 },
-            { data: "week1", type: "numeric", width: 120 },
-            { data: "week2", type: "numeric", width: 120 },
-            { data: "week3", type: "numeric", width: 120 },
-            { data: "week4", type: "numeric", width: 120 },
+            { data: "name", type: "text", width: 220 },
+            { data: "titheNumber", type: "text", width: 100 },
+            { data: "week1", type: "numeric", width: 110 },
+            { data: "week2", type: "numeric", width: 110 },
+            { data: "week3", type: "numeric", width: 110 },
+            { data: "week4", type: "numeric", width: 110 },
             ...(sundays.length === 5
-              ? [{ data: "week5", type: "numeric", width: 120 }]
+              ? [{ data: "week5", type: "numeric", width: 110 }]
               : []),
             { data: "total", type: "numeric", readOnly: true, width: 120 },
           ]}
           afterChange={afterChange}
           stretchH="all"
-          autoRowSize={false}
-          autoColumnSize={false}
-          minSpareRows={0} // No extra rows beyond 200
           rowHeaders={true}
           contextMenu={true}
           licenseKey="non-commercial-and-evaluation"
-          className="text-sm"
         />
       </div>
 
-      {/* Save Modal */}
       <Modal
-        title="Confirm Save"
+        title={isEditing ? "Update Existing Data" : "Confirm Save"}
         open={isModalOpen}
         onOk={confirmSave}
         onCancel={() => {
           setIsModalOpen(false);
           form.resetFields();
-          setSubmittedBy("");
         }}
-        okText="Save"
+        okText={isEditing ? "Update" : "Save"}
         cancelText="Cancel"
-        okButtonProps={{ type: "primary", loading }}
+        okButtonProps={{ loading }}
       >
         <p>
-          Are you sure you want to save this month’s tithe data? Only filled
-          rows will be saved.
+          {isEditing ? (
+            <>
+              Update tithe records for <strong>{assembly}</strong> -{" "}
+              {moment(selectedDate).format("MMMM YYYY")}?
+            </>
+          ) : (
+            <>
+              Save tithe records for <strong>{assembly}</strong> -{" "}
+              {moment(selectedDate).format("MMMM YYYY")}?
+            </>
+          )}
         </p>
-        <Form form={form} layout="vertical" className="mt-4">
+        <Form
+          form={form}
+          layout="vertical"
+          className="mt-4"
+          initialValues={{ submittedBy }}
+        >
           <Form.Item
             name="submittedBy"
-            label="Submitted By (Full Name)"
-            rules={[{ required: true, message: "Please enter your full name" }]}
+            label="Submitted By"
+            rules={[{ required: true, message: "Please enter your name" }]}
           >
             <Input
-              placeholder="Enter your full name"
-              value={submittedBy}
+              placeholder="Your full name"
               onChange={(e) => setSubmittedBy(e.target.value)}
             />
           </Form.Item>
