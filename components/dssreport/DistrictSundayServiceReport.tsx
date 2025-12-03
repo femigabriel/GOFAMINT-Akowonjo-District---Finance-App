@@ -176,7 +176,14 @@ const DistrictSundayServiceReport: React.FC = () => {
         data: f.key,
         type: "numeric",
         width: isMobile ? Math.max(70, baseWidth - 20) : baseWidth,
-        renderer: (instance: any, td: any, row: number, col: number, prop: string, value: any) => {
+        renderer: (
+          instance: any,
+          td: any,
+          row: number,
+          col: number,
+          prop: string,
+          value: any
+        ) => {
           td.innerHTML = value ?? 0;
           td.style.textAlign = "right";
           td.style.padding = isMobile ? "4px 6px" : "8px 12px";
@@ -192,7 +199,14 @@ const DistrictSundayServiceReport: React.FC = () => {
       type: "numeric",
       readOnly: true,
       width: isMobile ? Math.max(70, baseWidth - 20) : baseWidth,
-      renderer: (instance: any, td: any, row: number, col: number, prop: string, value: any) => {
+      renderer: (
+        instance: any,
+        td: any,
+        row: number,
+        col: number,
+        prop: string,
+        value: any
+      ) => {
         td.innerHTML = value ? value.toLocaleString() : 0;
         td.style.textAlign = "right";
         td.style.padding = isMobile ? "4px 6px" : "8px 12px";
@@ -201,18 +215,27 @@ const DistrictSundayServiceReport: React.FC = () => {
       },
     });
 
-    // ---- Monetary Total (read-only) ----
+    // ---- TOTAL OFFERINGS (read-only) ----
+    // This now sums all offerings EXCEPT tithes
     columns.push({
       data: "total",
       type: "numeric",
       readOnly: true,
       width: isMobile ? Math.max(70, baseWidth - 20) : baseWidth,
-      renderer: (instance: any, td: any, row: number, col: number, prop: string, value: any) => {
+      renderer: (
+        instance: any,
+        td: any,
+        row: number,
+        col: number,
+        prop: string,
+        value: any
+      ) => {
         td.innerHTML = value ? value.toLocaleString() : 0;
         td.style.textAlign = "right";
         td.style.padding = isMobile ? "4px 6px" : "8px 12px";
         td.style.fontSize = isMobile ? "12px" : "14px";
-        td.className = "htNumeric bg-gray-200 font-semibold hover:bg-gray-300 transition-colors";
+        td.className =
+          "htNumeric bg-gray-200 font-semibold hover:bg-gray-300 transition-colors";
       },
     });
 
@@ -222,7 +245,15 @@ const DistrictSundayServiceReport: React.FC = () => {
   const colHeaders = useMemo(() => {
     const isMobile = !screens.md;
     const base = isMobile
-      ? ["Att", "SBS", "Vis", "Tithes", "Offer", "Spec", ...customColumns.map((c) => c.name.split(" ")[0])]
+      ? [
+          "Att",
+          "SBS",
+          "Vis",
+          "Tithes",
+          "Offer",
+          "Spec",
+          ...customColumns.map((c) => c.name.split(" ")[0]),
+        ]
       : [
           "Attendance",
           "SBS",
@@ -232,7 +263,7 @@ const DistrictSundayServiceReport: React.FC = () => {
           "Special (₦)",
           ...customColumns.map((c) => c.name + " (₦)"),
         ];
-    return [...base, "Total Att.", "Total (₦)"];
+    return [...base, "Total Att.", "All Offerings (₦)"]; // Changed column header text
   }, [screens, customColumns]);
 
   const monthKey = (d: Date) => format(d, "MMMM-yyyy");
@@ -256,14 +287,17 @@ const DistrictSundayServiceReport: React.FC = () => {
       const { records } = await resp.json();
 
       console.log("Fetched records:", records); // DEBUG
-      console.log("Month Sundays:", monthSundays.map(d => format(d, "yyyy-MM-dd"))); // DEBUG
+      console.log(
+        "Month Sundays:",
+        monthSundays.map((d) => format(d, "yyyy-MM-dd"))
+      ); // DEBUG
 
       const filled: SundayServiceRow[] = monthSundays.map((sun, index) => {
         const dateStr = format(sun, "yyyy-MM-dd");
-        
+
         // Try exact match first
         let saved = records.find((r: any) => r.date === dateStr);
-        
+
         // If no exact match, try matching by week number as fallback
         if (!saved && records[index]) {
           saved = records[index];
@@ -317,14 +351,21 @@ const DistrictSundayServiceReport: React.FC = () => {
           date: format(monthSundays[i], "yyyy-MM-dd"),
           ...row,
         }))
-        .filter((r) => Object.values(r).some((v) => typeof v === "number" && v > 0));
+        .filter((r) =>
+          Object.values(r).some((v) => typeof v === "number" && v > 0)
+        );
 
       if (!payload.length) {
         notification.error({ message: "Nothing to save" });
         return;
       }
 
-      console.log("Sending payload:", { assembly, submittedBy, month: monthKey(selectedDate), records: payload });
+      console.log("Sending payload:", {
+        assembly,
+        submittedBy,
+        month: monthKey(selectedDate),
+        records: payload,
+      });
 
       setLoading(true);
       const resp = await fetch("/api/sunday-service-reports", {
@@ -344,11 +385,14 @@ const DistrictSundayServiceReport: React.FC = () => {
       }
 
       const result = await resp.json();
-      
+
       // Show success notification
       notification.success({
         message: "Successfully Saved!",
-        description: `Sunday service report for ${format(selectedDate, "MMMM yyyy")} has been saved.`,
+        description: `Sunday service report for ${format(
+          selectedDate,
+          "MMMM yyyy"
+        )} has been saved.`,
       });
 
       // Close modal and reset form
@@ -358,12 +402,13 @@ const DistrictSundayServiceReport: React.FC = () => {
 
       // Refresh data to get the latest from server
       fetchInitialRecords();
-
     } catch (e: any) {
       console.error(e);
-      notification.error({ 
-        message: "Save Failed", 
-        description: e.message || "Failed to save Sunday service report. Please try again." 
+      notification.error({
+        message: "Save Failed",
+        description:
+          e.message ||
+          "Failed to save Sunday service report. Please try again.",
       });
     } finally {
       setLoading(false);
@@ -383,20 +428,21 @@ const DistrictSundayServiceReport: React.FC = () => {
           copy[row] = { ...copy[row], [prop as string]: Number(newVal) || 0 };
         });
         copy.forEach((r) => {
-          // FIXED: Calculate total attendance as sum of all attendance types
-          r.totalAttendance = r.attendance + r.sbsAttendance + r.visitors;
+          // FIXED: Total attendance is just the main service attendance
+          r.totalAttendance = r.attendance; // Only main service attendance
+
+          // Calculate total offerings as sum of ALL offerings EXCEPT tithes
           r.total =
-            r.tithes +
-            r.offerings +
-            r.specialOfferings +
-            r.etf +
-            r.pastorsWarfare +
-            r.vigil +
-            r.thanksgiving +
-            r.retirees +
-            r.missionaries +
-            r.youthOfferings +
-            r.districtSupport;
+            r.offerings + // Regular offerings
+            r.specialOfferings + // Special offerings
+            r.etf + // ETF
+            r.pastorsWarfare + // Pastor's warfare
+            r.vigil + // Vigil
+            r.thanksgiving + // Thanksgiving
+            r.retirees + // Retirees
+            r.missionaries + // Missionaries
+            r.youthOfferings + // Youth offerings
+            r.districtSupport; // District support
         });
         return copy;
       });
@@ -404,28 +450,90 @@ const DistrictSundayServiceReport: React.FC = () => {
     []
   );
 
-  // FIXED: Calculate total attendance properly
+  // FIXED: Calculate totals properly with tithes SEPARATE from offerings
   const summaryStats = useMemo(() => {
+    const offeringsBreakdown = {
+      offerings: 0, // Regular Sunday offerings
+      specialOfferings: 0, // Special offerings
+      etf: 0, // ETF
+      pastorsWarfare: 0, // Pastor's warfare
+      vigil: 0, // Vigil
+      thanksgiving: 0, // Thanksgiving
+      retirees: 0, // Retirees
+      missionaries: 0, // Missionaries
+      youthOfferings: 0, // Youth offerings
+      districtSupport: 0, // District support
+    };
+
     return data.reduce(
       (a, r) => {
         a.serviceAttendance += r.attendance;
         a.sbsAttendance += r.sbsAttendance;
         a.visitors += r.visitors;
-        a.totalAttendance += r.attendance + r.sbsAttendance + r.visitors; // Sum all attendance types
-        a.totalTithes += r.tithes;
-        a.totalOfferings += r.total;
+        a.totalAttendance += r.attendance; // Only main service attendance
+        a.totalTithes += r.tithes; // Tithes are separate
+
+        // Track each offering type
+        offeringsBreakdown.offerings += r.offerings;
+        offeringsBreakdown.specialOfferings += r.specialOfferings;
+        offeringsBreakdown.etf += r.etf;
+        offeringsBreakdown.pastorsWarfare += r.pastorsWarfare;
+        offeringsBreakdown.vigil += r.vigil;
+        offeringsBreakdown.thanksgiving += r.thanksgiving;
+        offeringsBreakdown.retirees += r.retirees;
+        offeringsBreakdown.missionaries += r.missionaries;
+        offeringsBreakdown.youthOfferings += r.youthOfferings;
+        offeringsBreakdown.districtSupport += r.districtSupport;
+
+        // All offerings EXCEPT tithes
+        a.totalOfferings +=
+          r.offerings +
+          r.specialOfferings +
+          r.etf +
+          r.pastorsWarfare +
+          r.vigil +
+          r.thanksgiving +
+          r.retirees +
+          r.missionaries +
+          r.youthOfferings +
+          r.districtSupport;
+
         return a;
       },
-      { 
-        serviceAttendance: 0, 
-        sbsAttendance: 0, 
-        visitors: 0, 
-        totalAttendance: 0, 
-        totalTithes: 0, 
-        totalOfferings: 0 
+      {
+        serviceAttendance: 0,
+        sbsAttendance: 0,
+        visitors: 0,
+        totalAttendance: 0,
+        totalTithes: 0,
+        totalOfferings: 0,
+        offeringsBreakdown,
       }
     );
   }, [data]);
+
+  // Filter offerings breakdown to only show types that have data
+  const activeOfferings = useMemo(() => {
+    const breakdown = summaryStats.offeringsBreakdown;
+    return Object.entries(breakdown)
+      .filter(([key, value]) => value > 0)
+      .map(([key, value]) => {
+        // Format the key for display
+        const formattedKey = key
+          .replace(/([A-Z])/g, " $1") // Add space before capital letters
+          .replace(/^./, (str) => str.toUpperCase()) // Capitalize first letter
+          .replace(/Offerings$/, "") // Remove trailing 'Offerings'
+          .replace(/Etf/, "ETF") // Special case for ETF
+          .trim();
+
+        return {
+          key,
+          label: formattedKey,
+          value,
+        };
+      })
+      .sort((a, b) => b.value - a.value); // Sort by value descending
+  }, [summaryStats.offeringsBreakdown]);
 
   const handleSave = () => {
     if (!assembly) return notification.error({ message: "No assembly" });
@@ -472,13 +580,14 @@ const DistrictSundayServiceReport: React.FC = () => {
     URL.revokeObjectURL(url);
   };
 
+  // FIXED: Calendar date picker - set default to current month/year
   const handleMonthChange = (m: moment.Moment | null) => {
     if (m) setSelectedDate(m.toDate());
   };
 
   const tableHeight = useMemo(() => {
     const rowH = screens.md ? 42 : 36;
-    return rowH * (rowCount + 1) + 10; 
+    return rowH * (rowCount + 1) + 10;
   }, [screens, rowCount]);
 
   return (
@@ -500,112 +609,183 @@ const DistrictSundayServiceReport: React.FC = () => {
             </div>
           </div>
 
-          <DatePicker.MonthPicker
+          {/* FIXED: Calendar shows current year/month by default */}
+          <DatePicker
+            picker="month"
             value={moment(selectedDate)}
             onChange={handleMonthChange}
             className="rounded-lg w-full sm:w-auto"
             size={screens.xs ? "small" : "middle"}
             allowClear={false}
+            format="MMMM YYYY"
+            disabledDate={(current) => {
+              // Optional: You can restrict date range here if needed
+              // For example, only allow dates from 2020 to 2030
+              return (
+                current && (current.year() < 2020 || current.year() > 2030)
+              );
+            }}
           />
         </div>
 
-        {/* FIXED: 3 equal cards with proper total calculation */}
+        {/* FIXED: 3 equal cards with proper calculations */}
         <Row gutter={[12, 12]}>
-          {/* Total Attendance Card */}
+          {/* Total Attendance Card - FIXED: Only shows main service attendance */}
           <Col xs={24} sm={8} lg={8}>
             <Card
               className="bg-gradient-to-r from-blue-500 to-blue-600 text-white rounded-xl shadow-md h-full border-0"
               bodyStyle={{ padding: screens.xs ? "16px 12px" : "20px" }}
             >
               <div className="text-center">
-                <div className="text-blue-100 text-sm font-semibold mb-2">Total Attendance</div>
+                <div className="text-blue-100 text-sm font-semibold mb-2">
+                  Service Attendance
+                </div>
                 <div className="text-2xl sm:text-3xl font-bold text-white mb-3">
                   {summaryStats.totalAttendance.toLocaleString()}
                 </div>
                 <div className="grid grid-cols-3 gap-2 text-center border-t border-blue-400 pt-3">
                   <div>
-                    <div className="text-blue-100 text-xs">Service</div>
-                    <div className="text-white font-semibold text-sm">{summaryStats.serviceAttendance.toLocaleString()}</div>
-                  </div>
-                  <div>
                     <div className="text-blue-100 text-xs">SBS</div>
-                    <div className="text-white font-semibold text-sm">{summaryStats.sbsAttendance.toLocaleString()}</div>
+                    <div className="text-white font-semibold text-sm">
+                      {summaryStats.sbsAttendance.toLocaleString()}
+                    </div>
                   </div>
                   <div>
                     <div className="text-blue-100 text-xs">Visitors</div>
-                    <div className="text-white font-semibold text-sm">{summaryStats.visitors.toLocaleString()}</div>
+                    <div className="text-white font-semibold text-sm">
+                      {summaryStats.visitors.toLocaleString()}
+                    </div>
+                  </div>
+                  <div>
+                    <div className="text-blue-100 text-xs">Total</div>
+                    <div className="text-white font-semibold text-sm">
+                      {(
+                        summaryStats.totalAttendance +
+                        summaryStats.sbsAttendance +
+                        summaryStats.visitors
+                      ).toLocaleString()}
+                    </div>
                   </div>
                 </div>
               </div>
             </Card>
           </Col>
 
-          {/* Total Tithes Card */}
+          {/* Total Tithes Card - SEPARATE from offerings */}
           <Col xs={24} sm={8} lg={8}>
             <Card
               className="bg-gradient-to-r from-purple-500 to-purple-600 text-white rounded-xl shadow-md h-full border-0"
               bodyStyle={{ padding: screens.xs ? "16px 12px" : "20px" }}
             >
               <div className="text-center">
-                <div className="text-purple-100 text-sm font-semibold mb-2">Total Tithes</div>
+                <div className="text-purple-100 text-sm font-semibold mb-2">
+                  Total Tithes
+                </div>
                 <div className="text-2xl sm:text-3xl font-bold text-white">
                   ₦{summaryStats.totalTithes.toLocaleString()}
+                </div>
+                <div className="text-purple-200 text-xs mt-2">
+                  Tithes are separate from offerings
                 </div>
               </div>
             </Card>
           </Col>
 
-          {/* All Offerings Card */}
+          {/* All Offerings Card - FIXED: Shows breakdown like attendance */}
           <Col xs={24} sm={8} lg={8}>
             <Card
               className="bg-gradient-to-r from-pink-500 to-pink-600 text-white rounded-xl shadow-md h-full border-0"
               bodyStyle={{ padding: screens.xs ? "16px 12px" : "20px" }}
             >
               <div className="text-center">
-                <div className="text-pink-100 text-sm font-semibold mb-2">All Offerings</div>
-                <div className="text-2xl sm:text-3xl font-bold text-white">
+                <div className="text-pink-100 text-sm font-semibold mb-2">
+                  All Offerings
+                </div>
+                <div className="text-2xl sm:text-3xl font-bold text-white mb-3">
                   ₦{summaryStats.totalOfferings.toLocaleString()}
                 </div>
+
+                {/* Offerings breakdown - shows only types with data */}
+                {activeOfferings.length > 0 ? (
+                  <div className="border-t border-pink-400 pt-3">
+                    <div className="grid grid-cols-2 gap-2 text-center">
+                      {activeOfferings.slice(0, 4).map((item) => (
+                        <div key={item.key} className="text-center">
+                          <div
+                            className="text-pink-100 text-xs truncate"
+                            title={item.label}
+                          >
+                            {item.label.length > 10
+                              ? `${item.label.substring(0, 8)}...`
+                              : item.label}
+                          </div>
+                          <div className="text-white font-semibold text-sm">
+                            ₦{item.value.toLocaleString()}
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+
+                    {/* Show "more" indicator if there are more than 4 offering types */}
+                    {activeOfferings.length > 4 && (
+                      <div className="mt-2 text-pink-200 text-xs">
+                        +{activeOfferings.length - 4} more offering types
+                      </div>
+                    )}
+                  </div>
+                ) : (
+                  <div className="text-pink-200 text-xs mt-2">
+                    No offerings recorded
+                  </div>
+                )}
               </div>
             </Card>
           </Col>
         </Row>
       </div>
 
-      {/* Action buttons */}
+      {/* Action buttons - FIXED: Made bigger for mobile with visible text */}
       <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 mb-4 sm:mb-6">
         <div className="text-sm text-gray-500">
           {screens.md && "Edit any cell – totals update instantly."}
         </div>
         <Space
           wrap
-          size={[8, 8]}
-          className={`flex ${screens.xs ? "justify-stretch" : "justify-end"} gap-2`}
+          size={[12, 12]}
+          className={`flex ${
+            screens.xs ? "justify-stretch" : "justify-end"
+          } gap-3`}
         >
           <Button
             icon={<FileExcelOutlined />}
             onClick={handleExport}
-            size={screens.xs ? "small" : "middle"}
-            className="bg-green-600 text-white hover:bg-green-700 rounded-lg"
-            block={screens.xs}
+            size="large"
+            className="bg-green-600 text-white hover:bg-green-700 rounded-lg h-12 px-4"
+            style={{
+              minWidth: screens.xs ? "120px" : "auto",
+              fontSize: screens.xs ? "14px" : "inherit",
+            }}
           >
-            {screens.sm && "Export"}
+            <span className="ml-1">Export</span>
           </Button>
 
           <Popconfirm
-            title="Reset?"
-            description="Clear all data?"
+            title="Reset all data?"
+            description="This will clear all entries in the table."
             onConfirm={handleClear}
             okText="Yes"
             cancelText="No"
           >
             <Button
               icon={<ReloadOutlined />}
-              size={screens.xs ? "small" : "middle"}
-              className="bg-red-600 text-white hover:bg-red-700 rounded-lg"
-              block={screens.xs}
+              size="large"
+              className="bg-red-600 text-white hover:bg-red-700 rounded-lg h-12 px-4"
+              style={{
+                minWidth: screens.xs ? "120px" : "auto",
+                fontSize: screens.xs ? "14px" : "inherit",
+              }}
             >
-              {screens.sm && "Reset"}
+              <span className="ml-1">Reset</span>
             </Button>
           </Popconfirm>
 
@@ -614,11 +794,14 @@ const DistrictSundayServiceReport: React.FC = () => {
             icon={<SaveOutlined />}
             onClick={handleSave}
             loading={loading}
-            size={screens.xs ? "small" : "middle"}
-            className="bg-blue-600 hover:bg-blue-700 rounded-lg"
-            block={screens.xs}
+            size="large"
+            className="bg-blue-600 hover:bg-blue-700 rounded-lg h-12 px-4"
+            style={{
+              minWidth: screens.xs ? "120px" : "auto",
+              fontSize: screens.xs ? "14px" : "inherit",
+            }}
           >
-            {screens.sm && "Save"}
+            <span className="ml-1">Save</span>
           </Button>
         </Space>
       </div>
@@ -632,7 +815,10 @@ const DistrictSundayServiceReport: React.FC = () => {
         )}
         <div
           className="handsontable-container border rounded-lg shadow-sm bg-white overflow-hidden"
-          style={{ height: tableHeight, fontSize: screens.xs ? "12px" : "14px" }}
+          style={{
+            height: tableHeight,
+            fontSize: screens.xs ? "12px" : "14px",
+          }}
         >
           <HotTable
             ref={hotRef}
@@ -665,7 +851,10 @@ const DistrictSundayServiceReport: React.FC = () => {
         }}
         okText="Save"
         cancelText="Cancel"
-        okButtonProps={{ loading, className: "bg-blue-600 hover:bg-blue-700 rounded-lg h-10" }}
+        okButtonProps={{
+          loading,
+          className: "bg-blue-600 hover:bg-blue-700 rounded-lg h-10",
+        }}
         width={screens.xs ? 350 : 500}
       >
         <Form form={form} layout="vertical">
@@ -686,9 +875,25 @@ const DistrictSundayServiceReport: React.FC = () => {
       </Modal>
 
       <style jsx global>{`
-        .custom-handsontable .htCore { font-size: ${screens.xs ? "12px" : "14px"}; }
-        .custom-handsontable th { font-weight: 600; background:#f8fafc; padding:${screens.xs ? "6px 8px" : "8px 12px"}; }
-        .custom-handsontable td:hover { background:#f1f5f9 !important; }
+        .custom-handsontable .htCore {
+          font-size: ${screens.xs ? "12px" : "14px"};
+        }
+        .custom-handsontable th {
+          font-weight: 600;
+          background: #f8fafc;
+          padding: ${screens.xs ? "6px 8px" : "8px 12px"};
+        }
+        .custom-handsontable td:hover {
+          background: #f1f5f9 !important;
+        }
+
+        /* Make mobile buttons more touch-friendly */
+        @media (max-width: 640px) {
+          .ant-btn {
+            height: 48px !important;
+            font-size: 15px !important;
+          }
+        }
       `}</style>
     </div>
   );
