@@ -126,3 +126,6 @@ li {
 .ant-picker {
   border-radius: 4px !important;
 }
+.htCore th{
+  height: 0px !important;
+}
