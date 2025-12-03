@@ -327,6 +327,7 @@ const afterChange = useCallback(
     URL.revokeObjectURL(url);
   };
 
+  // FIXED: Calendar date picker - set default to current month/year
   const handleMonthChange = (m: moment.Moment | null) => {
     if (m) setSelectedDate(m.toDate());
   };
@@ -355,12 +356,19 @@ const afterChange = useCallback(
             </div>
           </div>
 
-          <DatePicker.MonthPicker
+          {/* FIXED: Calendar shows current year/month by default */}
+          <DatePicker
+            picker="month"
             value={moment(selectedDate)}
             onChange={handleMonthChange}
             className="rounded-lg w-full sm:w-auto"
             size={screens.xs ? "small" : "middle"}
             allowClear={false}
+            format="MMMM YYYY"
+            disabledDate={(current) => {
+              // Optional: You can restrict date range here if needed
+              return current && (current.year() < 2020 || current.year() > 2030);
+            }}
           />
         </div>
 
@@ -413,40 +421,46 @@ const afterChange = useCallback(
         </Row>
       </div>
 
-      {/* Action buttons */}
+      {/* Action buttons - FIXED: Made bigger for mobile with visible text */}
       <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 mb-4 sm:mb-6">
         <div className="text-sm text-gray-500">
           {screens.md && "Edit any cell – totals update instantly."}
         </div>
         <Space
           wrap
-          size={[8, 8]}
-          className={`flex ${screens.xs ? "justify-stretch" : "justify-end"} gap-2`}
+          size={[12, 12]}
+          className={`flex ${screens.xs ? "justify-stretch" : "justify-end"} gap-3`}
         >
           <Button
             icon={<FileExcelOutlined />}
             onClick={handleExport}
-            size={screens.xs ? "small" : "middle"}
-            className="bg-green-600 text-white hover:bg-green-700 rounded-lg"
-            block={screens.xs}
+            size="large"
+            className="bg-green-600 text-white hover:bg-green-700 rounded-lg h-12 px-4"
+            style={{ 
+              minWidth: screens.xs ? "120px" : "auto",
+              fontSize: screens.xs ? "14px" : "inherit"
+            }}
           >
-            {screens.sm && "Export"}
+            <span className="ml-1">Export</span>
           </Button>
 
           <Popconfirm
-            title="Reset?"
-            description="Clear all data?"
+            title="Reset all data?"
+            description="This will clear all entries in the table."
             onConfirm={handleClear}
             okText="Yes"
             cancelText="No"
           >
             <Button
               icon={<ReloadOutlined />}
-              size={screens.xs ? "small" : "middle"}
-              className="bg-red-600 text-white hover:bg-red-700 rounded-lg"
-              block={screens.xs}
+              size="large"
+              className="bg-red-600 text-white hover:bg-red-700 rounded-lg h-12 px-4"
+              style={{ 
+                minWidth: screens.xs ? "120px" : "auto",
+                fontSize: screens.xs ? "14px" : "inherit"
+              }}
             >
-              {screens.sm && "Reset"}
+              <span className="ml-1">Reset</span>
             </Button>
           </Popconfirm>
 
@@ -455,11 +469,14 @@ const afterChange = useCallback(
             icon={<SaveOutlined />}
             onClick={handleSave}
             loading={loading}
-            size={screens.xs ? "small" : "middle"}
-            className="bg-blue-600 hover:bg-blue-700 rounded-lg"
-            block={screens.xs}
+            size="large"
+            className="bg-blue-600 hover:bg-blue-700 rounded-lg h-12 px-4"
+            style={{ 
+              minWidth: screens.xs ? "120px" : "auto",
+              fontSize: screens.xs ? "14px" : "inherit"
+            }}
           >
-            {screens.sm && "Save"}
+            <span className="ml-1">Save</span>
           </Button>
         </Space>
       </div>
@@ -531,6 +548,14 @@ const afterChange = useCallback(
         .custom-handsontable .htCore { font-size: ${screens.xs ? "12px" : "14px"}; }
         .custom-handsontable th { font-weight: 600; background:#f8fafc; padding:${screens.xs ? "6px 8px" : "8px 12px"}; }
         .custom-handsontable td:hover { background:#f1f5f9 !important; }
+        
+        /* Make mobile buttons more touch-friendly */
+        @media (max-width: 640px) {
+          .ant-btn {
+            height: 48px !important;
+            font-size: 15px !important;
+          }
+        }
       `}</style>
     </div>
   );
