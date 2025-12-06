@@ -188,7 +188,7 @@ export default function FinanceDashboard() {
       </Card>
 
       {/* SUNDAY SERVICES */}
-      <Card title="Sunday Services" className="shadow rounded-xl">
+      {/* <Card title="Sunday Services" className="shadow rounded-xl">
         <Table
           rowKey="_id"
           dataSource={data.sundayServices}
@@ -229,7 +229,7 @@ export default function FinanceDashboard() {
           ]}
           pagination={false}
         />
-      </Card>
+      </Card> */}
     </div>
   );
 }
