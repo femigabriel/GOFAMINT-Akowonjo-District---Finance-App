@@ -606,46 +606,6 @@ export default function SundayServiceReportsTable() {
 
   return (
     <div className="p-4 md:p-6 bg-gray-50 min-h-screen">
-      {/* Header */}
-      <div className="mb-6">
-        <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4 mb-4">
-          <div>
-            <h1 className="text-2xl md:text-3xl font-bold text-gray-900 flex items-center gap-2">
-              <BarChartOutlined className="text-blue-600" />
-              Sunday Service Reports
-            </h1>
-            <p className="text-gray-600 mt-1">
-              Detailed overview of all Sunday service reports across assemblies
-            </p>
-          </div>
-          <div className="flex items-center gap-2">
-            <Switch
-              checkedChildren="Card View"
-              unCheckedChildren="Table View"
-              checked={viewMode === 'card'}
-              onChange={(checked) => setViewMode(checked ? 'card' : 'table')}
-            />
-            <Dropdown
-              menu={{
-                items: [
-                  { key: 'csv', label: 'Export as CSV', icon: <DownloadOutlined /> },
-                  { key: 'excel', label: 'Export as Excel', icon: <DownloadOutlined /> },
-                  { key: 'pdf', label: 'Export as PDF', icon: <DownloadOutlined /> },
-                ],
-                onClick: ({ key }) => handleExport(key as any),
-              }}
-            >
-              <Button type="primary" icon={<DownloadOutlined />}>
-                Export
-              </Button>
-            </Dropdown>
-          </div>
-        </div>
-
-        
-      </div>
-
-
 
       {/* Main Table */}
       <Card className="border-0 shadow-sm">
