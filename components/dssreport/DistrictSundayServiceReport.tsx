@@ -25,6 +25,7 @@ import {
   FileExcelOutlined,
   CalendarOutlined,
   UserOutlined,
+  InfoCircleOutlined,
 } from "@ant-design/icons";
 import {
   format,
@@ -57,6 +58,7 @@ interface SundayServiceRow {
   districtSupport: number;
   total: number;
   totalAttendance: number;
+  grandTotal: number; // NEW: For Tithes + All Offerings
   [key: string]: number;
 }
 
@@ -145,6 +147,7 @@ const DistrictSundayServiceReport: React.FC = () => {
       districtSupport: 0,
       total: 0,
       totalAttendance: 0,
+      grandTotal: 0, // NEW: Initialize grand total
     }));
   }, [rowCount]);
 
@@ -215,8 +218,7 @@ const DistrictSundayServiceReport: React.FC = () => {
       },
     });
 
-    // ---- TOTAL OFFERINGS (read-only) ----
-    // This now sums all offerings EXCEPT tithes
+    // ---- ALL OFFERINGS (read-only) - EXCLUDES tithes
     columns.push({
       data: "total",
       type: "numeric",
@@ -234,8 +236,29 @@ const DistrictSundayServiceReport: React.FC = () => {
         td.style.textAlign = "right";
         td.style.padding = isMobile ? "4px 6px" : "8px 12px";
         td.style.fontSize = isMobile ? "12px" : "14px";
-        td.className =
-          "htNumeric bg-gray-200 font-semibold hover:bg-gray-300 transition-colors";
+        td.className = "htNumeric bg-gray-200 font-semibold hover:bg-gray-300 transition-colors";
+      },
+    });
+
+    // ---- GRAND TOTAL (read-only) - Tithes + All Offerings
+    columns.push({
+      data: "grandTotal",
+      type: "numeric",
+      readOnly: true,
+      width: isMobile ? Math.max(70, baseWidth - 20) : baseWidth,
+      renderer: (
+        instance: any,
+        td: any,
+        row: number,
+        col: number,
+        prop: string,
+        value: any
+      ) => {
+        td.innerHTML = value ? value.toLocaleString() : 0;
+        td.style.textAlign = "right";
+        td.style.padding = isMobile ? "4px 6px" : "8px 12px";
+        td.style.fontSize = isMobile ? "12px" : "14px";
+        td.className = "htNumeric bg-green-200 font-semibold hover:bg-green-300 transition-colors";
       },
     });
 
@@ -246,24 +269,24 @@ const DistrictSundayServiceReport: React.FC = () => {
     const isMobile = !screens.md;
     const base = isMobile
       ? [
-          "Att",
-          "SBS",
+          "Att", // Main service attendance (includes SBS)
+          "SBS", // SBS count (already included above)
           "Vis",
-          "Tithes",
+          "Tithes", // Tithes column
           "Offer",
           "Spec",
           ...customColumns.map((c) => c.name.split(" ")[0]),
         ]
       : [
-          "Attendance",
-          "SBS",
+          "Service Att", // Main service attendance (includes SBS)
+          "SBS Att", // SBS count (already included above)
           "Visitors",
-          "Tithes (₦)",
+          "Tithes (₦)", // Tithes column
           "Offerings (₦)",
           "Special (₦)",
           ...customColumns.map((c) => c.name + " (₦)"),
         ];
-    return [...base, "Total Att.", "All Offerings (₦)"]; // Changed column header text
+    return [...base, "Total Att", "All Offerings (₦)", "Grand Total (₦)"]; // Added Grand Total column
   }, [screens, customColumns]);
 
   const monthKey = (d: Date) => format(d, "MMMM-yyyy");
@@ -286,12 +309,6 @@ const DistrictSundayServiceReport: React.FC = () => {
       if (!resp.ok) throw new Error(`HTTP ${resp.status}`);
       const { records } = await resp.json();
 
-      console.log("Fetched records:", records); // DEBUG
-      console.log(
-        "Month Sundays:",
-        monthSundays.map((d) => format(d, "yyyy-MM-dd"))
-      ); // DEBUG
-
       const filled: SundayServiceRow[] = monthSundays.map((sun, index) => {
         const dateStr = format(sun, "yyyy-MM-dd");
 
@@ -304,7 +321,7 @@ const DistrictSundayServiceReport: React.FC = () => {
         }
 
         if (saved) {
-          return {
+          const rowData = {
             attendance: saved.attendance || 0,
             sbsAttendance: saved.sbsAttendance || 0,
             visitors: saved.visitors || 0,
@@ -321,14 +338,35 @@ const DistrictSundayServiceReport: React.FC = () => {
             districtSupport: saved.districtSupport || 0,
             total: saved.total || 0,
             totalAttendance: saved.totalAttendance || 0,
+            grandTotal: 0, // Will calculate below
           };
+          
+          // Ensure total attendance is correct (should equal service attendance)
+          rowData.totalAttendance = rowData.attendance;
+          
+          // Calculate total offerings (EXCLUDING tithes)
+          rowData.total = 
+            rowData.offerings +
+            rowData.specialOfferings +
+            rowData.etf +
+            rowData.pastorsWarfare +
+            rowData.vigil +
+            rowData.thanksgiving +
+            rowData.retirees +
+            rowData.missionaries +
+            rowData.youthOfferings +
+            rowData.districtSupport;
+          
+          // Calculate grand total (Tithes + All Offerings)
+          rowData.grandTotal = rowData.tithes + rowData.total;
+          
+          return rowData;
         }
 
         // Return empty row
         return initializeEmptyData()[0];
       });
 
-      console.log("Final filled data:", filled); // DEBUG
       setData(filled);
     } catch (e: any) {
       console.error(e);
@@ -343,13 +381,23 @@ const DistrictSundayServiceReport: React.FC = () => {
     try {
       await form.validateFields();
 
-      console.log("About to save with assembly:", assembly);
-
       const payload = data
         .map((row, i) => ({
           week: `Week ${i + 1}`,
           date: format(monthSundays[i], "yyyy-MM-dd"),
           ...row,
+          totalAttendance: row.attendance, // Ensure correct total attendance
+          total: row.offerings + // Regular offerings
+                 row.specialOfferings + // Special offerings
+                 row.etf + // ETF
+                 row.pastorsWarfare + // Pastor's warfare
+                 row.vigil + // Vigil
+                 row.thanksgiving + // Thanksgiving
+                 row.retirees + // Retirees
+                 row.missionaries + // Missionaries
+                 row.youthOfferings + // Youth offerings
+                 row.districtSupport, // District support
+          grandTotal: row.tithes + row.total, // Tithes + All Offerings
         }))
         .filter((r) =>
           Object.values(r).some((v) => typeof v === "number" && v > 0)
@@ -359,13 +407,6 @@ const DistrictSundayServiceReport: React.FC = () => {
         notification.error({ message: "Nothing to save" });
         return;
       }
-
-      console.log("Sending payload:", {
-        assembly,
-        submittedBy,
-        month: monthKey(selectedDate),
-        records: payload,
-      });
 
       setLoading(true);
       const resp = await fetch("/api/sunday-service-reports", {
@@ -379,14 +420,12 @@ const DistrictSundayServiceReport: React.FC = () => {
         }),
       });
 
-      // FIXED: Add response handling
       if (!resp.ok) {
         throw new Error(`HTTP ${resp.status}`);
       }
 
       const result = await resp.json();
 
-      // Show success notification
       notification.success({
         message: "Successfully Saved!",
         description: `Sunday service report for ${format(
@@ -395,12 +434,10 @@ const DistrictSundayServiceReport: React.FC = () => {
         )} has been saved.`,
       });
 
-      // Close modal and reset form
       setIsModalOpen(false);
       form.resetFields();
       setSubmittedBy("");
 
-      // Refresh data to get the latest from server
       fetchInitialRecords();
     } catch (e: any) {
       console.error(e);
@@ -428,10 +465,10 @@ const DistrictSundayServiceReport: React.FC = () => {
           copy[row] = { ...copy[row], [prop as string]: Number(newVal) || 0 };
         });
         copy.forEach((r) => {
-          // FIXED: Total attendance is just the main service attendance
-          r.totalAttendance = r.attendance; // Only main service attendance
+          // Total attendance is just the main service attendance
+          r.totalAttendance = r.attendance;
 
-          // Calculate total offerings as sum of ALL offerings EXCEPT tithes
+          // Calculate total offerings (EXCLUDING tithes)
           r.total =
             r.offerings + // Regular offerings
             r.specialOfferings + // Special offerings
@@ -443,6 +480,9 @@ const DistrictSundayServiceReport: React.FC = () => {
             r.missionaries + // Missionaries
             r.youthOfferings + // Youth offerings
             r.districtSupport; // District support
+          
+          // Calculate grand total (Tithes + All Offerings)
+          r.grandTotal = r.tithes + r.total;
         });
         return copy;
       });
@@ -450,30 +490,35 @@ const DistrictSundayServiceReport: React.FC = () => {
     []
   );
 
-  // FIXED: Calculate totals properly with tithes SEPARATE from offerings
+  // Calculate summary statistics
   const summaryStats = useMemo(() => {
     const offeringsBreakdown = {
-      offerings: 0, // Regular Sunday offerings
-      specialOfferings: 0, // Special offerings
-      etf: 0, // ETF
-      pastorsWarfare: 0, // Pastor's warfare
-      vigil: 0, // Vigil
-      thanksgiving: 0, // Thanksgiving
-      retirees: 0, // Retirees
-      missionaries: 0, // Missionaries
-      youthOfferings: 0, // Youth offerings
-      districtSupport: 0, // District support
+      offerings: 0,
+      specialOfferings: 0,
+      etf: 0,
+      pastorsWarfare: 0,
+      vigil: 0,
+      thanksgiving: 0,
+      retirees: 0,
+      missionaries: 0,
+      youthOfferings: 0,
+      districtSupport: 0,
     };
 
     return data.reduce(
       (a, r) => {
+        // Attendance
         a.serviceAttendance += r.attendance;
         a.sbsAttendance += r.sbsAttendance;
         a.visitors += r.visitors;
-        a.totalAttendance += r.attendance; // Only main service attendance
-        a.totalTithes += r.tithes; // Tithes are separate
+        a.totalAttendance += r.attendance;
+        
+        // Financials
+        a.totalTithes += r.tithes; // Tithes only
+        a.totalOfferings += r.total; // All offerings EXCLUDING tithes
+        a.grandTotal += r.grandTotal; // Tithes + All Offerings
 
-        // Track each offering type
+        // Track each offering type (EXCLUDING tithes)
         offeringsBreakdown.offerings += r.offerings;
         offeringsBreakdown.specialOfferings += r.specialOfferings;
         offeringsBreakdown.etf += r.etf;
@@ -485,19 +530,6 @@ const DistrictSundayServiceReport: React.FC = () => {
         offeringsBreakdown.youthOfferings += r.youthOfferings;
         offeringsBreakdown.districtSupport += r.districtSupport;
 
-        // All offerings EXCEPT tithes
-        a.totalOfferings +=
-          r.offerings +
-          r.specialOfferings +
-          r.etf +
-          r.pastorsWarfare +
-          r.vigil +
-          r.thanksgiving +
-          r.retirees +
-          r.missionaries +
-          r.youthOfferings +
-          r.districtSupport;
-
         return a;
       },
       {
@@ -507,6 +539,7 @@ const DistrictSundayServiceReport: React.FC = () => {
         totalAttendance: 0,
         totalTithes: 0,
         totalOfferings: 0,
+        grandTotal: 0,
         offeringsBreakdown,
       }
     );
@@ -518,12 +551,11 @@ const DistrictSundayServiceReport: React.FC = () => {
     return Object.entries(breakdown)
       .filter(([key, value]) => value > 0)
       .map(([key, value]) => {
-        // Format the key for display
         const formattedKey = key
-          .replace(/([A-Z])/g, " $1") // Add space before capital letters
-          .replace(/^./, (str) => str.toUpperCase()) // Capitalize first letter
-          .replace(/Offerings$/, "") // Remove trailing 'Offerings'
-          .replace(/Etf/, "ETF") // Special case for ETF
+          .replace(/([A-Z])/g, " $1")
+          .replace(/^./, (str) => str.toUpperCase())
+          .replace(/Offerings$/, "")
+          .replace(/Etf/, "ETF")
           .trim();
 
         return {
@@ -532,7 +564,7 @@ const DistrictSundayServiceReport: React.FC = () => {
           value,
         };
       })
-      .sort((a, b) => b.value - a.value); // Sort by value descending
+      .sort((a, b) => b.value - a.value);
   }, [summaryStats.offeringsBreakdown]);
 
   const handleSave = () => {
@@ -569,6 +601,7 @@ const DistrictSundayServiceReport: React.FC = () => {
       r.districtSupport,
       r.totalAttendance,
       r.total,
+      r.grandTotal, // NEW: Include grand total in export
     ]);
     const csv = [headers, ...rows.map((r) => r.join(","))].join("\n");
     const blob = new Blob([csv], { type: "text/csv;charset=utf-8;" });
@@ -580,7 +613,6 @@ const DistrictSundayServiceReport: React.FC = () => {
     URL.revokeObjectURL(url);
   };
 
-  // FIXED: Calendar date picker - set default to current month/year
   const handleMonthChange = (m: moment.Moment | null) => {
     if (m) setSelectedDate(m.toDate());
   };
@@ -609,7 +641,6 @@ const DistrictSundayServiceReport: React.FC = () => {
             </div>
           </div>
 
-          {/* FIXED: Calendar shows current year/month by default */}
           <DatePicker
             picker="month"
             value={moment(selectedDate)}
@@ -619,8 +650,6 @@ const DistrictSundayServiceReport: React.FC = () => {
             allowClear={false}
             format="MMMM YYYY"
             disabledDate={(current) => {
-              // Optional: You can restrict date range here if needed
-              // For example, only allow dates from 2020 to 2030
               return (
                 current && (current.year() < 2020 || current.year() > 2030)
               );
@@ -628,10 +657,22 @@ const DistrictSundayServiceReport: React.FC = () => {
           />
         </div>
 
-        {/* FIXED: 3 equal cards with proper calculations */}
+        {/* Clarification Note */}
+        <div className="text-sm text-gray-600 mb-2 bg-blue-50 p-3 rounded-lg border border-blue-200">
+          <div className="flex items-start gap-2">
+            <InfoCircleOutlined className="text-blue-500 mt-0.5" />
+            <div>
+              <span className="font-semibold">Note:</span> SBS attendees are already 
+              included in the Service Attendance. "All Offerings" do not include Tithes 
+              - they are recorded separately. "Grand Total" is Tithes + All Offerings.
+            </div>
+          </div>
+        </div>
+
+        {/* UPDATED: Now 4 cards to show all totals separately */}
         <Row gutter={[12, 12]}>
-          {/* Total Attendance Card - FIXED: Only shows main service attendance */}
-          <Col xs={24} sm={8} lg={8}>
+          {/* Service Attendance Card */}
+          <Col xs={24} sm={6} lg={6}>
             <Card
               className="bg-gradient-to-r from-blue-500 to-blue-600 text-white rounded-xl shadow-md h-full border-0"
               bodyStyle={{ padding: screens.xs ? "16px 12px" : "20px" }}
@@ -643,9 +684,9 @@ const DistrictSundayServiceReport: React.FC = () => {
                 <div className="text-2xl sm:text-3xl font-bold text-white mb-3">
                   {summaryStats.totalAttendance.toLocaleString()}
                 </div>
-                <div className="grid grid-cols-3 gap-2 text-center border-t border-blue-400 pt-3">
+                <div className="grid grid-cols-2 gap-2 text-center border-t border-blue-400 pt-3">
                   <div>
-                    <div className="text-blue-100 text-xs">SBS</div>
+                    <div className="text-blue-100 text-xs">SBS Included</div>
                     <div className="text-white font-semibold text-sm">
                       {summaryStats.sbsAttendance.toLocaleString()}
                     </div>
@@ -656,23 +697,13 @@ const DistrictSundayServiceReport: React.FC = () => {
                       {summaryStats.visitors.toLocaleString()}
                     </div>
                   </div>
-                  <div>
-                    <div className="text-blue-100 text-xs">Total</div>
-                    <div className="text-white font-semibold text-sm">
-                      {(
-                        summaryStats.totalAttendance +
-                        summaryStats.sbsAttendance +
-                        summaryStats.visitors
-                      ).toLocaleString()}
-                    </div>
-                  </div>
                 </div>
               </div>
             </Card>
           </Col>
 
-          {/* Total Tithes Card - SEPARATE from offerings */}
-          <Col xs={24} sm={8} lg={8}>
+          {/* Total Tithes Card - SEPARATE */}
+          <Col xs={24} sm={6} lg={6}>
             <Card
               className="bg-gradient-to-r from-purple-500 to-purple-600 text-white rounded-xl shadow-md h-full border-0"
               bodyStyle={{ padding: screens.xs ? "16px 12px" : "20px" }}
@@ -685,14 +716,14 @@ const DistrictSundayServiceReport: React.FC = () => {
                   ₦{summaryStats.totalTithes.toLocaleString()}
                 </div>
                 <div className="text-purple-200 text-xs mt-2">
-                  Tithes are separate from offerings
+                  Tithes only
                 </div>
               </div>
             </Card>
           </Col>
 
-          {/* All Offerings Card - FIXED: Shows breakdown like attendance */}
-          <Col xs={24} sm={8} lg={8}>
+          {/* All Offerings Card - EXCLUDES tithes */}
+          <Col xs={24} sm={6} lg={6}>
             <Card
               className="bg-gradient-to-r from-pink-500 to-pink-600 text-white rounded-xl shadow-md h-full border-0"
               bodyStyle={{ padding: screens.xs ? "16px 12px" : "20px" }}
@@ -704,47 +735,36 @@ const DistrictSundayServiceReport: React.FC = () => {
                 <div className="text-2xl sm:text-3xl font-bold text-white mb-3">
                   ₦{summaryStats.totalOfferings.toLocaleString()}
                 </div>
+                <div className="text-pink-200 text-xs mt-2">
+                  Excludes tithes
+                </div>
+              </div>
+            </Card>
+          </Col>
 
-                {/* Offerings breakdown - shows only types with data */}
-                {activeOfferings.length > 0 ? (
-                  <div className="border-t border-pink-400 pt-3">
-                    <div className="grid grid-cols-2 gap-2 text-center">
-                      {activeOfferings.slice(0, 4).map((item) => (
-                        <div key={item.key} className="text-center">
-                          <div
-                            className="text-pink-100 text-xs truncate"
-                            title={item.label}
-                          >
-                            {item.label.length > 10
-                              ? `${item.label.substring(0, 8)}...`
-                              : item.label}
-                          </div>
-                          <div className="text-white font-semibold text-sm">
-                            ₦{item.value.toLocaleString()}
-                          </div>
-                        </div>
-                      ))}
-                    </div>
-
-                    {/* Show "more" indicator if there are more than 4 offering types */}
-                    {activeOfferings.length > 4 && (
-                      <div className="mt-2 text-pink-200 text-xs">
-                        +{activeOfferings.length - 4} more offering types
-                      </div>
-                    )}
-                  </div>
-                ) : (
-                  <div className="text-pink-200 text-xs mt-2">
-                    No offerings recorded
-                  </div>
-                )}
+          {/* NEW: Grand Total Card - Tithes + All Offerings */}
+          <Col xs={24} sm={6} lg={6}>
+            <Card
+              className="bg-gradient-to-r from-green-500 to-green-600 text-white rounded-xl shadow-md h-full border-0"
+              bodyStyle={{ padding: screens.xs ? "16px 12px" : "20px" }}
+            >
+              <div className="text-center">
+                <div className="text-green-100 text-sm font-semibold mb-2">
+                  Grand Total
+                </div>
+                <div className="text-2xl sm:text-3xl font-bold text-white">
+                  ₦{summaryStats.grandTotal.toLocaleString()}
+                </div>
+                <div className="text-green-200 text-xs mt-2">
+                  Tithes + All Offerings
+                </div>
               </div>
             </Card>
           </Col>
         </Row>
       </div>
 
-      {/* Action buttons - FIXED: Made bigger for mobile with visible text */}
+      {/* Action buttons */}
       <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 mb-4 sm:mb-6">
         <div className="text-sm text-gray-500">
           {screens.md && "Edit any cell – totals update instantly."}

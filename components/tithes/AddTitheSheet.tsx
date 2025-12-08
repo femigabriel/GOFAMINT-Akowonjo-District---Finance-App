@@ -44,7 +44,6 @@ const districtMapping: Record<string, string> = {
   "RCCG": "Akowonjo",
   "Victory": "Akowonjo",
   "Dominion": "Akowonjo",
-  // Add more assemblies as needed
 };
 
 interface TitheRowInternal {

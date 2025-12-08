@@ -8,7 +8,7 @@ import { ThemeProvider } from "@/context/ThemeContext";
 
 export const metadata: Metadata = {
   title: "GOFAMINT Akowonjo District - Finance App",
-  description: "Finance management system for GOFAMINT assemblies",
+description: "Finance management system for GOFAMINT assemblies",
 };
 
 export default function RootLayout({

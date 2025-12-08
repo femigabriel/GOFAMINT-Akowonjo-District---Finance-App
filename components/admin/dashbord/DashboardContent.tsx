@@ -465,6 +465,7 @@ export default function DashboardContent() {
       generateFinancialInsights(dashboardData);
     }
   };
+  console.log({dashboardData})
 
   return (
     <div className="p-4 lg:p-6 bg-gray-50 min-h-screen">
