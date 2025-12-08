@@ -6,14 +6,18 @@ import MidweekServiceReport from "@/models/MidweekServiceReport";
 import SpecialServiceReport from "@/models/SpecialServiceReport";
 import { format } from "date-fns";
 
-/* ---------- Helper to calculate totals for Sunday ---------- */
+/* ---------- FIXED: Helper to calculate totals for Sunday ---------- */
 function calcSundayTotals(r: any) {
   const attendance = Number(r.attendance) || 0;
   const sbs = Number(r.sbsAttendance) || 0;
   const visitors = Number(r.visitors) || 0;
 
-  const monetary =
-    Number(r.tithes) +
+  // FIXED: Total attendance is just the main service attendance
+  // SBS attendees are already included in the service attendance
+  const totalAttendance = attendance; // Only main service attendance
+
+  // FIXED: Total offerings EXCLUDES tithes
+  const totalOfferings =
     Number(r.offerings) +
     Number(r.specialOfferings) +
     Number(r.etf) +
@@ -26,8 +30,8 @@ function calcSundayTotals(r: any) {
     Number(r.districtSupport);
 
   return {
-    totalAttendance: attendance + sbs + visitors,
-    total: monetary,
+    totalAttendance, // Only service attendance
+    totalOfferings, // All offerings EXCLUDING tithes
   };
 }
 
@@ -35,35 +39,45 @@ function calcSundayTotals(r: any) {
 function generateDateForWeek(week: string, month: string): string {
   try {
     // Parse month like "November-2025"
-    const [monthName, year] = month.split('-');
+    const [monthName, year] = month.split("-");
     const monthIndex = [
-      'January', 'February', 'March', 'April', 'May', 'June',
-      'July', 'August', 'September', 'October', 'November', 'December'
+      "January",
+      "February",
+      "March",
+      "April",
+      "May",
+      "June",
+      "July",
+      "August",
+      "September",
+      "October",
+      "November",
+      "December",
     ].indexOf(monthName);
-    
-    if (monthIndex === -1) return '';
-    
+
+    if (monthIndex === -1) return "";
+
     // Get week number (e.g., "Week 1" -> 1)
-    const weekNumber = parseInt(week.replace('Week ', '')) || 1;
-    
+    const weekNumber = parseInt(week.replace("Week ", "")) || 1;
+
     // Calculate date: first Sunday of the month + (week-1) * 7 days
     const firstOfMonth = new Date(parseInt(year), monthIndex, 1);
-    
+
     // Find first Sunday of the month
     let firstSunday = new Date(firstOfMonth);
-    while (firstSunday.getDay() !== 0) { // 0 is Sunday
+    while (firstSunday.getDay() !== 0) {
+      // 0 is Sunday
       firstSunday.setDate(firstSunday.getDate() + 1);
     }
-    
+
     // Add weeks
     const recordDate = new Date(firstSunday);
     recordDate.setDate(firstSunday.getDate() + (weekNumber - 1) * 7);
-    
-    return recordDate.toISOString().split('T')[0]; // YYYY-MM-DD format
-    
+
+    return recordDate.toISOString().split("T")[0]; // YYYY-MM-DD format
   } catch (error) {
-    console.error('Error generating date:', error);
-    return '';
+    console.error("Error generating date:", error);
+    return "";
   }
 }
 
@@ -73,7 +87,13 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
     await dbConnect();
     console.log("Connected to MongoDB (POST)");
 
-    const { assembly, submittedBy, month, records, serviceType = "sunday" } = await request.json();
+    const {
+      assembly,
+      submittedBy,
+      month,
+      records,
+      serviceType = "sunday",
+    } = await request.json();
 
     if (!assembly || !submittedBy || !month || !Array.isArray(records)) {
       return NextResponse.json(
@@ -90,11 +110,11 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
           const hasValue =
             r.attendance > 0 ||
             r.offering > 0 ||
-            (r.serviceName && r.serviceName.trim() !== '');
+            (r.serviceName && r.serviceName.trim() !== "");
           return hasValue;
         })
         .map((r: any) => ({
-          serviceName: r.serviceName?.trim() || 'Unnamed Service',
+          serviceName: r.serviceName?.trim() || "Unnamed Service",
           date: r.date,
           attendance: Number(r.attendance) || 0,
           offering: Number(r.offering) || 0,
@@ -119,20 +139,26 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
         {
           new: true,
           upsert: true,
-          runValidators: true
+          runValidators: true,
         }
       );
 
-      console.log("Saved special service report – records:", validRecords.length);
-      console.log("Saved special service records:", validRecords.map(r => ({ 
-        serviceName: r.serviceName, 
-        date: r.date 
-      })));
+      console.log(
+        "Saved special service report – records:",
+        validRecords.length
+      );
+      console.log(
+        "Saved special service records:",
+        validRecords.map((r) => ({
+          serviceName: r.serviceName,
+          date: r.date,
+        }))
+      );
 
       return NextResponse.json({
         success: true,
         message: `${validRecords.length} special service record(s) saved`,
-        data: report
+        data: report,
       });
     }
     // Handle Midweek Service Reports
@@ -140,9 +166,7 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
       /* Filter out completely empty rows & calculate totals for midweek */
       const validRecords = records
         .filter((r: any) => {
-          const hasValue =
-            r.attendance > 0 ||
-            r.offering > 0;
+          const hasValue = r.attendance > 0 || r.offering > 0;
           return hasValue;
         })
         .map((r: any) => ({
@@ -171,12 +195,15 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
         {
           new: true,
           upsert: true,
-          runValidators: true
+          runValidators: true,
         }
       );
 
       console.log("Saved midweek report – records:", validRecords.length);
-      console.log("Saved midweek records with dates:", validRecords.map(r => ({ date: r.date, day: r.day })));
+      console.log(
+        "Saved midweek records with dates:",
+        validRecords.map((r) => ({ date: r.date, day: r.day }))
+      );
 
       return NextResponse.json({
         success: true,
@@ -206,8 +233,8 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
           return hasValue;
         })
         .map((r: any) => {
-          const { totalAttendance, total } = calcSundayTotals(r);
-          
+          const { totalAttendance, totalOfferings } = calcSundayTotals(r);
+
           // AUTO-GENERATE DATE IF MISSING
           let recordDate = r.date;
           if (!recordDate && r.week && month) {
@@ -232,8 +259,8 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
             missionaries: Number(r.missionaries) || 0,
             youthOfferings: Number(r.youthOfferings) || 0,
             districtSupport: Number(r.districtSupport) || 0,
-            total,
-            totalAttendance,
+            total: totalOfferings, // FIXED: This is now only offerings (excluding tithes)
+            totalAttendance, // FIXED: This is now only service attendance
           };
         });
 
@@ -255,12 +282,15 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
         {
           new: true,
           upsert: true,
-          runValidators: true
+          runValidators: true,
         }
       );
 
       console.log("Saved sunday report – records:", validRecords.length);
-      console.log("Saved sunday records with dates:", validRecords.map(r => ({ week: r.week, date: r.date })));
+      console.log(
+        "Saved sunday records with dates:",
+        validRecords.map((r) => ({ week: r.week, date: r.date }))
+      );
 
       return NextResponse.json({
         success: true,
@@ -270,12 +300,13 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
   } catch (err: any) {
     console.error("POST error:", err);
     return NextResponse.json(
-      { error: err.message || "Server error" }, 
+      { error: err.message || "Server error" },
       { status: 500 }
     );
   }
 }
 
+/* ---------- GET – fetch latest report for assembly+month ---------- */
 /* ---------- GET – fetch latest report for assembly+month ---------- */
 export async function GET(request: NextRequest): Promise<NextResponse> {
   try {
@@ -303,11 +334,39 @@ export async function GET(request: NextRequest): Promise<NextResponse> {
       records: [],
       createdAt: null,
       updatedAt: null,
-      __v: 0
+      __v: 0,
     };
 
+    // Handle Sunday Service Reports (default)
+    if (serviceType === "sunday") {
+      const doc = await SundayServiceReport.findOne({ assembly, month })
+        .sort({ createdAt: -1 })
+        .lean();
+
+      if (!doc) {
+        return NextResponse.json(emptyResponse);
+      }
+
+      // FIX: Recalculate totals for each record to ensure correctness
+      const updatedRecords = doc.records.map((record: any) => {
+        const { totalAttendance, totalOfferings } = calcSundayTotals(record);
+
+        // Return record with recalculated totals
+        return {
+          ...record,
+          total: totalOfferings,
+          totalAttendance: totalAttendance,
+        };
+      });
+
+      // Return document with corrected records
+      return NextResponse.json({
+        ...doc,
+        records: updatedRecords,
+      });
+    }
     // Handle Special Service Reports
-    if (serviceType === "special") {
+    else if (serviceType === "special") {
       const doc = await SpecialServiceReport.findOne({ assembly, month })
         .sort({ createdAt: -1 })
         .lean();
@@ -330,23 +389,10 @@ export async function GET(request: NextRequest): Promise<NextResponse> {
 
       return NextResponse.json(doc);
     }
-    // Handle Sunday Service Reports (default)
-    else {
-      const doc = await SundayServiceReport.findOne({ assembly, month })
-        .sort({ createdAt: -1 })
-        .lean();
-
-      if (!doc) {
-        return NextResponse.json(emptyResponse);
-      }
-
-      return NextResponse.json(doc);
-    }
-    
   } catch (err: any) {
     console.error("GET error:", err);
     return NextResponse.json(
-      { error: err.message || "Server error" }, 
+      { error: err.message || "Server error" },
       { status: 500 }
     );
   }

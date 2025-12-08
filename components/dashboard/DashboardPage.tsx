@@ -320,7 +320,7 @@ export default function DashboardPage() {
               youthOfferings: parseNum(r.youthOfferings),
               districtSupport: parseNum(r.districtSupport),
               total: parseNum(r.total),
-              totalAttendance: attendance + sbs + visitors,
+totalAttendance: attendance, // Only main service attendance
               submittedBy: responseData.submittedBy || "Unknown",
               _id: r._id?.$oid || r._id,
             };
@@ -1097,7 +1097,7 @@ export default function DashboardPage() {
         <div className="flex flex-col lg:flex-row lg:items-center lg:justify-between gap-4 mb-6">
           <div>
             <Title level={2} className="!mb-2 text-gray-900 text-xl sm:text-2xl">
-              Service Dashboard
+             Dashboard
             </Title>
             <Text className="text-gray-600 text-sm sm:text-base">
               {assembly} Assembly • {dateRange[0].format("MMM DD")} -{" "}
