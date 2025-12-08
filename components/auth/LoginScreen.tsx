@@ -30,7 +30,7 @@ export default function LoginPage() {
       ) {
         localStorage.setItem("admin", "true");
         message.success("Admin login successful!");
-        window.location.href = "/admin/dashboard"; // Use window.location for admin redirect
+        window.location.href = "/admin/dashboard"; 
       } else {
         message.error("Invalid admin credentials");
       }

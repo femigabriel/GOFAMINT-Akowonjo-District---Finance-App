@@ -129,3 +129,60 @@ li {
 .htCore th{
   height: 0px !important;
 }
+
+
+/* styles/responsive-table.css */
+@media print {
+  .print\\:hidden {
+    display: none !important;
+  }
+  
+  .print\\:border-none {
+    border: none !important;
+    box-shadow: none !important;
+  }
+  
+  .print\\:p-0 {
+    padding: 0 !important;
+  }
+}
+
+/* Mobile optimizations */
+@media (max-width: 768px) {
+  .ant-table-thead > tr > th {
+    padding: 12px 8px !important;
+    font-size: 12px !important;
+  }
+  
+  .ant-table-tbody > tr > td {
+    padding: 12px 8px !important;
+    font-size: 12px !important;
+  }
+  
+  .ant-btn {
+    font-size: 12px !important;
+    padding: 4px 8px !important;
+  }
+  
+  .ant-card {
+    margin-bottom: 16px !important;
+  }
+}
+
+/* Custom scrollbar for table */
+.ant-table-wrapper::-webkit-scrollbar {
+  height: 8px;
+}
+
+.ant-table-wrapper::-webkit-scrollbar-track {
+  background: #f1f1f1;
+}
+
+.ant-table-wrapper::-webkit-scrollbar-thumb {
+  background: #888;
+  border-radius: 4px;
+}
+
+.ant-table-wrapper::-webkit-scrollbar-thumb:hover {
+  background: #555;
+}

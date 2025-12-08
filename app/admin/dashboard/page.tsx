@@ -36,8 +36,9 @@ export default function AdminDashboardPage() {
             animate={{ opacity: 1 }}
             transition={{ duration: 0.4 }}
           >
-            <SundayServiceReportsTable />
+          
             <DashboardContent />
+              {/* <SundayServiceReportsTable /> */}
           </motion.div>
         )}
       </AnimatePresence>
