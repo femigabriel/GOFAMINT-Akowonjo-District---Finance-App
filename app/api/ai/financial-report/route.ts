@@ -1,4 +1,4 @@
-// app/api/ai/admin-comprehensive-analysis/route.ts
+// app/api/ai/financial-report/route.ts
 import { NextRequest, NextResponse } from "next/server";
 import OpenAI from "openai";
 
@@ -6,708 +6,740 @@ const openai = new OpenAI({
   apiKey: process.env.OPENAI_API_KEY,
 });
 
-interface AdminAnalysisRequest {
+interface ReportData {
   reports: any[];
   summary: any;
-  period: {
-    from: string;
-    to: string;
-  };
-  location?: string;
+  serviceType: string;
+  assembly?: string;
+  month?: string;
+  year?: string;
 }
 
-interface AssemblyPerformance {
-  name: string;
+interface WeekAnalysis {
+  weekNumber: number;
+  weekLabel: string;
+  dates: string[];
   totalIncome: number;
   totalAttendance: number;
   reportCount: number;
-  sundayReports: number;
-  midweekReports: number;
-  specialReports: number;
-  sundayIncome: number;
-  midweekIncome: number;
-  specialIncome: number;
-  sundayAttendance: number;
-  midweekAttendance: number;
-  specialAttendance: number;
-  averagePerService: number;
-  averageAttendancePerService: number;
-  completenessScore: number;
+  sundayData?: any;
+  midweekData?: any[];
+  status?: "completed" | "partial" | "pending";
 }
 
-interface AdminComprehensiveAnalysis {
+interface EnhancedReportResponse {
   executive_summary: string;
-  district_overview: string;
-  assembly_performance_ranking: Array<{
-    rank: number;
-    assembly: string;
-    total_income: number;
-    total_attendance: number;
-    income_per_attendee: number;
-    report_completeness: string;
-    key_strength: string;
-    major_challenge: string;
-  }>;
-  financial_health_assessment: {
-    overall_health: "Strong" | "Moderate" | "Concerning";
-    revenue_distribution: string;
-    giving_trends: string;
+  key_findings: string[];
+  recommendations: string[];
+  financial_analysis: {
+    revenue_trends: string;
+    attendance_patterns: string;
     collection_efficiency: string;
-    areas_of_concern: string[];
-    sustainability_metrics: {
-      revenue_diversification_score: number;
-      income_stability_index: number;
-      growth_trajectory: string;
-    };
+    weekly_progress: string;
   };
-  attendance_analysis: {
-    overall_trend: string;
-    assembly_comparison: string;
-    engagement_patterns: string;
-    seasonal_factors: string[];
-    retention_analysis: string;
-    growth_opportunities: string[];
-  };
-  operational_efficiency: {
-    reporting_compliance: {
-      overall_compliance_rate: number;
-      best_performers: string[];
-      lagging_assemblies: string[];
-      submission_timeliness: string;
-    };
-    data_quality: {
-      completeness_score: number;
-      accuracy_indicators: string[];
-      missing_data_impact: string;
-    };
-  };
-  strategic_recommendations: {
-    immediate_actions: string[];
-    short_term_goals: string[];
-    long_term_strategies: string[];
-    assembly_specific_interventions: Array<{
-      assembly: string;
-      priority_area: string;
-      recommended_action: string;
+  weekly_analysis: {
+    weeks_completed: number;
+    weeks_pending: number;
+    current_progress: string;
+    weekly_breakdown: Array<{
+      week: string;
+      income: number;
+      attendance: number;
+      status: "completed" | "partial" | "pending";
     }>;
   };
-  risk_assessment: {
-    financial_risks: string[];
-    operational_risks: string[];
-    growth_risks: string[];
-    mitigation_strategies: string[];
+  assembly_performance: {
+    top_performers: string[];
+    areas_for_improvement: string[];
+    detailed_analysis: string;
   };
-  success_stories: Array<{
-    assembly: string;
-    achievement: string;
-    replicable_strategy: string;
-  }>;
-  next_quarter_targets: {
-    financial_targets: {
-      overall_target: number;
-      assembly_targets: Array<{ assembly: string; target: number }>;
-    };
-    attendance_targets: {
-      overall_target: number;
-      assembly_targets: Array<{ assembly: string; target: number }>;
-    };
-    reporting_targets: {
-      completeness_goal: number;
-      timeliness_goal: string;
-    };
+  formatted_report: string;
+}
+
+// Helper functions
+function getWeekOfMonth(date: Date): number {
+  const firstDay = new Date(date.getFullYear(), date.getMonth(), 1);
+  const firstDayWeekday = firstDay.getDay();
+  const offsetDate = date.getDate() + firstDayWeekday - 1;
+  return Math.floor(offsetDate / 7) + 1;
+}
+
+function getMonthIndex(monthName: string): number {
+  const months = [
+    "January",
+    "February",
+    "March",
+    "April",
+    "May",
+    "June",
+    "July",
+    "August",
+    "September",
+    "October",
+    "November",
+    "December",
+  ];
+  return months.findIndex((m) => m.toLowerCase() === monthName?.toLowerCase());
+}
+
+function getMonthName(monthIndex: number): string {
+  const months = [
+    "January",
+    "February",
+    "March",
+    "April",
+    "May",
+    "June",
+    "July",
+    "August",
+    "September",
+    "October",
+    "November",
+    "December",
+  ];
+  return months[monthIndex - 1] || "Unknown";
+}
+
+function getCurrentWeekProgress(weekAnalysis: WeekAnalysis[]): string {
+  const completed = weekAnalysis.filter((w) => w.status === "completed").length;
+  const partial = weekAnalysis.filter((w) => w.status === "partial").length;
+  const totalWeeks = 4;
+
+  if (completed === 0 && partial === 0) return "No weeks reported yet";
+  if (completed >= totalWeeks) return "Month complete";
+  return `${completed} full weeks + ${partial} partial weeks reported`;
+}
+
+function analyzeWeeksAndDates(
+  reports: any[],
+  month?: string,
+  year?: string
+): WeekAnalysis[] {
+  const weeksMap = new Map<string, WeekAnalysis>();
+
+  reports.forEach((report) => {
+    if (report.records && Array.isArray(report.records)) {
+      report.records.forEach((record: any) => {
+        if (record.date) {
+          try {
+            const recordDate = new Date(record.date);
+            if (isNaN(recordDate.getTime())) return;
+
+            const weekNumber = getWeekOfMonth(recordDate);
+            const weekLabel = `Week ${weekNumber}`;
+
+            if (!weeksMap.has(weekLabel)) {
+              weeksMap.set(weekLabel, {
+                weekNumber,
+                weekLabel,
+                dates: [],
+                totalIncome: 0,
+                totalAttendance: 0,
+                reportCount: 0,
+              });
+            }
+
+            const weekData = weeksMap.get(weekLabel)!;
+
+            if (!weekData.dates.includes(record.date)) {
+              weekData.dates.push(record.date);
+            }
+
+            const recordTotal = Number(record.total) || 0;
+            const recordAttendance = Number(
+              record.totalAttendance || record.attendance || 0
+            );
+
+            weekData.totalIncome += recordTotal;
+            weekData.totalAttendance += recordAttendance;
+            weekData.reportCount += 1;
+
+            if (report.serviceType === "sunday") {
+              weekData.sundayData = record;
+            } else if (report.serviceType === "midweek") {
+              if (!weekData.midweekData) weekData.midweekData = [];
+              weekData.midweekData.push(record);
+            }
+          } catch (error) {
+            console.error("Error processing record:", error);
+          }
+        }
+      });
+    }
+  });
+
+  const weekAnalysis = Array.from(weeksMap.values()).sort(
+    (a, b) => a.weekNumber - b.weekNumber
+  );
+
+  const currentDate = new Date();
+  weekAnalysis.forEach((week) => {
+    const lastDateInWeek =
+      week.dates.length > 0
+        ? new Date(Math.max(...week.dates.map((d) => new Date(d).getTime())))
+        : null;
+
+    let status: "completed" | "partial" | "pending" = "pending";
+
+    if (
+      lastDateInWeek &&
+      !isNaN(lastDateInWeek.getTime()) &&
+      lastDateInWeek <= currentDate
+    ) {
+      const hasSunday = week.sundayData !== undefined;
+      const hasMidweek = week.midweekData && week.midweekData.length >= 2;
+
+      if (hasSunday && hasMidweek) {
+        status = "completed";
+      } else if (hasSunday || hasMidweek) {
+        status = "partial";
+      }
+    }
+
+    (week as any).status = status;
+  });
+
+  return weekAnalysis;
+}
+
+function createEnhancedAnalysisPrompt(
+  reports: any[],
+  summary: any,
+  weekAnalysis: WeekAnalysis[],
+  isCurrentMonth: boolean,
+  serviceType: string,
+  assembly?: string,
+  month?: string,
+  year?: string
+): string {
+  const currentDate = new Date();
+  const today = currentDate.toISOString().split("T")[0];
+
+  const latestReport =
+    reports.length > 0
+      ? new Date(
+          Math.max(...reports.map((r) => new Date(r.createdAt).getTime()))
+        )
+      : null;
+
+  const daysSinceLastReport = latestReport
+    ? Math.floor(
+        (currentDate.getTime() - latestReport.getTime()) / (1000 * 60 * 60 * 24)
+      )
+    : null;
+
+  const weeklyBreakdown = weekAnalysis
+    .map(
+      (week) => `
+Week ${week.weekNumber} (${week.status?.toUpperCase()}):
+  - Dates: ${week.dates.join(", ")}
+  - Total Income: NGN ${week.totalIncome.toLocaleString()}
+  - Total Attendance: ${week.totalAttendance.toLocaleString()}
+  - Reports: ${week.reportCount}
+  ${
+    week.sundayData
+      ? `  Sunday: NGN ${
+          week.sundayData.total?.toLocaleString() || "0"
+        }, Attendance: ${week.sundayData.totalAttendance || "0"}`
+      : "  Sunday: Not reported"
+  }
+  ${
+    week.midweekData
+      ? `  Midweek: ${
+          week.midweekData.length
+        } services, Total: NGN ${week.midweekData
+          .reduce((sum: number, r: any) => sum + (Number(r.total) || 0), 0)
+          .toLocaleString()}`
+      : "  Midweek: Not reported"
+  }
+`
+    )
+    .join("\n");
+
+  const timingContext = isCurrentMonth
+    ? `
+TIMING CONTEXT:
+- This is analysis for the CURRENT MONTH (${month} ${year})
+- Today's date: ${today}
+- ${
+        daysSinceLastReport !== null
+          ? `Last report was ${daysSinceLastReport} day${
+              daysSinceLastReport !== 1 ? "s" : ""
+            } ago`
+          : "No report timing available"
+      }
+- Week progress: ${getCurrentWeekProgress(weekAnalysis)}
+`
+    : `
+TIMING CONTEXT:
+- This is analysis for PAST MONTH (${month} ${year})
+- Today's date: ${today}
+- Data represents complete/historical records
+`;
+
+  return `Analyze the following GOFAMINT church service financial data with sensitivity to timing and weekly progress:
+
+${timingContext}
+
+DATA OVERVIEW:
+- Total Reports: ${reports.length}
+- Service Type: ${serviceType.toUpperCase()}
+- Assembly: ${assembly || "All Assemblies"}
+- Period: ${month || "All Months"} ${year || ""}
+- Total Income: NGN ${summary.totalIncome?.toLocaleString() || "0"}
+- Total Attendance: ${summary.totalAttendance?.toLocaleString() || "0"}
+
+WEEK-BY-WEEK ANALYSIS:
+${weeklyBreakdown}
+
+FINANCIAL BREAKDOWN:
+- Sunday Income: NGN ${summary.sundayIncome?.toLocaleString() || "0"}
+- Midweek Income: NGN ${summary.midweekIncome?.toLocaleString() || "0"}
+- Special Income: NGN ${summary.specialIncome?.toLocaleString() || "0"}
+- Sunday Tithes: NGN ${summary.sundayTithes?.toLocaleString() || "0"}
+
+REPORTS DETAIL (first 2):
+${JSON.stringify(reports.slice(0, 2), null, 2)}
+
+EXPECTED OUTPUT STRUCTURE:
+{
+  "executive_summary": "string",
+  "key_findings": ["string", "string"],
+  "recommendations": ["string", "string"],
+  "financial_analysis": {
+    "revenue_trends": "string",
+    "attendance_patterns": "string",
+    "collection_efficiency": "string",
+    "weekly_progress": "string"
+  },
+  "weekly_analysis": {
+    "weeks_completed": number,
+    "weeks_pending": number,
+    "current_progress": "string",
+    "weekly_breakdown": [{"week": "Week 1", "income": number, "attendance": number, "status": "completed|partial|pending"}]
+  },
+  "assembly_performance": {
+    "top_performers": ["string"],
+    "areas_for_improvement": ["string"],
+    "detailed_analysis": "string"
+  },
+  "formatted_report": "string"
+}`;
+}
+
+function getDefaultSummary() {
+  return {
+    totalIncome: 0,
+    totalAttendance: 0,
+    sundayReports: 0,
+    midweekReports: 0,
+    specialReports: 0,
+    sundayIncome: 0,
+    midweekIncome: 0,
+    specialIncome: 0,
+    sundayTithes: 0,
+    sundayAttendance: 0,
+    midweekAttendance: 0,
+    specialAttendance: 0,
   };
-  detailed_report: string;
+}
+
+function generateEnhancedFallbackReport(
+  reports: any[],
+  summary: any,
+  weekAnalysis: WeekAnalysis[],
+  serviceType: string,
+  assembly?: string,
+  month?: string,
+  year?: string
+): EnhancedReportResponse {
+  const currentDate = new Date();
+  const isCurrentMonth =
+    month === getMonthName(currentDate.getMonth() + 1) &&
+    year === currentDate.getFullYear().toString();
+
+  const completedWeeks = weekAnalysis.filter(
+    (w) => w.status === "completed"
+  ).length;
+  const partialWeeks = weekAnalysis.filter(
+    (w) => w.status === "partial"
+  ).length;
+  const pendingWeeks = 4 - (completedWeeks + partialWeeks);
+
+  const weeklyBreakdown = weekAnalysis.map((week) => ({
+    week: week.weekLabel,
+    income: week.totalIncome,
+    attendance: week.totalAttendance,
+    status: week.status || "pending",
+  }));
+
+  const hasData = reports.length > 0;
+  const timingNote = hasData
+    ? isCurrentMonth
+      ? `Analysis is for the CURRENT MONTH. ${completedWeeks} weeks completed, ${pendingWeeks} weeks pending.`
+      : `Analysis is for a PAST MONTH. ${completedWeeks} weeks have been reported.`
+    : "No data available for analysis.";
+
+  return {
+    executive_summary: hasData
+      ? `Financial analysis for ${assembly || "all assemblies"} during ${
+          month || ""
+        } ${year || ""}. ${timingNote} Total income: NGN ${
+          summary.totalIncome?.toLocaleString() || "0"
+        }.`
+      : "No financial data available for analysis. Please ensure reports have been submitted.",
+    key_findings: hasData
+      ? [
+          `${completedWeeks} complete week${
+            completedWeeks !== 1 ? "s" : ""
+          } of data analyzed`,
+          `${partialWeeks} partial week${
+            partialWeeks !== 1 ? "s" : ""
+          } reported`,
+          `Week ${
+            weekAnalysis.length > 0 ? weekAnalysis[0].weekNumber : 1
+          } had highest income: NGN ${
+            weekAnalysis.length > 0
+              ? weekAnalysis[0].totalIncome.toLocaleString()
+              : "0"
+          }`,
+          isCurrentMonth && pendingWeeks > 0
+            ? `${pendingWeeks} week${
+                pendingWeeks !== 1 ? "s" : ""
+              } remaining in month`
+            : "Month analysis complete",
+          `Sunday services contributed NGN ${
+            summary.sundayIncome?.toLocaleString() || "0"
+          } (${
+            summary.totalIncome > 0
+              ? Math.round(
+                  (Number(summary.sundayIncome) / Number(summary.totalIncome)) *
+                    100
+                )
+              : 0
+          }%)`,
+        ]
+      : [
+          "No reports found for the selected period",
+          "Please check if reports have been submitted",
+          "Ensure proper data connection",
+        ],
+    recommendations: hasData
+      ? [
+          isCurrentMonth && pendingWeeks > 0
+            ? `Focus on completing reports for remaining ${pendingWeeks} week${
+                pendingWeeks !== 1 ? "s" : ""
+              }`
+            : "Review monthly performance trends",
+          "Ensure both Tuesday and Thursday midweek services are consistently reported",
+          "Compare week-over-week attendance patterns",
+          "Set weekly financial targets based on historical data",
+          "Provide early-month encouragement if Week 1 shows strong performance",
+          "Address any missing midweek reports promptly",
+        ]
+      : [
+          "Submit service reports for the selected period",
+          "Verify data connectivity and API endpoints",
+          "Check if reports exist in the database",
+          "Ensure proper authentication and permissions",
+        ],
+    financial_analysis: {
+      revenue_trends: hasData
+        ? `Revenue shows ${
+            weekAnalysis.length > 1
+              ? weekAnalysis[0].totalIncome > weekAnalysis[1].totalIncome
+                ? "strong start"
+                : "steady progression"
+              : "initial data"
+          } across weeks.`
+        : "No revenue data available for analysis.",
+      attendance_patterns: hasData
+        ? `Weekly attendance ${
+            weekAnalysis.length > 0
+              ? "averages " +
+                Math.round(
+                  weekAnalysis.reduce((sum, w) => sum + w.totalAttendance, 0) /
+                    weekAnalysis.length
+                ) +
+                " per week"
+              : "data being collected"
+          }.`
+        : "No attendance data available.",
+      collection_efficiency: hasData
+        ? `Collection patterns indicate ${
+            Number(summary.totalIncome) > 10000 ? "healthy" : "developing"
+          } giving culture.`
+        : "Cannot assess collection efficiency without data.",
+      weekly_progress: hasData
+        ? weeklyBreakdown
+            .map(
+              (w) =>
+                `${w.week}: NGN ${w.income.toLocaleString()}, ${
+                  w.attendance
+                } attendees (${w.status})`
+            )
+            .join(" | ")
+        : "No weekly progress data available.",
+    },
+    weekly_analysis: {
+      weeks_completed: completedWeeks,
+      weeks_pending: pendingWeeks,
+      current_progress: hasData
+        ? `${completedWeeks} full + ${partialWeeks} partial weeks reported`
+        : "No data available",
+      weekly_breakdown: weeklyBreakdown,
+    },
+    assembly_performance: {
+      top_performers: hasData ? [assembly || "Primary assembly"] : ["No data"],
+      areas_for_improvement: hasData
+        ? ["Consistency in midweek reporting", "Attendance growth"]
+        : ["Data submission", "Report completeness"],
+      detailed_analysis: hasData
+        ? "Performance analysis focused on weekly consistency and reporting completeness."
+        : "No data available for assembly performance analysis.",
+    },
+    formatted_report: hasData
+      ? `GOFAMINT FINANCIAL ANALYSIS - WEEKLY PERSPECTIVE
+Period: ${month || "N/A"} ${
+          year || ""
+        } | Generated: ${currentDate.toLocaleDateString()}
+Assembly: ${assembly || "All Assemblies"}
+
+TIMING CONTEXT: ${timingNote}
+
+WEEKLY PROGRESS:
+${
+  weeklyBreakdown.length > 0
+    ? weeklyBreakdown
+        .map(
+          (w) =>
+            `• ${w.week}: NGN ${w.income.toLocaleString()} | Attendance: ${
+              w.attendance
+            } | Status: ${w.status.toUpperCase()}`
+        )
+        .join("\n")
+    : "No weekly data available"
+}
+
+SUMMARY:
+• Total Income: NGN ${summary.totalIncome?.toLocaleString() || "0"}
+• Total Attendance: ${summary.totalAttendance?.toLocaleString() || "0"}
+• Reports Submitted: ${reports.length}
+• Weeks Analyzed: ${weekAnalysis.length}
+
+RECOMMENDATIONS:
+1. ${
+          isCurrentMonth && pendingWeeks > 0
+            ? `Complete reporting for remaining ${pendingWeeks} week${
+                pendingWeeks !== 1 ? "s" : ""
+              }`
+            : "Review complete monthly performance"
+        }
+2. Ensure both midweek services (Tuesday & Thursday) are consistently documented
+3. Monitor week-over-week attendance trends
+4. ${
+          weekAnalysis.some((w) => w.status === "partial")
+            ? "Address partially reported weeks promptly"
+            : "Maintain current reporting consistency"
+        }
+
+This analysis considers the weekly progression within the month.`
+      : "NO DATA AVAILABLE\n\nNo financial reports were found for analysis. Please ensure:\n1. Service reports have been submitted\n2. The selected period contains data\n3. Reports are properly saved in the database\n4. You have appropriate permissions to view the data",
+  };
 }
 
 export async function POST(request: NextRequest) {
+  console.log("📊 AI Financial Report API called");
+
   try {
     const body = await request.json();
-    const { reports, summary, period, location = "Lagos, Nigeria" } = body as AdminAnalysisRequest;
+    console.log("📥 Request body received:", {
+      hasReports: Array.isArray(body.reports),
+      reportCount: body.reports?.length || 0,
+      hasSummary: !!body.summary,
+      serviceType: body.serviceType,
+      assembly: body.assembly,
+      month: body.month,
+      year: body.year,
+    });
+
+    const { reports, summary, serviceType, assembly, month, year } =
+      body as ReportData;
 
     if (!reports || !Array.isArray(reports) || reports.length === 0) {
+      console.error("❌ No reports found in request");
       return NextResponse.json(
-        { 
-          success: false,
+        {
           error: "No reports data provided",
-          message: "Please provide service reports for analysis"
+          message: "Please ensure reports are being sent in the request body",
         },
         { status: 400 }
       );
     }
 
-    // 1. Analyze assembly performance
-    const assemblyPerformance = analyzeAssemblyPerformance(reports);
-    
-    // 2. Calculate district-wide metrics
-    const districtMetrics = calculateDistrictMetrics(reports, summary, assemblyPerformance);
-    
-    // 3. Create comprehensive prompt
-    const prompt = createAdminAnalysisPrompt(
-      reports,
-      summary,
-      assemblyPerformance,
-      districtMetrics,
-      period,
-      location
-    );
+    if (!summary || typeof summary !== "object") {
+      console.error("❌ Invalid or missing summary");
+      return NextResponse.json(
+        { error: "Invalid or missing summary data" },
+        { status: 400 }
+      );
+    }
 
-    console.log("🤖 Generating comprehensive admin analysis...");
+    // Log sample data for debugging
+    console.log("🔍 Sample report data:", {
+      firstReport: reports[0],
+      summaryKeys: Object.keys(summary),
+      summaryValues: summary,
+    });
 
-    // 4. Call OpenAI for comprehensive analysis
-    const response = await openai.chat.completions.create({
-      model: "gpt-4-turbo-preview",
-      messages: [
-        {
-          role: "system",
-          content: `You are the District Superintendent of GOFAMINT Akowonjo District, Region 28 in Lagos, Nigeria.
-          You have 20+ years of experience in church administration, financial management, and ministerial oversight.
-          You provide strategic, data-driven analysis for district leadership with:
-          
-          1. DEEP UNDERSTANDING of Nigerian church dynamics in urban Lagos
-          2. STRATEGIC MINDSET for district-level planning and resource allocation
-          3. FINANCIAL ACUMEN for sustainability and growth analysis
-          4. OPERATIONAL EXPERTISE in church administration and reporting systems
-          5. PASTORAL INSIGHT for spiritual health and ministry effectiveness
-          
-          Your analysis must be:
-          - Honest and data-driven (no sugarcoating)
-          - Strategic and actionable
-          - Balanced between financial and ministerial considerations
-          - Culturally relevant to Lagos context
-          - Professional yet accessible to church leadership`
+    // 1. Analyze weeks and dates
+    const weekAnalysis = analyzeWeeksAndDates(reports, month, year);
+    console.log("📅 Week analysis:", {
+      totalWeeks: weekAnalysis.length,
+      weeks: weekAnalysis.map((w) => ({
+        week: w.weekLabel,
+        income: w.totalIncome,
+        status: w.status,
+      })),
+    });
+
+    // 2. Get current date context
+    const currentDate = new Date();
+    const currentMonthNum = currentDate.getMonth() + 1;
+    const currentYearNum = currentDate.getFullYear();
+    const isCurrentMonth =
+      month === getMonthName(currentMonthNum) &&
+      year === currentYearNum.toString();
+
+    console.log("⏰ Timing context:", {
+      currentDate: currentDate.toISOString(),
+      isCurrentMonth,
+      month,
+      year,
+      currentMonth: getMonthName(currentMonthNum),
+      currentYear: currentYearNum,
+    });
+
+    try {
+      // 3. Create enhanced prompt with week context
+      const prompt = createEnhancedAnalysisPrompt(
+        reports,
+        summary,
+        weekAnalysis,
+        isCurrentMonth,
+        serviceType || "all",
+        assembly,
+        month,
+        year
+      );
+
+      console.log("🤖 Sending request to OpenAI...");
+
+      // 4. Call OpenAI with enhanced context
+      const response = await openai.chat.completions.create({
+        model: "gpt-4-turbo-preview",
+        messages: [
+          {
+            role: "system",
+            content: `You are a financial analyst for GOFAMINT Akowonjo District, Region 28 in Lagos, Nigeria.`,
+          },
+          {
+            role: "user",
+            content: prompt,
+          },
+        ],
+        temperature: 0.7,
+        max_tokens: 3000,
+        response_format: { type: "json_object" },
+      });
+
+      console.log("✅ OpenAI response received");
+
+      const analysis: EnhancedReportResponse = JSON.parse(
+        response.choices[0].message.content || "{}"
+      );
+
+      return NextResponse.json({
+        success: true,
+        data: analysis,
+        metadata: {
+          generated_at: new Date().toISOString(),
+          total_reports: reports.length,
+          total_income: summary.totalIncome || 0,
+          total_attendance: summary.totalAttendance || 0,
+          week_context: {
+            weeks_analyzed: weekAnalysis.length,
+            is_current_month: isCurrentMonth,
+            weeks_completed: weekAnalysis.filter(
+              (w) => w.status === "completed"
+            ).length,
+            current_week_progress: getCurrentWeekProgress(weekAnalysis),
+          },
+          period: month ? `${month}${year ? ` ${year}` : ""}` : "All Time",
         },
-        {
-          role: "user",
-          content: prompt
-        }
-      ],
-      temperature: 0.7,
-      max_tokens: 4000,
-      response_format: { type: "json_object" }
-    });
+      });
+    } catch (openaiError: any) {
+      console.error("❌ OpenAI API error:", openaiError);
 
-    const analysis: AdminComprehensiveAnalysis = JSON.parse(
-      response.choices[0].message.content || "{}"
-    );
+      // Generate fallback report
+      const fallbackReport = generateEnhancedFallbackReport(
+        reports,
+        summary,
+        weekAnalysis,
+        serviceType || "all",
+        assembly,
+        month,
+        year
+      );
 
-    return NextResponse.json({
-      success: true,
-      data: analysis,
-      metadata: {
-        generated_at: new Date().toISOString(),
-        district_name: "GOFAMINT Akowonjo District, Region 28",
-        location,
-        period: `${new Date(period.from).toLocaleDateString()} to ${new Date(period.to).toLocaleDateString()}`,
-        total_assemblies: assemblyPerformance.length,
-        total_reports: reports.length,
-        total_income: summary.totalIncome || 0,
-        total_attendance: summary.totalAttendance || 0,
-        reporting_compliance_rate: calculateReportingCompliance(reports)
-      }
-    });
-
-  } catch (error: any) {
-    console.error("Admin comprehensive analysis error:", error);
-    
-    // Generate a fallback analysis
-    const fallbackAnalysis = generateFallbackAdminAnalysis(body);
-    
-    return NextResponse.json({
-      success: true,
-      data: fallbackAnalysis,
-      metadata: {
-        generated_at: new Date().toISOString(),
-        note: "Analysis generated with limited AI assistance",
-        fallback_reason: error.message || "AI service unavailable"
-      }
-    }, { status: 200 });
-  }
-}
-
-// ==================== ANALYSIS FUNCTIONS ====================
-
-function analyzeAssemblyPerformance(reports: any[]): AssemblyPerformance[] {
-  const assemblyMap = new Map<string, AssemblyPerformance>();
-  
-  reports.forEach(report => {
-    const assemblyName = report.assembly;
-    
-    if (!assemblyMap.has(assemblyName)) {
-      assemblyMap.set(assemblyName, {
-        name: assemblyName,
-        totalIncome: 0,
-        totalAttendance: 0,
-        reportCount: 0,
-        sundayReports: 0,
-        midweekReports: 0,
-        specialReports: 0,
-        sundayIncome: 0,
-        midweekIncome: 0,
-        specialIncome: 0,
-        sundayAttendance: 0,
-        midweekAttendance: 0,
-        specialAttendance: 0,
-        averagePerService: 0,
-        averageAttendancePerService: 0,
-        completenessScore: 0
+      return NextResponse.json({
+        success: true,
+        data: fallbackReport,
+        metadata: {
+          generated_at: new Date().toISOString(),
+          note: "Fallback report generated due to OpenAI API issue",
+          week_context: {
+            weeks_analyzed: weekAnalysis.length,
+            weeks_completed: weekAnalysis.filter(
+              (w) => w.status === "completed"
+            ).length,
+          },
+        },
       });
     }
-    
-    const assembly = assemblyMap.get(assemblyName)!;
-    
-    // Calculate report totals
-    assembly.reportCount += 1;
-    assembly.totalIncome += calculateReportTotalIncome(report);
-    assembly.totalAttendance += calculateReportTotalAttendance(report);
-    
-    // Categorize by service type
-    switch (report.serviceType) {
-      case 'sunday':
-        assembly.sundayReports += 1;
-        assembly.sundayIncome += calculateReportTotalIncome(report);
-        assembly.sundayAttendance += calculateReportTotalAttendance(report);
-        break;
-      case 'midweek':
-        assembly.midweekReports += 1;
-        assembly.midweekIncome += calculateReportTotalIncome(report);
-        assembly.midweekAttendance += calculateReportTotalAttendance(report);
-        break;
-      case 'special':
-        assembly.specialReports += 1;
-        assembly.specialIncome += calculateReportTotalIncome(report);
-        assembly.specialAttendance += calculateReportTotalAttendance(report);
-        break;
+  } catch (error: any) {
+    console.error("💥 AI financial report error:", error);
+
+    // Even if we can't parse the request, try to provide a helpful error
+    try {
+      const body = await request.text();
+      console.error("📝 Raw request body:", body);
+    } catch (e) {
+      console.error("❌ Could not read request body");
     }
-    
-    // Calculate completeness
-    assembly.completenessScore = calculateReportCompleteness(report);
-  });
-  
-  // Calculate averages and finalize
-  return Array.from(assemblyMap.values()).map(assembly => ({
-    ...assembly,
-    averagePerService: assembly.totalIncome / (assembly.reportCount || 1),
-    averageAttendancePerService: assembly.totalAttendance / (assembly.reportCount || 1)
-  })).sort((a, b) => b.totalIncome - a.totalIncome); // Sort by income descending
-}
 
-function calculateDistrictMetrics(
-  reports: any[],
-  summary: any,
-  assemblyPerformance: AssemblyPerformance[]
-) {
-  const totalAssemblies = assemblyPerformance.length;
-  const activeAssemblies = assemblyPerformance.filter(a => a.reportCount > 0).length;
-  
-  // Calculate financial health metrics
-  const totalIncome = summary.totalIncome || 0;
-  const averageIncomePerAssembly = totalIncome / (totalAssemblies || 1);
-  const incomeStandardDeviation = calculateIncomeStandardDeviation(assemblyPerformance);
-  
-  // Calculate attendance metrics
-  const totalAttendance = summary.totalAttendance || 0;
-  const averageAttendancePerAssembly = totalAttendance / (totalAssemblies || 1);
-  
-  // Calculate reporting metrics
-  const totalReports = reports.length;
-  const averageReportsPerAssembly = totalReports / (totalAssemblies || 1);
-  const reportingRate = (activeAssemblies / totalAssemblies) * 100;
-  
-  return {
-    totalAssemblies,
-    activeAssemblies,
-    inactiveAssemblies: totalAssemblies - activeAssemblies,
-    totalIncome,
-    averageIncomePerAssembly,
-    incomeStandardDeviation,
-    totalAttendance,
-    averageAttendancePerAssembly,
-    totalReports,
-    averageReportsPerAssembly,
-    reportingRate,
-    incomeConcentration: calculateIncomeConcentration(assemblyPerformance),
-    attendanceConsistency: calculateAttendanceConsistency(assemblyPerformance)
-  };
-}
+    // Return a minimal fallback report
+    const fallbackReport = generateEnhancedFallbackReport(
+      [],
+      getDefaultSummary(),
+      [],
+      "all",
+      undefined,
+      undefined,
+      undefined
+    );
 
-function createAdminAnalysisPrompt(
-  reports: any[],
-  summary: any,
-  assemblyPerformance: AssemblyPerformance[],
-  districtMetrics: any,
-  period: { from: string; to: string },
-  location: string
-): string {
-  
-  const currentDate = new Date().toLocaleDateString('en-GB', {
-    day: '2-digit',
-    month: 'long',
-    year: 'numeric'
-  });
-  
-  const periodText = `${new Date(period.from).toLocaleDateString()} to ${new Date(period.to).toLocaleDateString()}`;
-  
-  // Top 3 and bottom 3 assemblies
-  const topPerformers = assemblyPerformance.slice(0, 3);
-  const bottomPerformers = assemblyPerformance.slice(-3).reverse();
-  
-  // Service type distribution
-  const sundayReports = reports.filter(r => r.serviceType === 'sunday').length;
-  const midweekReports = reports.filter(r => r.serviceType === 'midweek').length;
-  const specialReports = reports.filter(r => r.serviceType === 'special').length;
-  
-  return `You are analyzing the GOFAMINT Akowonjo District, Region 28 performance. 
-  Provide a comprehensive strategic analysis for district leadership.
-
-DISTRICT OVERVIEW:
-- Location: ${location}
-- Analysis Period: ${periodText}
-- Date Generated: ${currentDate}
-- Total Assemblies: ${districtMetrics.totalAssemblies}
-- Active Assemblies: ${districtMetrics.activeAssemblies}
-- Reporting Rate: ${districtMetrics.reportingRate.toFixed(1)}%
-
-FINANCIAL PERFORMANCE:
-- Total District Income: ₦${districtMetrics.totalIncome.toLocaleString()}
-- Average per Assembly: ₦${Math.round(districtMetrics.averageIncomePerAssembly).toLocaleString()}
-- Top Assembly: ${topPerformers[0]?.name || 'N/A'} (₦${topPerformers[0]?.totalIncome.toLocaleString() || '0'})
-- Income Concentration: ${districtMetrics.incomeConcentration.toFixed(1)}% (top 3 assemblies)
-
-ATTENDANCE PERFORMANCE:
-- Total District Attendance: ${districtMetrics.totalAttendance.toLocaleString()}
-- Average per Assembly: ${Math.round(districtMetrics.averageAttendancePerAssembly)}
-- Attendance Consistency Score: ${districtMetrics.attendanceConsistency.toFixed(1)}/10
-
-OPERATIONAL METRICS:
-- Total Reports Submitted: ${districtMetrics.totalReports}
-- Service Distribution: Sunday (${sundayReports}), Midweek (${midweekReports}), Special (${specialReports})
-- Average Reports per Assembly: ${districtMetrics.averageReportsPerAssembly.toFixed(1)}
-- Inactive Assemblies: ${districtMetrics.inactiveAssemblies}
-
-TOP PERFORMING ASSEMBLIES:
-${topPerformers.map((assembly, index) => 
-  `${index + 1}. ${assembly.name}: ₦${assembly.totalIncome.toLocaleString()}, ${assembly.totalAttendance} attendance, ${assembly.reportCount} reports`
-).join('\n')}
-
-LAGGING ASSEMBLIES (Needs Attention):
-${bottomPerformers.map((assembly, index) => 
-  `${index + 1}. ${assembly.name}: ₦${assembly.totalIncome.toLocaleString()}, ${assembly.totalAttendance} attendance, ${assembly.reportCount} reports`
-).join('\n')}
-
-SAMPLE REPORTS (for context):
-${JSON.stringify(reports.slice(0, 2), null, 2)}
-
-EXPECTED OUTPUT FORMAT (JSON):
-{
-  "executive_summary": "string (2-3 paragraph overview of district health)",
-  "district_overview": "string (detailed district performance assessment)",
-  "assembly_performance_ranking": [
-    {
-      "rank": 1,
-      "assembly": "string",
-      "total_income": number,
-      "total_attendance": number,
-      "income_per_attendee": number,
-      "report_completeness": "Excellent/Good/Fair/Poor",
-      "key_strength": "string",
-      "major_challenge": "string"
-    }
-  ],
-  "financial_health_assessment": {
-    "overall_health": "Strong/Moderate/Concerning",
-    "revenue_distribution": "string (analysis of income spread)",
-    "giving_trends": "string (patterns in giving)",
-    "collection_efficiency": "string",
-    "areas_of_concern": ["string", "string"],
-    "sustainability_metrics": {
-      "revenue_diversification_score": number (1-10),
-      "income_stability_index": number (1-10),
-      "growth_trajectory": "string"
-    }
-  },
-  "attendance_analysis": {
-    "overall_trend": "string",
-    "assembly_comparison": "string",
-    "engagement_patterns": "string",
-    "seasonal_factors": ["string", "string"],
-    "retention_analysis": "string",
-    "growth_opportunities": ["string", "string"]
-  },
-  "operational_efficiency": {
-    "reporting_compliance": {
-      "overall_compliance_rate": number (0-100),
-      "best_performers": ["string", "string"],
-      "lagging_assemblies": ["string", "string"],
-      "submission_timeliness": "string"
-    },
-    "data_quality": {
-      "completeness_score": number (0-100),
-      "accuracy_indicators": ["string", "string"],
-      "missing_data_impact": "string"
-    }
-  },
-  "strategic_recommendations": {
-    "immediate_actions": ["string", "string", "string"],
-    "short_term_goals": ["string", "string"],
-    "long_term_strategies": ["string", "string"],
-    "assembly_specific_interventions": [
+    return NextResponse.json(
       {
-        "assembly": "string",
-        "priority_area": "string",
-        "recommended_action": "string"
-      }
-    ]
-  },
-  "risk_assessment": {
-    "financial_risks": ["string", "string"],
-    "operational_risks": ["string", "string"],
-    "growth_risks": ["string", "string"],
-    "mitigation_strategies": ["string", "string"]
-  },
-  "success_stories": [
-    {
-      "assembly": "string",
-      "achievement": "string",
-      "replicable_strategy": "string"
-    }
-  ],
-  "next_quarter_targets": {
-    "financial_targets": {
-      "overall_target": number,
-      "assembly_targets": [
-        {"assembly": "string", "target": number}
-      ]
-    },
-    "attendance_targets": {
-      "overall_target": number,
-      "assembly_targets": [
-        {"assembly": "string", "target": number}
-      ]
-    },
-    "reporting_targets": {
-      "completeness_goal": number (0-100),
-      "timeliness_goal": "string"
-    }
-  },
-  "detailed_report": "string (complete narrative report in professional format)"
-}
-
-ANALYSIS GUIDELINES:
-1. Be data-driven and honest
-2. Focus on strategic district-level insights
-3. Consider Lagos-specific challenges and opportunities
-4. Provide actionable recommendations
-5. Balance financial and ministerial perspectives
-6. Highlight both successes and areas needing intervention
-7. Consider the reality of Nigerian church operations
-8. Set realistic, measurable targets
-9. Identify transferable best practices
-10. Acknowledge operational constraints`;
-}
-
-// ==================== HELPER FUNCTIONS ====================
-
-function calculateReportTotalIncome(report: any): number {
-  if (!report.records || !Array.isArray(report.records)) return 0;
-  return report.records.reduce((sum: number, record: any) => sum + (record.total || 0), 0);
-}
-
-function calculateReportTotalAttendance(report: any): number {
-  if (!report.records || !Array.isArray(report.records)) return 0;
-  return report.records.reduce((sum: number, record: any) => 
-    sum + (record.totalAttendance || record.attendance || 0), 0);
-}
-
-function calculateReportCompleteness(report: any): number {
-  if (!report.records || !Array.isArray(report.records)) return 0;
-  const records = report.records;
-  let completeCount = 0;
-  
-  records.forEach((record: any) => {
-    const hasAttendance = record.totalAttendance || record.attendance;
-    const hasIncome = record.total;
-    if (hasAttendance && hasIncome) completeCount++;
-  });
-  
-  return records.length > 0 ? (completeCount / records.length) * 100 : 0;
-}
-
-function calculateIncomeStandardDeviation(assemblies: AssemblyPerformance[]): number {
-  if (assemblies.length === 0) return 0;
-  
-  const incomes = assemblies.map(a => a.totalIncome);
-  const mean = incomes.reduce((a, b) => a + b, 0) / incomes.length;
-  const squaredDiffs = incomes.map(income => Math.pow(income - mean, 2));
-  const variance = squaredDiffs.reduce((a, b) => a + b, 0) / incomes.length;
-  
-  return Math.sqrt(variance);
-}
-
-function calculateIncomeConcentration(assemblies: AssemblyPerformance[]): number {
-  if (assemblies.length === 0) return 0;
-  
-  const totalIncome = assemblies.reduce((sum, a) => sum + a.totalIncome, 0);
-  if (totalIncome === 0) return 0;
-  
-  const top3Income = assemblies.slice(0, 3).reduce((sum, a) => sum + a.totalIncome, 0);
-  return (top3Income / totalIncome) * 100;
-}
-
-function calculateAttendanceConsistency(assemblies: AssemblyPerformance[]): number {
-  if (assemblies.length === 0) return 0;
-  
-  const attendanceRates = assemblies
-    .filter(a => a.reportCount > 0)
-    .map(a => a.averageAttendancePerService);
-  
-  if (attendanceRates.length === 0) return 0;
-  
-  const mean = attendanceRates.reduce((a, b) => a + b, 0) / attendanceRates.length;
-  const variance = attendanceRates.reduce((sum, rate) => sum + Math.pow(rate - mean, 2), 0) / attendanceRates.length;
-  const stdDev = Math.sqrt(variance);
-  
-  // Convert to 1-10 score (lower std deviation = higher consistency)
-  return Math.max(1, Math.min(10, 10 - (stdDev / 10)));
-}
-
-function calculateReportingCompliance(reports: any[]): number {
-  if (reports.length === 0) return 0;
-  
-  let compliantCount = 0;
-  reports.forEach(report => {
-    const completeness = calculateReportCompleteness(report);
-    if (completeness >= 80) compliantCount++;
-  });
-  
-  return (compliantCount / reports.length) * 100;
-}
-
-function generateFallbackAdminAnalysis(body: any): AdminComprehensiveAnalysis {
-  const { reports = [], summary = {}, period = { from: new Date().toISOString(), to: new Date().toISOString() }, location = "Lagos, Nigeria" } = body;
-  
-  const assemblyPerformance = analyzeAssemblyPerformance(reports);
-  const topAssemblies = assemblyPerformance.slice(0, 3).map(a => a.name);
-  const bottomAssemblies = assemblyPerformance.slice(-3).map(a => a.name).reverse();
-  
-  return {
-    executive_summary: `District analysis for ${assemblyPerformance.length} assemblies during ${new Date(period.from).toLocaleDateString()} to ${new Date(period.to).toLocaleDateString()}. Total income: ₦${summary.totalIncome?.toLocaleString() || '0'}. Active reporting assemblies: ${assemblyPerformance.filter(a => a.reportCount > 0).length}.`,
-    
-    district_overview: `District shows ${assemblyPerformance.length} total assemblies with ${assemblyPerformance.filter(a => a.reportCount > 0).length} actively reporting. Financial performance varies significantly across assemblies.`,
-    
-    assembly_performance_ranking: assemblyPerformance.map((assembly, index) => ({
-      rank: index + 1,
-      assembly: assembly.name,
-      total_income: assembly.totalIncome,
-      total_attendance: assembly.totalAttendance,
-      income_per_attendee: assembly.totalAttendance > 0 ? Math.round(assembly.totalIncome / assembly.totalAttendance) : 0,
-      report_completeness: assembly.completenessScore >= 80 ? "Excellent" : assembly.completenessScore >= 60 ? "Good" : assembly.completenessScore >= 40 ? "Fair" : "Poor",
-      key_strength: assembly.reportCount > 0 ? "Active reporting" : "Needs activation",
-      major_challenge: assembly.reportCount === 0 ? "No reports submitted" : "Data completeness"
-    })),
-    
-    financial_health_assessment: {
-      overall_health: summary.totalIncome > 100000 ? "Strong" : summary.totalIncome > 50000 ? "Moderate" : "Concerning",
-      revenue_distribution: "Revenue concentrated in top assemblies",
-      giving_trends: "Sunday services drive majority of income",
-      collection_efficiency: "Moderate efficiency across assemblies",
-      areas_of_concern: ["Low reporting compliance", "Income concentration"],
-      sustainability_metrics: {
-        revenue_diversification_score: 6,
-        income_stability_index: 7,
-        growth_trajectory: "Stable with growth potential"
-      }
-    },
-    
-    attendance_analysis: {
-      overall_trend: "Attendance shows room for growth across assemblies",
-      assembly_comparison: "Significant variation in attendance patterns",
-      engagement_patterns: "Higher engagement in larger assemblies",
-      seasonal_factors: ["Holiday season impact", "Rainy season challenges"],
-      retention_analysis: "Need improved visitor retention strategies",
-      growth_opportunities: ["Midweek service promotion", "Youth engagement programs"]
-    },
-    
-    operational_efficiency: {
-      reporting_compliance: {
-        overall_compliance_rate: calculateReportingCompliance(reports),
-        best_performers: topAssemblies,
-        lagging_assemblies: bottomAssemblies,
-        submission_timeliness: "Varies by assembly"
+        success: false,
+        data: fallbackReport,
+        error: error.message || "Failed to process request",
+        metadata: {
+          generated_at: new Date().toISOString(),
+          note: "Error occurred while processing the request",
+        },
       },
-      data_quality: {
-        completeness_score: assemblyPerformance.length > 0 
-          ? assemblyPerformance.reduce((sum, a) => sum + a.completenessScore, 0) / assemblyPerformance.length 
-          : 0,
-        accuracy_indicators: ["Basic data captured", "Income tracking established"],
-        missing_data_impact: "Affects trend analysis accuracy"
-      }
-    },
-    
-    strategic_recommendations: {
-      immediate_actions: [
-        "Address non-reporting assemblies",
-        "Improve data completeness",
-        "Standardize reporting timelines"
-      ],
-      short_term_goals: [
-        "Increase reporting compliance to 80%",
-        "Grow midweek attendance by 20%",
-        "Implement digital giving options"
-      ],
-      long_term_strategies: [
-        "Develop assembly leadership pipelines",
-        "Establish district-wide training programs",
-        "Create sustainable funding models"
-      ],
-      assembly_specific_interventions: assemblyPerformance.slice(0, 3).map(assembly => ({
-        assembly: assembly.name,
-        priority_area: assembly.reportCount > 0 ? "Growth optimization" : "Activation",
-        recommended_action: assembly.reportCount > 0 ? "Focus on attendance growth" : "Establish reporting system"
-      }))
-    },
-    
-    risk_assessment: {
-      financial_risks: ["Income concentration", "Dependence on Sunday offerings"],
-      operational_risks: ["Reporting inconsistency", "Leadership gaps"],
-      growth_risks: ["Visitor retention", "Youth engagement"],
-      mitigation_strategies: ["Diversify income streams", "Standardize operations"]
-    },
-    
-    success_stories: topAssemblies.map((assembly, index) => ({
-      assembly,
-      achievement: "Consistent reporting and strong participation",
-      replicable_strategy: "Regular follow-up and clear expectations"
-    })),
-    
-    next_quarter_targets: {
-      financial_targets: {
-        overall_target: summary.totalIncome ? Math.round(summary.totalIncome * 1.1) : 100000,
-        assembly_targets: assemblyPerformance.map(a => ({
-          assembly: a.name,
-          target: Math.round(a.totalIncome * 1.1)
-        }))
-      },
-      attendance_targets: {
-        overall_target: summary.totalAttendance ? Math.round(summary.totalAttendance * 1.15) : 500,
-        assembly_targets: assemblyPerformance.map(a => ({
-          assembly: a.name,
-          target: Math.round(a.totalAttendance * 1.15)
-        }))
-      },
-      reporting_targets: {
-        completeness_goal: 90,
-        timeliness_goal: "Within 48 hours of service"
-      }
-    },
-    
-    detailed_report: `DISTRICT ADMIN ANALYSIS REPORT
-Generated: ${new Date().toLocaleDateString()}
-Period: ${new Date(period.from).toLocaleDateString()} to ${new Date(period.to).toLocaleDateString()}
-Location: ${location}
-
-This report provides a strategic overview of district performance based on available data. 
-Key focus areas include improving reporting compliance and developing growth strategies 
-tailored to the Lagos context. Recommendations are provided for both district-level 
-initiatives and assembly-specific interventions.`
-  };
+      { status: 500 }
+    );
+  }
 }

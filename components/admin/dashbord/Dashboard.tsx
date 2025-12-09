@@ -130,14 +130,14 @@ export default function ChurchReport() {
       // This would be an API call to get available assemblies for the selected month
       // For now, using mock data
       const mockAssemblies = [
-        "Grace Assembly",
-        "Hope Assembly",
-        "Faith Assembly",
-        "Victory Assembly",
-        "Peace Assembly",
-        "Joy Assembly",
-        "Love Assembly",
-        "Mercy Assembly",
+        "PPS",
+        "Overcomers",
+        "Beulah",
+        "Jubilee",
+        "Success",
+        "Restoration",
+        "Liberty",
+        "RayPower",
       ];
       setAssemblies(mockAssemblies);
     } catch (error) {
@@ -397,7 +397,7 @@ export default function ChurchReport() {
   };
 
   return (
-    <Layout 
+    <Layout
     // style={{ minHeight: "100vh", background: "#f0f2f5" }}
     >
       <Content style={{ padding: screens.xs ? 12 : 24 }}>
