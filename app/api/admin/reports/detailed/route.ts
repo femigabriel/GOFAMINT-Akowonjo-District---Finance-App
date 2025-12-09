@@ -2,6 +2,8 @@
 import { NextResponse } from "next/server";
 import dbConnect from "@/lib/mongodb";
 import SundayServiceReport from "@/models/SundayServiceReport";
+import MidweekServiceReport from "@/models/MidweekServiceReport";
+import SpecialServiceReport from "@/models/SpecialServiceReport";
 
 export async function GET(request: Request) {
   try {
@@ -11,6 +13,7 @@ export async function GET(request: Request) {
     const assembly = searchParams.get("assembly");
     const month = searchParams.get("month");
     const year = searchParams.get("year");
+    const serviceType = searchParams.get("serviceType") || "all";
     const page = parseInt(searchParams.get("page") || "1");
     const limit = parseInt(searchParams.get("limit") || "50");
     const skip = (page - 1) * limit;
@@ -23,59 +26,179 @@ export async function GET(request: Request) {
       query.month = { $regex: `-${year}$` };
     }
     
-    const [reports, total] = await Promise.all([
-      SundayServiceReport.find(query)
-        .sort({ createdAt: -1 })
-        .skip(skip)
-        .limit(limit)
-        .lean(),
-      SundayServiceReport.countDocuments(query)
-    ]);
+    let reports: any[] = [];
+    let total = 0;
     
-    const formattedReports = reports.map(report => ({
-      id: report._id,
-      assembly: report.assembly,
-      month: report.month,
-      submittedBy: report.submittedBy,
-      createdAt: report.createdAt,
-      updatedAt: report.updatedAt,
-      records: report.records.map((record: any) => ({
-        id: record._id,
-        week: record.week,
-        date: record.date,
-        attendance: record.attendance,
-        sbsAttendance: record.sbsAttendance,
-        visitors: record.visitors,
-        tithes: record.tithes,
-        offerings: record.offerings,
-        specialOfferings: record.specialOfferings,
-        etf: record.etf,
-        pastorsWarfare: record.pastorsWarfare,
-        vigil: record.vigil,
-        thanksgiving: record.thanksgiving,
-        retirees: record.retirees,
-        missionaries: record.missionaries,
-        youthOfferings: record.youthOfferings,
-        districtSupport: record.districtSupport,
-        total: record.total,
-        totalAttendance: record.totalAttendance
-      }))
-    }));
+    // Fetch based on service type
+    if (serviceType === 'all') {
+      const [sundayReports, midweekReports, specialReports, sundayTotal, midweekTotal, specialTotal] = await Promise.all([
+        SundayServiceReport.find(query).sort({ createdAt: -1 }).skip(skip).limit(limit).lean(),
+        MidweekServiceReport.find(query).sort({ createdAt: -1 }).skip(skip).limit(limit).lean(),
+        SpecialServiceReport.find(query).sort({ createdAt: -1 }).skip(skip).limit(limit).lean(),
+        SundayServiceReport.countDocuments(query),
+        MidweekServiceReport.countDocuments(query),
+        SpecialServiceReport.countDocuments(query),
+      ]);
+      
+      // Combine all reports - use type assertion to tell TypeScript the shape
+      const allReports: any[] = [
+        ...sundayReports.map(r => ({ ...r, serviceType: 'sunday' })),
+        ...midweekReports.map(r => ({ ...r, serviceType: 'midweek' })),
+        ...specialReports.map(r => ({ ...r, serviceType: 'special' }))
+      ];
+      
+      // Use optional chaining and provide defaults
+      allReports.sort((a, b) => {
+        const aDate = a.createdAt ? new Date(a.createdAt).getTime() : 0;
+        const bDate = b.createdAt ? new Date(b.createdAt).getTime() : 0;
+        return bDate - aDate;
+      });
+      
+      reports = allReports.slice(skip, skip + limit);
+      total = sundayTotal + midweekTotal + specialTotal;
+      
+    } else if (serviceType === 'sunday') {
+      const [sundayReports, sundayTotal] = await Promise.all([
+        SundayServiceReport.find(query).sort({ createdAt: -1 }).skip(skip).limit(limit).lean(),
+        SundayServiceReport.countDocuments(query)
+      ]);
+      reports = sundayReports.map(r => ({ ...r, serviceType: 'sunday' }));
+      total = sundayTotal;
+      
+    } else if (serviceType === 'midweek') {
+      const [midweekReports, midweekTotal] = await Promise.all([
+        MidweekServiceReport.find(query).sort({ createdAt: -1 }).skip(skip).limit(limit).lean(),
+        MidweekServiceReport.countDocuments(query)
+      ]);
+      reports = midweekReports.map(r => ({ ...r, serviceType: 'midweek' }));
+      total = midweekTotal;
+      
+    } else if (serviceType === 'special') {
+      const [specialReports, specialTotal] = await Promise.all([
+        SpecialServiceReport.find(query).sort({ createdAt: -1 }).skip(skip).limit(limit).lean(),
+        SpecialServiceReport.countDocuments(query)
+      ]);
+      reports = specialReports.map(r => ({ ...r, serviceType: 'special' }));
+      total = specialTotal;
+    }
+    
+    // Format reports - ensure all properties have defaults
+    const formattedReports = reports.map(report => {
+      // Use optional chaining and provide defaults for all properties
+      const baseReport: any = {
+        id: report?._id?.toString() || '',
+        assembly: report?.assembly || '',
+        month: report?.month || '',
+        submittedBy: report?.submittedBy || '',
+        createdAt: report?.createdAt || new Date(),
+        updatedAt: report?.updatedAt || new Date(),
+        serviceType: report?.serviceType || serviceType,
+        records: []
+      };
+      
+      if (!report?.records || !Array.isArray(report.records)) {
+        return baseReport;
+      }
+      
+      const records = report.records;
+      const currentServiceType = report?.serviceType || serviceType;
+      
+      if (currentServiceType === 'sunday') {
+        baseReport.records = records.map((record: any) => ({
+          id: record?._id?.toString() || Math.random().toString(36).substr(2, 9),
+          week: record?.week || '',
+          date: record?.date || '',
+          attendance: record?.attendance || 0,
+          sbsAttendance: record?.sbsAttendance || 0,
+          visitors: record?.visitors || 0,
+          tithes: record?.tithes || 0,
+          offerings: record?.offerings || 0,
+          specialOfferings: record?.specialOfferings || 0,
+          etf: record?.etf || 0,
+          pastorsWarfare: record?.pastorsWarfare || 0,
+          vigil: record?.vigil || 0,
+          thanksgiving: record?.thanksgiving || 0,
+          retirees: record?.retirees || 0,
+          missionaries: record?.missionaries || 0,
+          youthOfferings: record?.youthOfferings || 0,
+          districtSupport: record?.districtSupport || 0,
+          total: record?.total || 0,
+          totalAttendance: record?.totalAttendance || 0
+        }));
+      } else if (currentServiceType === 'midweek') {
+        baseReport.records = records.map((record: any) => ({
+          id: record?._id?.toString() || Math.random().toString(36).substr(2, 9),
+          date: record?.date || '',
+          day: record?.day || '',
+          attendance: record?.attendance || 0,
+          offering: record?.offering || 0,
+          total: record?.total || 0
+        }));
+      } else if (currentServiceType === 'special') {
+        baseReport.records = records.map((record: any) => ({
+          id: record?._id?.toString() || Math.random().toString(36).substr(2, 9),
+          serviceName: record?.serviceName || '',
+          date: record?.date || '',
+          attendance: record?.attendance || 0,
+          offering: record?.offering || 0,
+          total: record?.offering || 0
+        }));
+      }
+      
+      return baseReport;
+    });
+    
+    // Calculate statistics
+    const sundayReports = formattedReports.filter(r => r.serviceType === 'sunday');
+    const midweekReports = formattedReports.filter(r => r.serviceType === 'midweek');
+    const specialReports = formattedReports.filter(r => r.serviceType === 'special');
+    
+    const sundayIncome = sundayReports.reduce((acc, report) => 
+      acc + report.records.reduce((sum: number, record: any) => sum + (record.total || 0), 0), 0);
+    
+    const sundayTithes = sundayReports.reduce((acc, report) => 
+      acc + report.records.reduce((sum: number, record: any) => sum + (record.tithes || 0), 0), 0);
+    
+    const midweekIncome = midweekReports.reduce((acc, report) => 
+      acc + report.records.reduce((sum: number, record: any) => sum + (record.total || 0), 0), 0);
+    
+    const specialIncome = specialReports.reduce((acc, report) => 
+      acc + report.records.reduce((sum: number, record: any) => sum + (record.total || 0), 0), 0);
+    
+    const totalIncome = sundayIncome + midweekIncome + specialIncome;
+    
+    const sundayAttendance = sundayReports.reduce((acc, report) => 
+      acc + report.records.reduce((sum: number, record: any) => sum + (record.totalAttendance || 0), 0), 0);
+    
+    const midweekAttendance = midweekReports.reduce((acc, report) => 
+      acc + report.records.reduce((sum: number, record: any) => sum + (record.attendance || 0), 0), 0);
+    
+    const specialAttendance = specialReports.reduce((acc, report) => 
+      acc + report.records.reduce((sum: number, record: any) => sum + (record.attendance || 0), 0), 0);
+    
+    const totalAttendance = sundayAttendance + midweekAttendance + specialAttendance;
     
     return NextResponse.json({
       success: true,
       data: {
         reports: formattedReports,
-        pagination: {
-          page,
-          limit,
-          total,
-          pages: Math.ceil(total / limit)
-        },
+        pagination: { page, limit, total, pages: Math.ceil(total / limit) },
         summary: {
           totalReports: total,
-          totalRecords: reports.reduce((acc, report) => acc + report.records.length, 0),
-          totalAssemblies: new Set(reports.map(r => r.assembly)).size
+          totalRecords: formattedReports.reduce((acc, r) => acc + r.records.length, 0),
+          totalAssemblies: new Set(formattedReports.map(r => r.assembly)).size,
+          sundayReports: sundayReports.length,
+          midweekReports: midweekReports.length,
+          specialReports: specialReports.length,
+          totalIncome,
+          sundayIncome,
+          midweekIncome,
+          specialIncome,
+          sundayTithes,
+          totalAttendance,
+          sundayAttendance,
+          midweekAttendance,
+          specialAttendance
         }
       }
     });
