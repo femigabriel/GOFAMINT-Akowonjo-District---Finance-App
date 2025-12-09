@@ -64,9 +64,13 @@ export async function POST(request: Request) {
       </head>
       <body>
         <div class="header">
-          <h1>AI Church Analysis Report</h1>
-          <h2>${assembly} Assembly</h2>
-          <p>Lagos, Nigeria • Generated on ${new Date(date).toLocaleDateString()}</p>
+          <h1>THE GOSPEL FAITH MISSION INT'L, REGION 28L</h1>
+          <h2>Akownjo District ${assembly} Assembly</h2>
+        <span>AI Analysis Report for ${assembly} Assembly</span>
+
+          <p>Lagos, Nigeria • Generated on ${new Date(
+            date
+          ).toLocaleDateString()}</p>
         </div>
 
         <div class="metadata">
@@ -100,9 +104,9 @@ export async function POST(request: Request) {
       </html>
     `;
 
- await page.setContent(htmlContent, { waitUntil: "domcontentloaded" });
+    await page.setContent(htmlContent, { waitUntil: "domcontentloaded" });
 
-       const pdfBuffer = await page.pdf({
+    const pdfBuffer = await page.pdf({
       format: "A4",
       printBackground: true,
       margin: {

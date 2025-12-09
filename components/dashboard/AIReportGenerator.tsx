@@ -185,10 +185,10 @@ const AIReportGenerator: React.FC<AIReportGeneratorProps> = ({
               <Button
                 type="primary"
                 size="large"
-                icon={<RobotOutlined />}
+                icon={<RobotOutlined className="text-xs"/>}
                 onClick={handleGenerateReport}
                 loading={loading}
-                className="w-full bg-gradient-to-r from-purple-600 to-blue-600 hover:from-purple-700 hover:to-blue-700 border-0 font-semibold h-12"
+                className="w-full bg-gradient-to-r from-purple-600 text-sm to-blue-600 hover:from-purple-700 hover:to-blue-700 border-0 font-semibold h-12"
               >
                 {loading ? "Analyzing with AI..." : "Generate Smart Report"}
               </Button>
@@ -206,7 +206,7 @@ const AIReportGenerator: React.FC<AIReportGeneratorProps> = ({
         title={
           <div className="flex items-center gap-2">
             <RobotOutlined className="text-purple-600" />
-            <span>AI Analysis Report for {assembly}</span>
+            <span>AI Analysis Report for GOFAMINT, Akownjo District, {assembly}Assembly</span>
             <Tag color="purple">Lagos, Nigeria</Tag>
           </div>
         }
