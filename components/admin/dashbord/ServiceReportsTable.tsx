@@ -592,8 +592,77 @@ export default function ServiceReportsTable() {
   // ==================== AI REPORT FUNCTIONS ====================
   const generateAIReport = async () => {
     setAiReportLoading(true);
-    setAiReportModalVisible(true);
     try {
+      // Group reports by assembly
+      const assemblyReports = reports.reduce((acc, report) => {
+        if (!acc[report.assembly]) {
+          acc[report.assembly] = [];
+        }
+        acc[report.assembly].push(report);
+        return acc;
+      }, {} as Record<string, ExtendedReport[]>);
+
+      // Calculate assembly-level statistics
+      const assemblyStats = Object.entries(assemblyReports).map(
+        ([assemblyName, assemblyReports]) => {
+          const totalIncome = assemblyReports.reduce(
+            (sum, r) => sum + r.totalIncome,
+            0
+          );
+          const totalAttendance = assemblyReports.reduce(
+            (sum, r) => sum + r.totalAttendance,
+            0
+          );
+          const sundayReports = assemblyReports.filter(
+            (r) => r.serviceType === "sunday"
+          ).length;
+          const midweekReports = assemblyReports.filter(
+            (r) => r.serviceType === "midweek"
+          ).length;
+          const specialReports = assemblyReports.filter(
+            (r) => r.serviceType === "special"
+          ).length;
+
+          return {
+            assembly: assemblyName,
+            totalIncome,
+            totalAttendance,
+            reportCount: assemblyReports.length,
+            averageIncome: totalIncome / assemblyReports.length,
+            averageAttendance: totalAttendance / assemblyReports.length,
+            breakdown: {
+              sunday: {
+                income: assemblyReports
+                  .filter((r) => r.serviceType === "sunday")
+                  .reduce((sum, r) => sum + r.totalIncome, 0),
+                attendance: assemblyReports
+                  .filter((r) => r.serviceType === "sunday")
+                  .reduce((sum, r) => sum + r.totalAttendance, 0),
+                reports: sundayReports,
+              },
+              midweek: {
+                income: assemblyReports
+                  .filter((r) => r.serviceType === "midweek")
+                  .reduce((sum, r) => sum + r.totalIncome, 0),
+                attendance: assemblyReports
+                  .filter((r) => r.serviceType === "midweek")
+                  .reduce((sum, r) => sum + r.totalAttendance, 0),
+                reports: midweekReports,
+              },
+              special: {
+                income: assemblyReports
+                  .filter((r) => r.serviceType === "special")
+                  .reduce((sum, r) => sum + r.totalIncome, 0),
+                attendance: assemblyReports
+                  .filter((r) => r.serviceType === "special")
+                  .reduce((sum, r) => sum + r.totalAttendance, 0),
+                reports: specialReports,
+              },
+            },
+          };
+        }
+      );
+
       // Get summary data
       const summary = {
         totalIncome: reports.reduce((sum, r) => sum + r.totalIncome, 0),
@@ -628,40 +697,7 @@ export default function ServiceReportsTable() {
 
       const result = await generateAIFinancialReport({
         reports: reports.slice(0, 10), // Send first 10 reports for analysis
-        summary: {
-          totalIncome: reports.reduce((sum, r) => sum + r.totalIncome, 0),
-          totalAttendance: reports.reduce(
-            (sum, r) => sum + r.totalAttendance,
-            0
-          ),
-          sundayReports: reports.filter((r) => r.serviceType === "sunday")
-            .length,
-          midweekReports: reports.filter((r) => r.serviceType === "midweek")
-            .length,
-          specialReports: reports.filter((r) => r.serviceType === "special")
-            .length,
-          sundayIncome: reports
-            .filter((r) => r.serviceType === "sunday")
-            .reduce((sum, r) => sum + r.totalIncome, 0),
-          midweekIncome: reports
-            .filter((r) => r.serviceType === "midweek")
-            .reduce((sum, r) => sum + r.totalIncome, 0),
-          specialIncome: reports
-            .filter((r) => r.serviceType === "special")
-            .reduce((sum, r) => sum + r.totalIncome, 0),
-          sundayTithes: reports
-            .filter((r) => r.serviceType === "sunday")
-            .reduce((sum: number, r: any) => sum + (r.tithesTotal || 0), 0),
-          sundayAttendance: reports
-            .filter((r) => r.serviceType === "sunday")
-            .reduce((sum, r) => sum + r.totalAttendance, 0),
-          midweekAttendance: reports
-            .filter((r) => r.serviceType === "midweek")
-            .reduce((sum, r) => sum + r.totalAttendance, 0),
-          specialAttendance: reports
-            .filter((r) => r.serviceType === "special")
-            .reduce((sum, r) => sum + r.totalAttendance, 0),
-        },
+        summary,
         serviceType: serviceTypeFilter,
         assembly: filters.assembly || undefined,
         month: filters.month || undefined,
@@ -669,10 +705,11 @@ export default function ServiceReportsTable() {
       });
 
       setAiReport(result.data);
+      setAiReportModalVisible(true);
       notification.success({
         message: "AI Report Generated",
         description:
-          "Professional financial analysis report created successfully",
+          "Professional financial analysis report with assembly details created successfully",
       });
     } catch (error) {
       console.error("Error generating AI report:", error);
@@ -1131,7 +1168,7 @@ export default function ServiceReportsTable() {
               <div>
                 <div className="text-sm text-gray-600">Attendance</div>
                 <div className="text-xl font-bold text-purple-600 mt-1">
-                  {(summary.totalAttendance ).toFixed(0)}
+                  {summary.totalAttendance.toFixed(0)}
                 </div>
               </div>
               <TeamOutlined className="text-purple-500 text-lg" />
@@ -1291,6 +1328,146 @@ export default function ServiceReportsTable() {
         return <div>No records available</div>;
     }
   };
+
+  // Helper function for compact table in expandable rows
+const renderCompactRecordsTable = (report: ExtendedReport) => {
+  switch (report.serviceType) {
+    case "sunday":
+      const sundayReport = report as SundayReport;
+      return (
+        <Table<SundayRecord>
+          columns={[
+            { title: "Week", dataIndex: "week", key: "week", width: 80 },
+            {
+              title: "Date",
+              dataIndex: "date",
+              key: "date",
+              width: 100,
+              render: (date: string) => dayjs(date).format("DD/MM/YY"),
+            },
+            {
+              title: "Attend",
+              dataIndex: "totalAttendance",
+              key: "totalAttendance",
+              width: 80,
+            },
+            {
+              title: "Total",
+              dataIndex: "total",
+              key: "total",
+              width: 100,
+              render: (value: number) => (
+                <span className="font-semibold text-green-600">
+                  ₦{value.toLocaleString()}
+                </span>
+              ),
+            },
+          ]}
+          dataSource={sundayReport.records}
+          pagination={false}
+          size="small"
+          rowKey="id"
+          className="compact-table"
+          scroll={{ x: 400 }}
+        />
+      );
+
+    case "midweek":
+      const midweekReport = report as MidweekReport;
+      return (
+        <Table<MidweekRecord>
+          columns={[
+            {
+              title: "Day",
+              dataIndex: "day",
+              key: "day",
+              width: 80,
+              render: (day: string) =>
+                day.charAt(0).toUpperCase() + day.slice(1),
+            },
+            {
+              title: "Date",
+              dataIndex: "date",
+              key: "date",
+              width: 100,
+              render: (date: string) => dayjs(date).format("DD/MM/YY"),
+            },
+            {
+              title: "Attend",
+              dataIndex: "attendance",
+              key: "attendance",
+              width: 80,
+            },
+            {
+              title: "Total",
+              dataIndex: "total",
+              key: "total",
+              width: 100,
+              render: (value: number) => (
+                <span className="font-semibold text-green-600">
+                  ₦{value.toLocaleString()}
+                </span>
+              ),
+            },
+          ]}
+          dataSource={midweekReport.records}
+          pagination={false}
+          size="small"
+          rowKey="id"
+          className="compact-table"
+          scroll={{ x: 400 }}
+        />
+      );
+
+    case "special":
+      const specialReport = report as SpecialReport;
+      return (
+        <Table<SpecialRecord>
+          columns={[
+            {
+              title: "Service",
+              dataIndex: "serviceName",
+              key: "serviceName",
+              width: 150,
+            },
+            {
+              title: "Date",
+              dataIndex: "date",
+              key: "date",
+              width: 100,
+              render: (date: string) => dayjs(date).format("DD/MM/YY"),
+            },
+            {
+              title: "Attend",
+              dataIndex: "attendance",
+              key: "attendance",
+              width: 80,
+            },
+            {
+              title: "Offering",
+              dataIndex: "offering",
+              key: "offering",
+              width: 100,
+              render: (value: number) => (
+                <span className="font-semibold text-green-600">
+                  ₦{value.toLocaleString()}
+                </span>
+              ),
+            },
+          ]}
+          dataSource={specialReport.records}
+          pagination={false}
+          size="small"
+          rowKey="id"
+          className="compact-table"
+          scroll={{ x: 450 }}
+        />
+      );
+
+    default:
+      return <div>No records available</div>;
+  }
+};
 
   return (
     <div className="p-3 md:p-6 bg-gradient-to-b from-gray-50 to-white min-h-screen">
@@ -1556,113 +1733,20 @@ export default function ServiceReportsTable() {
             });
           }}
           expandable={{
-            expandedRowRender: (record: ExtendedReport) => (
-              <div className="p-3 bg-gray-50 rounded-lg">
-                <h4 className="font-semibold mb-3 text-sm">
-                  {record.serviceType === "sunday"
-                    ? "Sunday Service Weekly Breakdown"
-                    : record.serviceType === "midweek"
-                    ? "Midweek Service Breakdown"
-                    : "Special Services Breakdown"}
-                </h4>
-                <Table
-                  columns={
-                    record.serviceType === "sunday"
-                      ? [
-                          { title: "Week", dataIndex: "week", key: "week" },
-                          {
-                            title: "Date",
-                            dataIndex: "date",
-                            key: "date",
-                            render: (date: string) =>
-                              dayjs(date).format("DD/MM/YY"),
-                          },
-                          {
-                            title: "Attendance",
-                            dataIndex: "totalAttendance",
-                            key: "totalAttendance",
-                          },
-                          {
-                            title: "Total",
-                            dataIndex: "total",
-                            key: "total",
-                            render: (value: number) => (
-                              <span className="font-semibold text-green-600">
-                                ₦{value.toLocaleString()}
-                              </span>
-                            ),
-                          },
-                        ]
+            expandedRowRender: (record: ExtendedReport) => {
+              return (
+                <div className="p-3 bg-gray-50 rounded-lg">
+                  <h4 className="font-semibold mb-3 text-sm">
+                    {record.serviceType === "sunday"
+                      ? "Sunday Service Weekly Breakdown"
                       : record.serviceType === "midweek"
-                      ? [
-                          {
-                            title: "Day",
-                            dataIndex: "day",
-                            key: "day",
-                            render: (day: string) =>
-                              day.charAt(0).toUpperCase() + day.slice(1),
-                          },
-                          {
-                            title: "Date",
-                            dataIndex: "date",
-                            key: "date",
-                            render: (date: string) =>
-                              dayjs(date).format("DD/MM/YY"),
-                          },
-                          {
-                            title: "Attendance",
-                            dataIndex: "attendance",
-                            key: "attendance",
-                          },
-                          {
-                            title: "Total",
-                            dataIndex: "total",
-                            key: "total",
-                            render: (value: number) => (
-                              <span className="font-semibold text-green-600">
-                                ₦{value.toLocaleString()}
-                              </span>
-                            ),
-                          },
-                        ]
-                      : [
-                          {
-                            title: "Service",
-                            dataIndex: "serviceName",
-                            key: "serviceName",
-                          },
-                          {
-                            title: "Date",
-                            dataIndex: "date",
-                            key: "date",
-                            render: (date: string) =>
-                              dayjs(date).format("DD/MM/YY"),
-                          },
-                          {
-                            title: "Attendance",
-                            dataIndex: "attendance",
-                            key: "attendance",
-                          },
-                          {
-                            title: "Offering",
-                            dataIndex: "offering",
-                            key: "offering",
-                            render: (value: number) => (
-                              <span className="font-semibold text-green-600">
-                                ₦{value.toLocaleString()}
-                              </span>
-                            ),
-                          },
-                        ]
-                  }
-                  dataSource={record.records}
-                  pagination={false}
-                  size="small"
-                  rowKey="id"
-                  className="compact-table"
-                />
-              </div>
-            ),
+                      ? "Midweek Service Breakdown"
+                      : "Special Services Breakdown"}
+                  </h4>
+                  {renderCompactRecordsTable(record)}
+                </div>
+              );
+            },
             rowExpandable: (record: ExtendedReport) =>
               record.records.length > 0,
             expandIcon: ({ expanded, onExpand, record }) =>
