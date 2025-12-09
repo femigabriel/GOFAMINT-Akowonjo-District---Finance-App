@@ -19,7 +19,7 @@ import {
   Tabs,
   Select,
 } from "antd";
-import type { ColumnsType } from 'antd/es/table';
+import type { ColumnsType } from "antd/es/table";
 import {
   Download,
   TrendingUp,
@@ -47,6 +47,8 @@ import {
 } from "chart.js";
 import MainLayout from "../layout/DashboardLayout";
 import dayjs, { Dayjs } from "dayjs";
+import AIReportGenerator from "./AIReportGenerator";
+import ServiceReportTable from "./ServiceReportTable";
 
 ChartJS.register(
   CategoryScale,
@@ -101,7 +103,9 @@ interface BaseRecord {
 }
 
 // Combined record type for the table
-type CombinedRecord = (SundayServiceRecord & { serviceType: 'sunday' }) | (MidweekServiceRecord & { serviceType: 'midweek' });
+type CombinedRecord =
+  | (SundayServiceRecord & { serviceType: "sunday" })
+  | (MidweekServiceRecord & { serviceType: "midweek" });
 
 interface SundayServiceData {
   _id: string;
@@ -171,12 +175,21 @@ export default function DashboardPage() {
     dayjs().startOf("month"),
     dayjs().endOf("month"),
   ]);
-  const [sundaySubmissions, setSundaySubmissions] = useState<SundayServiceRecord[]>([]);
-  const [midweekSubmissions, setMidweekSubmissions] = useState<MidweekServiceRecord[]>([]);
-  const [allSundayMonthlyData, setAllSundayMonthlyData] = useState<SundayServiceData[]>([]);
-  const [allMidweekMonthlyData, setAllMidweekMonthlyData] = useState<MidweekServiceData[]>([]);
+  const [sundaySubmissions, setSundaySubmissions] = useState<
+    SundayServiceRecord[]
+  >([]);
+  const [midweekSubmissions, setMidweekSubmissions] = useState<
+    MidweekServiceRecord[]
+  >([]);
+  const [allSundayMonthlyData, setAllSundayMonthlyData] = useState<
+    SundayServiceData[]
+  >([]);
+  const [allMidweekMonthlyData, setAllMidweekMonthlyData] = useState<
+    MidweekServiceData[]
+  >([]);
   const [loading, setLoading] = useState<boolean>(false);
-  const [activeServiceType, setActiveServiceType] = useState<ServiceType>("sunday");
+  const [activeServiceType, setActiveServiceType] =
+    useState<ServiceType>("sunday");
   const [stats, setStats] = useState<DashboardStats>({
     totalThisWeek: 0,
     totalThisMonth: 0,
@@ -221,10 +234,21 @@ export default function DashboardPage() {
       const year = dateRange[0].year();
       const allSundayData: SundayServiceData[] = [];
       const allMidweekData: MidweekServiceData[] = [];
+      const allSpecialData: any[] = []; // Add if needed
 
       const months = [
-        "January", "February", "March", "April", "May", "June",
-        "July", "August", "September", "October", "November", "December",
+        "January",
+        "February",
+        "March",
+        "April",
+        "May",
+        "June",
+        "July",
+        "August",
+        "September",
+        "October",
+        "November",
+        "December",
       ];
 
       console.log("🔄 Starting to fetch data for year:", year);
@@ -235,16 +259,28 @@ export default function DashboardPage() {
         try {
           console.log(`📡 Fetching Sunday data for: ${monthKey}`);
           const res = await fetch(
-            `/api/sunday-service-reports?assembly=${encodeURIComponent(
+            `/api/admin/reports/detailed?assembly=${encodeURIComponent(
               assembly
-            )}&month=${encodeURIComponent(monthKey)}&serviceType=sunday`
+            )}&month=${encodeURIComponent(m)}&year=${encodeURIComponent(
+              year
+            )}&serviceType=sunday&limit=100`
           );
           if (res.ok) {
-            const data: SundayServiceData = await res.json();
-            console.log(`✅ Successfully fetched Sunday ${monthKey}:`, data);
-            allSundayData.push(data);
+            const response = await res.json();
+            if (response.success && response.data?.reports) {
+              // The admin endpoint returns an array of reports
+              const reports = response.data.reports;
+              console.log(
+                `✅ Successfully fetched Sunday ${monthKey}:`,
+                reports
+              );
+              allSundayData.push(...reports);
+            }
           } else {
-            console.log(`❌ No Sunday data for ${monthKey}, status:`, res.status);
+            console.log(
+              `❌ No Sunday data for ${monthKey}, status:`,
+              res.status
+            );
           }
         } catch (error) {
           console.error(`❌ Error fetching Sunday ${monthKey}:`, error);
@@ -257,34 +293,50 @@ export default function DashboardPage() {
         try {
           console.log(`📡 Fetching Midweek data for: ${monthKey}`);
           const res = await fetch(
-            `/api/sunday-service-reports?assembly=${encodeURIComponent(
+            `/api/admin/reports/detailed?assembly=${encodeURIComponent(
               assembly
-            )}&month=${encodeURIComponent(monthKey)}&serviceType=midweek`
+            )}&month=${encodeURIComponent(m)}&year=${encodeURIComponent(
+              year
+            )}&serviceType=midweek&limit=100`
           );
           if (res.ok) {
-            const data: MidweekServiceData = await res.json();
-            console.log(`✅ Successfully fetched Midweek ${monthKey}:`, data);
-            allMidweekData.push(data);
+            const response = await res.json();
+            if (response.success && response.data?.reports) {
+              const reports = response.data.reports;
+              console.log(
+                `✅ Successfully fetched Midweek ${monthKey}:`,
+                reports
+              );
+              allMidweekData.push(...reports);
+            }
           } else {
-            console.log(`❌ No Midweek data for ${monthKey}, status:`, res.status);
+            console.log(
+              `❌ No Midweek data for ${monthKey}, status:`,
+              res.status
+            );
           }
         } catch (error) {
           console.error(`❌ Error fetching Midweek ${monthKey}:`, error);
         }
       }
-      
+
       setAllSundayMonthlyData(allSundayData);
       setAllMidweekMonthlyData(allMidweekData);
 
       // Fetch current month data for both services
-      const curMonth = dateRange[0].format("MMMM-YYYY");
-      
-      // Fetch Sunday data
-      console.log(`🎯 Fetching current month Sunday data: ${curMonth}`);
+      const currentMonth = dateRange[0].format("MMMM");
+      const currentYear = dateRange[0].format("YYYY");
+
+      // Fetch Sunday data for current month
+      console.log(
+        `🎯 Fetching current month Sunday data: ${currentMonth}-${currentYear}`
+      );
       const sundayRes = await fetch(
-        `/api/sunday-service-reports?assembly=${encodeURIComponent(
+        `/api/admin/reports/detailed?assembly=${encodeURIComponent(
           assembly
-        )}&month=${encodeURIComponent(curMonth)}&serviceType=sunday`
+        )}&month=${encodeURIComponent(currentMonth)}&year=${encodeURIComponent(
+          currentYear
+        )}&serviceType=sunday&limit=100`
       );
 
       let currentSundaySubmissions: SundayServiceRecord[] = [];
@@ -292,82 +344,108 @@ export default function DashboardPage() {
 
       if (sundayRes.ok) {
         const responseData = await sundayRes.json();
-        console.log("🎯 Full Sunday API response for current month:", responseData);
-        
-        if (responseData.records && Array.isArray(responseData.records)) {
-          currentSundaySubmissions = responseData.records.map((r: any, index: number) => {
-            const attendance = parseNum(r.attendance);
-            const sbs = parseNum(r.sbsAttendance);
-            const visitors = parseNum(r.visitors);
+        console.log(
+          "🎯 Full Sunday API response for current month:",
+          responseData
+        );
 
-            const recordDate = r.date || "";
+        if (responseData.success && responseData.data?.reports) {
+          const reports = responseData.data.reports;
+          reports.forEach((report: any) => {
+            if (report.records && Array.isArray(report.records)) {
+              const sundayRecords = report.records.map(
+                (r: any, index: number) => {
+                  const attendance = parseNum(r.attendance);
+                  const sbs = parseNum(r.sbsAttendance);
+                  const visitors = parseNum(r.visitors);
+                  const recordDate = r.date || "";
 
-            return {
-              week: r.week ?? `Week ${index + 1}`,
-              date: recordDate,
-              attendance,
-              sbsAttendance: sbs,
-              visitors,
-              tithes: parseNum(r.tithes),
-              offerings: parseNum(r.offerings),
-              specialOfferings: parseNum(r.specialOfferings),
-              etf: parseNum(r.etf),
-              pastorsWarfare: parseNum(r.pastorsWarfare),
-              vigil: parseNum(r.vigil),
-              thanksgiving: parseNum(r.thanksgiving),
-              retirees: parseNum(r.retirees),
-              missionaries: parseNum(r.missionaries),
-              youthOfferings: parseNum(r.youthOfferings),
-              districtSupport: parseNum(r.districtSupport),
-              total: parseNum(r.total),
-totalAttendance: attendance, // Only main service attendance
-              submittedBy: responseData.submittedBy || "Unknown",
-              _id: r._id?.$oid || r._id,
-            };
+                  return {
+                    week: r.week ?? `Week ${index + 1}`,
+                    date: recordDate,
+                    attendance,
+                    sbsAttendance: sbs,
+                    visitors,
+                    tithes: parseNum(r.tithes),
+                    offerings: parseNum(r.offerings),
+                    specialOfferings: parseNum(r.specialOfferings),
+                    etf: parseNum(r.etf),
+                    pastorsWarfare: parseNum(r.pastorsWarfare),
+                    vigil: parseNum(r.vigil),
+                    thanksgiving: parseNum(r.thanksgiving),
+                    retirees: parseNum(r.retirees),
+                    missionaries: parseNum(r.missionaries),
+                    youthOfferings: parseNum(r.youthOfferings),
+                    districtSupport: parseNum(r.districtSupport),
+                    total: parseNum(r.total),
+                    totalAttendance: attendance + sbs + visitors,
+                    submittedBy: report.submittedBy || "Unknown",
+                    _id: r.id || r._id,
+                  };
+                }
+              );
+              currentSundaySubmissions.push(...sundayRecords);
+            }
           });
         }
       }
 
-      // Fetch Midweek data
-      console.log(`🎯 Fetching current month Midweek data: ${curMonth}`);
+      // Fetch Midweek data for current month
+      console.log(
+        `🎯 Fetching current month Midweek data: ${currentMonth}-${currentYear}`
+      );
       const midweekRes = await fetch(
-        `/api/sunday-service-reports?assembly=${encodeURIComponent(
+        `/api/admin/reports/detailed?assembly=${encodeURIComponent(
           assembly
-        )}&month=${encodeURIComponent(curMonth)}&serviceType=midweek`
+        )}&month=${encodeURIComponent(currentMonth)}&year=${encodeURIComponent(
+          currentYear
+        )}&serviceType=midweek&limit=100`
       );
 
       if (midweekRes.ok) {
         const responseData = await midweekRes.json();
-        console.log("🎯 Full Midweek API response for current month:", responseData);
-        
-        if (responseData.records && Array.isArray(responseData.records)) {
-          currentMidweekSubmissions = responseData.records.map((r: any, index: number) => {
-            const recordDate = r.date || "";
+        console.log(
+          "🎯 Full Midweek API response for current month:",
+          responseData
+        );
 
-            return {
-              date: recordDate,
-              day: r.day || "",
-              attendance: parseNum(r.attendance),
-              offering: parseNum(r.offering),
-              total: parseNum(r.total),
-              submittedBy: responseData.submittedBy || "Unknown",
-              _id: r._id?.$oid || r._id,
-            };
+        if (responseData.success && responseData.data?.reports) {
+          const reports = responseData.data.reports;
+          reports.forEach((report: any) => {
+            if (report.records && Array.isArray(report.records)) {
+              const midweekRecords = report.records.map((r: any) => {
+                const recordDate = r.date || "";
+                return {
+                  date: recordDate,
+                  day: r.day || "",
+                  attendance: parseNum(r.attendance),
+                  offering: parseNum(r.offering),
+                  total: parseNum(r.total),
+                  submittedBy: report.submittedBy || "Unknown",
+                  _id: r.id || r._id,
+                };
+              });
+              currentMidweekSubmissions.push(...midweekRecords);
+            }
           });
         }
       }
 
       console.log("🎉 Final transformed submissions:", {
         sunday: currentSundaySubmissions,
-        midweek: currentMidweekSubmissions
+        midweek: currentMidweekSubmissions,
       });
 
       setSundaySubmissions(currentSundaySubmissions);
       setMidweekSubmissions(currentMidweekSubmissions);
-      
-      // Calculate stats with the new data
-      calculateStats(currentSundaySubmissions, currentMidweekSubmissions, allSundayData, allMidweekData);
 
+      // Calculate stats with the new data
+      calculateStats(
+        currentSundaySubmissions,
+        currentMidweekSubmissions,
+        allSundayData,
+        allMidweekData
+      );
     } catch (err) {
       console.error("💥 Error in fetchAllServiceReports:", err);
       message.error("Failed to fetch data");
@@ -403,7 +481,12 @@ totalAttendance: attendance, // Only main service attendance
 
   // Separate useEffect to recalculate stats when service type changes
   useEffect(() => {
-    calculateStats(sundaySubmissions, midweekSubmissions, allSundayMonthlyData, allMidweekMonthlyData);
+    calculateStats(
+      sundaySubmissions,
+      midweekSubmissions,
+      allSundayMonthlyData,
+      allMidweekMonthlyData
+    );
   }, [activeServiceType, sundaySubmissions, midweekSubmissions]);
 
   const calculateStats = (
@@ -413,7 +496,7 @@ totalAttendance: attendance, // Only main service attendance
     allMidweekYear: MidweekServiceData[]
   ): void => {
     console.log("📈 Calculating stats for service type:", activeServiceType);
-    
+
     let totalThisMonth = 0;
     let totalThisWeek = 0;
     let submissionCount = 0;
@@ -442,7 +525,7 @@ totalAttendance: attendance, // Only main service attendance
         0
       );
       totalAttendance += sundayData.reduce((s, r) => s + r.totalAttendance, 0);
-      
+
       // Get latest week total
       if (sundayData.length > 0) {
         const latestSunday = sundayData[sundayData.length - 1];
@@ -455,7 +538,7 @@ totalAttendance: attendance, // Only main service attendance
       submissionCount += midweekData.length;
       totalAllOfferings += midweekData.reduce((s, r) => s + r.offering, 0);
       totalAttendance += midweekData.reduce((s, r) => s + r.attendance, 0);
-      
+
       // Get latest midweek total
       if (midweekData.length > 0) {
         const latestMidweek = midweekData[midweekData.length - 1];
@@ -463,25 +546,29 @@ totalAttendance: attendance, // Only main service attendance
       }
     }
 
-    const averageWeekly = submissionCount ? totalThisMonth / submissionCount : 0;
+    const averageWeekly = submissionCount
+      ? totalThisMonth / submissionCount
+      : 0;
 
     // Calculate year totals - FIXED CALCULATION
     let totalThisYear = 0;
-    
+
     if (activeServiceType === "sunday" || activeServiceType === "combined") {
       totalThisYear += allSundayYear.reduce((yearTotal, monthlyData) => {
-        const monthTotal = monthlyData.records?.reduce((monthSum: number, record: any) => {
-          return monthSum + (parseNum(record.total) || 0);
-        }, 0) || 0;
+        const monthTotal =
+          monthlyData.records?.reduce((monthSum: number, record: any) => {
+            return monthSum + (parseNum(record.total) || 0);
+          }, 0) || 0;
         return yearTotal + monthTotal;
       }, 0);
     }
 
     if (activeServiceType === "midweek" || activeServiceType === "combined") {
       totalThisYear += allMidweekYear.reduce((yearTotal, monthlyData) => {
-        const monthTotal = monthlyData.records?.reduce((monthSum: number, record: any) => {
-          return monthSum + (parseNum(record.total) || 0);
-        }, 0) || 0;
+        const monthTotal =
+          monthlyData.records?.reduce((monthSum: number, record: any) => {
+            return monthSum + (parseNum(record.total) || 0);
+          }, 0) || 0;
         return yearTotal + monthTotal;
       }, 0);
     }
@@ -489,37 +576,44 @@ totalAttendance: attendance, // Only main service attendance
     // Calculate growth percentage - FIXED
     let growthPercentage = 0;
     const currentMonthTotal = totalThisMonth;
-    
+
     // Get previous month total for comparison
-    const prevMonth = dateRange[0].subtract(1, 'month').format("MMMM-YYYY");
+    const prevMonth = dateRange[0].subtract(1, "month").format("MMMM-YYYY");
     const currentMonth = dateRange[0].format("MMMM-YYYY");
-    
+
     let prevMonthTotal = 0;
-    
+
     // Calculate previous month total based on service type
     if (activeServiceType === "sunday" || activeServiceType === "combined") {
-      const prevSundayData = allSundayYear.find(d => d.month === prevMonth);
+      const prevSundayData = allSundayYear.find((d) => d.month === prevMonth);
       if (prevSundayData?.records) {
-        prevMonthTotal += prevSundayData.records.reduce((sum: number, record: any) => sum + (parseNum(record.total) || 0), 0);
+        prevMonthTotal += prevSundayData.records.reduce(
+          (sum: number, record: any) => sum + (parseNum(record.total) || 0),
+          0
+        );
       }
     }
-    
+
     if (activeServiceType === "midweek" || activeServiceType === "combined") {
-      const prevMidweekData = allMidweekYear.find(d => d.month === prevMonth);
+      const prevMidweekData = allMidweekYear.find((d) => d.month === prevMonth);
       if (prevMidweekData?.records) {
-        prevMonthTotal += prevMidweekData.records.reduce((sum: number, record: any) => sum + (parseNum(record.total) || 0), 0);
+        prevMonthTotal += prevMidweekData.records.reduce(
+          (sum: number, record: any) => sum + (parseNum(record.total) || 0),
+          0
+        );
       }
     }
 
     if (prevMonthTotal > 0) {
-      growthPercentage = ((currentMonthTotal - prevMonthTotal) / prevMonthTotal) * 100;
+      growthPercentage =
+        ((currentMonthTotal - prevMonthTotal) / prevMonthTotal) * 100;
     }
 
     const monthsWithData = Math.max(
       allSundayYear.filter((m) => m.records && m.records.length > 0).length,
       allMidweekYear.filter((m) => m.records && m.records.length > 0).length
     );
-    
+
     const monthlyAverage = monthsWithData ? totalThisYear / monthsWithData : 0;
 
     const newStats = {
@@ -548,7 +642,10 @@ totalAttendance: attendance, // Only main service attendance
     try {
       let csvContent = "";
       const monthName = dateRange[0].format("MMMM YYYY");
-      const submittedBy = sundaySubmissions[0]?.submittedBy || midweekSubmissions[0]?.submittedBy || "N/A";
+      const submittedBy =
+        sundaySubmissions[0]?.submittedBy ||
+        midweekSubmissions[0]?.submittedBy ||
+        "N/A";
 
       if (activeServiceType === "sunday") {
         const headers = [
@@ -560,7 +657,9 @@ totalAttendance: attendance, // Only main service attendance
 
         const rows = sundaySubmissions.map((r) => [
           r.week,
-          r.date && dayjs(r.date).isValid() ? dayjs(r.date).format("MMM DD, YYYY") : "N/A",
+          r.date && dayjs(r.date).isValid()
+            ? dayjs(r.date).format("MMM DD, YYYY")
+            : "N/A",
           r.attendance,
           r.sbsAttendance,
           r.visitors,
@@ -607,7 +706,6 @@ totalAttendance: attendance, // Only main service attendance
           ...rows.map((row) => row.join(",")),
           totals.join(","),
         ].join("\n");
-
       } else if (activeServiceType === "midweek") {
         const headers = [
           "PPS ASSEMBLY - MIDWEEK SERVICE FINANCIAL REPORT",
@@ -617,7 +715,9 @@ totalAttendance: attendance, // Only main service attendance
         ];
 
         const rows = midweekSubmissions.map((r) => [
-          r.date && dayjs(r.date).isValid() ? dayjs(r.date).format("MMM DD, YYYY") : "N/A",
+          r.date && dayjs(r.date).isValid()
+            ? dayjs(r.date).format("MMM DD, YYYY")
+            : "N/A",
           r.day,
           r.attendance,
           r.offering,
@@ -639,8 +739,8 @@ totalAttendance: attendance, // Only main service attendance
           ...rows.map((row) => row.join(",")),
           totals.join(","),
         ].join("\n");
-
-      } else { // combined
+      } else {
+        // combined
         const headers = [
           "PPS ASSEMBLY - COMBINED SERVICE FINANCIAL REPORT",
           `${monthName} | Submitted by: ${submittedBy}`,
@@ -651,7 +751,9 @@ totalAttendance: attendance, // Only main service attendance
         const sundayRows = sundaySubmissions.map((r) => [
           "Sunday Service",
           r.week,
-          r.date && dayjs(r.date).isValid() ? dayjs(r.date).format("MMM DD, YYYY") : "N/A",
+          r.date && dayjs(r.date).isValid()
+            ? dayjs(r.date).format("MMM DD, YYYY")
+            : "N/A",
           "Sunday",
           r.attendance,
           r.sbsAttendance,
@@ -675,14 +777,25 @@ totalAttendance: attendance, // Only main service attendance
         const midweekRows = midweekSubmissions.map((r) => [
           "Midweek Service",
           "",
-          r.date && dayjs(r.date).isValid() ? dayjs(r.date).format("MMM DD, YYYY") : "N/A",
+          r.date && dayjs(r.date).isValid()
+            ? dayjs(r.date).format("MMM DD, YYYY")
+            : "N/A",
           r.day,
           r.attendance,
-          "", "", // SBS, Visitors
+          "",
+          "", // SBS, Visitors
           r.attendance, // Total Attendance
           "", // Tithes
           r.offering, // Regular Offerings
-          "", "", "", "", "", "", "", "", "", // Other offerings
+          "",
+          "",
+          "",
+          "",
+          "",
+          "",
+          "",
+          "",
+          "", // Other offerings
           r.total,
           r.submittedBy,
         ]);
@@ -697,13 +810,14 @@ totalAttendance: attendance, // Only main service attendance
       const blob = new Blob([csvContent], { type: "text/csv;charset=utf-8;" });
       const url = URL.createObjectURL(blob);
       const link = document.createElement("a");
-      
-      const filename = activeServiceType === "sunday" 
-        ? `PPS_Sunday_Service_Report_${monthName.replace(" ", "_")}.csv`
-        : activeServiceType === "midweek"
-        ? `PPS_Midweek_Service_Report_${monthName.replace(" ", "_")}.csv`
-        : `PPS_Combined_Service_Report_${monthName.replace(" ", "_")}.csv`;
-      
+
+      const filename =
+        activeServiceType === "sunday"
+          ? `PPS_Sunday_Service_Report_${monthName.replace(" ", "_")}.csv`
+          : activeServiceType === "midweek"
+          ? `PPS_Midweek_Service_Report_${monthName.replace(" ", "_")}.csv`
+          : `PPS_Combined_Service_Report_${monthName.replace(" ", "_")}.csv`;
+
       link.href = url;
       link.download = filename;
       link.click();
@@ -721,115 +835,178 @@ totalAttendance: attendance, // Only main service attendance
       return {
         barData: {
           labels: [
-            "Tithes", "Regular Offerings", "Special Offerings", "ETF", "Pastor's Warfare",
-            "Vigil", "Thanksgiving", "Retirees", "Missionaries", "Youth Offerings", "District Support"
+            "Tithes",
+            "Regular Offerings",
+            "Special Offerings",
+            "ETF",
+            "Pastor's Warfare",
+            "Vigil",
+            "Thanksgiving",
+            "Retirees",
+            "Missionaries",
+            "Youth Offerings",
+            "District Support",
           ],
-          datasets: [{
-            label: "Financial Breakdown (₦)",
-            data: (() => {
-              const init = new Array(11).fill(0);
-              sundaySubmissions.forEach((r) => {
-                init[0] += r.tithes;
-                init[1] += r.offerings;
-                init[2] += r.specialOfferings;
-                init[3] += r.etf;
-                init[4] += r.pastorsWarfare;
-                init[5] += r.vigil;
-                init[6] += r.thanksgiving;
-                init[7] += r.retirees;
-                init[8] += r.missionaries;
-                init[9] += r.youthOfferings;
-                init[10] += r.districtSupport;
-              });
-              return init;
-            })(),
-            backgroundColor: [
-              "#1e3a8a", "#f59e0b", "#fbbf24", "#10b981", "#3b82f6",
-              "#ef4444", "#8b5cf6", "#06b6d4", "#84cc16", "#f97316", "#64748b",
-            ],
-          }],
+          datasets: [
+            {
+              label: "Financial Breakdown (₦)",
+              data: (() => {
+                const init = new Array(11).fill(0);
+                sundaySubmissions.forEach((r) => {
+                  init[0] += r.tithes;
+                  init[1] += r.offerings;
+                  init[2] += r.specialOfferings;
+                  init[3] += r.etf;
+                  init[4] += r.pastorsWarfare;
+                  init[5] += r.vigil;
+                  init[6] += r.thanksgiving;
+                  init[7] += r.retirees;
+                  init[8] += r.missionaries;
+                  init[9] += r.youthOfferings;
+                  init[10] += r.districtSupport;
+                });
+                return init;
+              })(),
+              backgroundColor: [
+                "#1e3a8a",
+                "#f59e0b",
+                "#fbbf24",
+                "#10b981",
+                "#3b82f6",
+                "#ef4444",
+                "#8b5cf6",
+                "#06b6d4",
+                "#84cc16",
+                "#f97316",
+                "#64748b",
+              ],
+            },
+          ],
         },
         pieData: {
           labels: [
-            "Regular Offerings", "Special Offerings", "ETF", "Pastor's Warfare",
-            "Vigil", "Thanksgiving", "Retirees", "Missionaries", "Youth Offerings", "District Support"
+            "Regular Offerings",
+            "Special Offerings",
+            "ETF",
+            "Pastor's Warfare",
+            "Vigil",
+            "Thanksgiving",
+            "Retirees",
+            "Missionaries",
+            "Youth Offerings",
+            "District Support",
           ],
-          datasets: [{
-            label: "Offerings",
-            data: (() => {
-              const init = new Array(10).fill(0);
-              sundaySubmissions.forEach((r) => {
-                init[0] += r.offerings;
-                init[1] += r.specialOfferings;
-                init[2] += r.etf;
-                init[3] += r.pastorsWarfare;
-                init[4] += r.vigil;
-                init[5] += r.thanksgiving;
-                init[6] += r.retirees;
-                init[7] += r.missionaries;
-                init[8] += r.youthOfferings;
-                init[9] += r.districtSupport;
-              });
-              return init;
-            })(),
-            backgroundColor: [
-              "#f59e0b", "#fbbf24", "#10b981", "#3b82f6", "#ef4444",
-              "#8b5cf6", "#06b6d4", "#84cc16", "#f97316", "#64748b",
-            ],
-            borderWidth: 2,
-            borderColor: ["#fff"],
-          }],
-        }
+          datasets: [
+            {
+              label: "Offerings",
+              data: (() => {
+                const init = new Array(10).fill(0);
+                sundaySubmissions.forEach((r) => {
+                  init[0] += r.offerings;
+                  init[1] += r.specialOfferings;
+                  init[2] += r.etf;
+                  init[3] += r.pastorsWarfare;
+                  init[4] += r.vigil;
+                  init[5] += r.thanksgiving;
+                  init[6] += r.retirees;
+                  init[7] += r.missionaries;
+                  init[8] += r.youthOfferings;
+                  init[9] += r.districtSupport;
+                });
+                return init;
+              })(),
+              backgroundColor: [
+                "#f59e0b",
+                "#fbbf24",
+                "#10b981",
+                "#3b82f6",
+                "#ef4444",
+                "#8b5cf6",
+                "#06b6d4",
+                "#84cc16",
+                "#f97316",
+                "#64748b",
+              ],
+              borderWidth: 2,
+              borderColor: ["#fff"],
+            },
+          ],
+        },
       };
     } else if (activeServiceType === "midweek") {
-      const totalMidweekOfferings = midweekSubmissions.reduce((sum, r) => sum + r.offering, 0);
+      const totalMidweekOfferings = midweekSubmissions.reduce(
+        (sum, r) => sum + r.offering,
+        0
+      );
       return {
         barData: {
           labels: ["Midweek Offerings"],
-          datasets: [{
-            label: "Midweek Offerings (₦)",
-            data: [totalMidweekOfferings],
-            backgroundColor: ["#8b5cf6"],
-          }],
+          datasets: [
+            {
+              label: "Midweek Offerings (₦)",
+              data: [totalMidweekOfferings],
+              backgroundColor: ["#8b5cf6"],
+            },
+          ],
         },
         pieData: {
           labels: ["Midweek Offerings"],
-          datasets: [{
-            label: "Midweek Offerings",
-            data: [totalMidweekOfferings],
-            backgroundColor: ["#8b5cf6"],
-            borderWidth: 2,
-            borderColor: ["#fff"],
-          }],
-        }
+          datasets: [
+            {
+              label: "Midweek Offerings",
+              data: [totalMidweekOfferings],
+              backgroundColor: ["#8b5cf6"],
+              borderWidth: 2,
+              borderColor: ["#fff"],
+            },
+          ],
+        },
       };
-    } else { // combined
-      const sundayOfferings = sundaySubmissions.reduce((sum, r) => 
-        sum + r.offerings + r.specialOfferings + r.etf + r.pastorsWarfare + 
-        r.vigil + r.thanksgiving + r.retirees + r.missionaries + 
-        r.youthOfferings + r.districtSupport, 0
+    } else {
+      // combined
+      const sundayOfferings = sundaySubmissions.reduce(
+        (sum, r) =>
+          sum +
+          r.offerings +
+          r.specialOfferings +
+          r.etf +
+          r.pastorsWarfare +
+          r.vigil +
+          r.thanksgiving +
+          r.retirees +
+          r.missionaries +
+          r.youthOfferings +
+          r.districtSupport,
+        0
       );
-      const midweekOfferings = midweekSubmissions.reduce((sum, r) => sum + r.offering, 0);
+      const midweekOfferings = midweekSubmissions.reduce(
+        (sum, r) => sum + r.offering,
+        0
+      );
 
       return {
         barData: {
           labels: ["Sunday Offerings", "Midweek Offerings"],
-          datasets: [{
-            label: "Combined Offerings (₦)",
-            data: [sundayOfferings, midweekOfferings],
-            backgroundColor: ["#3b82f6", "#8b5cf6"],
-          }],
+          datasets: [
+            {
+              label: "Combined Offerings (₦)",
+              data: [sundayOfferings, midweekOfferings],
+              backgroundColor: ["#3b82f6", "#8b5cf6"],
+            },
+          ],
         },
         pieData: {
           labels: ["Sunday Offerings", "Midweek Offerings"],
-          datasets: [{
-            label: "Combined Offerings",
-            data: [sundayOfferings, midweekOfferings],
-            backgroundColor: ["#3b82f6", "#8b5cf6"],
-            borderWidth: 2,
-            borderColor: ["#fff"],
-          }],
-        }
+          datasets: [
+            {
+              label: "Combined Offerings",
+              data: [sundayOfferings, midweekOfferings],
+              backgroundColor: ["#3b82f6", "#8b5cf6"],
+              borderWidth: 2,
+              borderColor: ["#fff"],
+            },
+          ],
+        },
       };
     }
   };
@@ -851,7 +1028,8 @@ totalAttendance: attendance, // Only main service attendance
           title: "Date",
           dataIndex: "date",
           key: "date",
-          render: (d: string) => d && dayjs(d).isValid() ? dayjs(d).format("MMM DD, YYYY") : "N/A",
+          render: (d: string) =>
+            d && dayjs(d).isValid() ? dayjs(d).format("MMM DD, YYYY") : "N/A",
           width: 130,
         },
         {
@@ -873,13 +1051,15 @@ totalAttendance: attendance, // Only main service attendance
         {
           title: "Offerings",
           key: "offerings",
-          render: (_: any, r: SundayServiceRecord) => formatCurrency(r.offerings),
+          render: (_: any, r: SundayServiceRecord) =>
+            formatCurrency(r.offerings),
           width: 130,
         },
         {
           title: "Special",
           key: "special",
-          render: (_: any, r: SundayServiceRecord) => formatCurrency(r.specialOfferings),
+          render: (_: any, r: SundayServiceRecord) =>
+            formatCurrency(r.specialOfferings),
           width: 130,
         },
         {
@@ -896,7 +1076,9 @@ totalAttendance: attendance, // Only main service attendance
           title: "Submitted By",
           dataIndex: "submittedBy",
           key: "submittedBy",
-          render: (text: string) => <Tag color="purple">{text || "Unknown"}</Tag>,
+          render: (text: string) => (
+            <Tag color="purple">{text || "Unknown"}</Tag>
+          ),
           width: 150,
         },
       ];
@@ -904,16 +1086,17 @@ totalAttendance: attendance, // Only main service attendance
       return {
         columns,
         dataSource: sundaySubmissions,
-        rowKey: (record: SundayServiceRecord) => record._id || `sunday-${record.week}-${record.date}`
+        rowKey: (record: SundayServiceRecord) =>
+          record._id || `sunday-${record.week}-${record.date}`,
       };
-
     } else if (activeServiceType === "midweek") {
       const columns: ColumnsType<MidweekServiceRecord> = [
         {
           title: "Date",
           dataIndex: "date",
           key: "date",
-          render: (d: string) => d && dayjs(d).isValid() ? dayjs(d).format("MMM DD, YYYY") : "N/A",
+          render: (d: string) =>
+            d && dayjs(d).isValid() ? dayjs(d).format("MMM DD, YYYY") : "N/A",
           width: 130,
         },
         {
@@ -956,7 +1139,9 @@ totalAttendance: attendance, // Only main service attendance
           title: "Submitted By",
           dataIndex: "submittedBy",
           key: "submittedBy",
-          render: (text: string) => <Tag color="purple">{text || "Unknown"}</Tag>,
+          render: (text: string) => (
+            <Tag color="purple">{text || "Unknown"}</Tag>
+          ),
           width: 150,
         },
       ];
@@ -964,22 +1149,29 @@ totalAttendance: attendance, // Only main service attendance
       return {
         columns,
         dataSource: midweekSubmissions,
-        rowKey: (record: MidweekServiceRecord) => record._id || `midweek-${record.date}-${record.day}`
+        rowKey: (record: MidweekServiceRecord) =>
+          record._id || `midweek-${record.date}-${record.day}`,
       };
-
-    } else { // combined
+    } else {
+      // combined
       const combinedData: CombinedRecord[] = [
-        ...sundaySubmissions.map(r => ({ ...r, serviceType: 'sunday' as const })),
-        ...midweekSubmissions.map(r => ({ ...r, serviceType: 'midweek' as const }))
-      ].sort((a, b) => dayjs(a.date).isBefore(dayjs(b.date)) ? -1 : 1);
+        ...sundaySubmissions.map((r) => ({
+          ...r,
+          serviceType: "sunday" as const,
+        })),
+        ...midweekSubmissions.map((r) => ({
+          ...r,
+          serviceType: "midweek" as const,
+        })),
+      ].sort((a, b) => (dayjs(a.date).isBefore(dayjs(b.date)) ? -1 : 1));
 
       const columns: ColumnsType<CombinedRecord> = [
         {
           title: "Service",
           key: "serviceType",
           render: (_: any, r: CombinedRecord) => (
-            <Tag color={r.serviceType === 'sunday' ? "blue" : "orange"}>
-              {r.serviceType === 'sunday' ? "Sunday" : "Midweek"}
+            <Tag color={r.serviceType === "sunday" ? "blue" : "orange"}>
+              {r.serviceType === "sunday" ? "Sunday" : "Midweek"}
             </Tag>
           ),
           width: 100,
@@ -987,17 +1179,20 @@ totalAttendance: attendance, // Only main service attendance
         {
           title: "Week/Day",
           key: "weekDay",
-          render: (_: any, r: CombinedRecord) => 
-            r.serviceType === 'sunday' ? 
-              <Tag color="blue">{(r as SundayServiceRecord).week}</Tag> : 
-              <Tag color="orange">{(r as MidweekServiceRecord).day}</Tag>,
+          render: (_: any, r: CombinedRecord) =>
+            r.serviceType === "sunday" ? (
+              <Tag color="blue">{(r as SundayServiceRecord).week}</Tag>
+            ) : (
+              <Tag color="orange">{(r as MidweekServiceRecord).day}</Tag>
+            ),
           width: 120,
         },
         {
           title: "Date",
           dataIndex: "date",
           key: "date",
-          render: (d: string) => d && dayjs(d).isValid() ? dayjs(d).format("MMM DD, YYYY") : "N/A",
+          render: (d: string) =>
+            d && dayjs(d).isValid() ? dayjs(d).format("MMM DD, YYYY") : "N/A",
           width: 130,
         },
         {
@@ -1005,9 +1200,9 @@ totalAttendance: attendance, // Only main service attendance
           key: "attendance",
           render: (_: any, r: CombinedRecord) => (
             <Text strong className="text-green-600">
-              {r.serviceType === 'sunday' ? 
-                (r as SundayServiceRecord).totalAttendance.toLocaleString() : 
-                (r as MidweekServiceRecord).attendance.toLocaleString()}
+              {r.serviceType === "sunday"
+                ? (r as SundayServiceRecord).totalAttendance.toLocaleString()
+                : (r as MidweekServiceRecord).attendance.toLocaleString()}
             </Text>
           ),
           width: 110,
@@ -1017,11 +1212,16 @@ totalAttendance: attendance, // Only main service attendance
           key: "money",
           render: (_: any, r: CombinedRecord) => (
             <div className="text-xs">
-              {r.serviceType === 'sunday' ? 
-                `Sunday: ${formatCurrency((r as SundayServiceRecord).tithes)}` : 
-                `Midweek: ${formatCurrency((r as MidweekServiceRecord).offering)}`}
-              {r.serviceType === 'sunday' && (r as SundayServiceRecord).specialOfferings > 0 && 
-                `, Special: ${formatCurrency((r as SundayServiceRecord).specialOfferings)}`}
+              {r.serviceType === "sunday"
+                ? `Sunday: ${formatCurrency((r as SundayServiceRecord).tithes)}`
+                : `Midweek: ${formatCurrency(
+                    (r as MidweekServiceRecord).offering
+                  )}`}
+              {r.serviceType === "sunday" &&
+                (r as SundayServiceRecord).specialOfferings > 0 &&
+                `, Special: ${formatCurrency(
+                  (r as SundayServiceRecord).specialOfferings
+                )}`}
             </div>
           ),
           width: 200,
@@ -1040,7 +1240,9 @@ totalAttendance: attendance, // Only main service attendance
           title: "Submitted By",
           dataIndex: "submittedBy",
           key: "submittedBy",
-          render: (text: string) => <Tag color="purple">{text || "Unknown"}</Tag>,
+          render: (text: string) => (
+            <Tag color="purple">{text || "Unknown"}</Tag>
+          ),
           width: 150,
         },
       ];
@@ -1048,8 +1250,13 @@ totalAttendance: attendance, // Only main service attendance
       return {
         columns,
         dataSource: combinedData,
-        rowKey: (record: CombinedRecord) => 
-          record._id || `${record.serviceType}-${record.date}-${record.serviceType === 'sunday' ? (record as SundayServiceRecord).week : (record as MidweekServiceRecord).day}`
+        rowKey: (record: CombinedRecord) =>
+          record._id ||
+          `${record.serviceType}-${record.date}-${
+            record.serviceType === "sunday"
+              ? (record as SundayServiceRecord).week
+              : (record as MidweekServiceRecord).day
+          }`,
       };
     }
   };
@@ -1063,9 +1270,9 @@ totalAttendance: attendance, // Only main service attendance
   const handleDateRangeChange = (dates: any) => {
     if (dates?.[0] && dates?.[1]) setDateRange([dates[0], dates[1]]);
   };
-  
+
   const handleRefresh = () => fetchAllServiceReports();
-  
+
   const handleAddReport = () => {
     if (activeServiceType === "sunday") {
       router.push("/sunday-service-reports");
@@ -1073,7 +1280,7 @@ totalAttendance: attendance, // Only main service attendance
       router.push("/midweek-service-reports");
     }
   };
-  
+
   const handleEmailReport = () => message.info("Coming soon!");
 
   if (!assembly) {
@@ -1096,8 +1303,11 @@ totalAttendance: attendance, // Only main service attendance
       <div className="mb-6">
         <div className="flex flex-col lg:flex-row lg:items-center lg:justify-between gap-4 mb-6">
           <div>
-            <Title level={2} className="!mb-2 text-gray-900 text-xl sm:text-2xl">
-             Dashboard
+            <Title
+              level={2}
+              className="!mb-2 text-gray-900 text-xl sm:text-2xl"
+            >
+              Dashboard
             </Title>
             <Text className="text-gray-600 text-sm sm:text-base">
               {assembly} Assembly • {dateRange[0].format("MMM DD")} -{" "}
@@ -1157,9 +1367,15 @@ totalAttendance: attendance, // Only main service attendance
             <Card className="h-full border-0 rounded-xl shadow-md bg-gradient-to-br from-blue-500 to-blue-600 text-white hover:shadow-lg transition-shadow">
               <div className="flex items-center justify-between">
                 <div className="flex-1">
-                  <Text className="text-blue-100 text-xs font-semibold">THIS WEEK</Text>
-                  <div className="text-lg sm:text-xl font-bold mt-1">{formatCurrency(stats.totalThisWeek)}</div>
-                  <Text className="text-blue-200 text-xs mt-1">Current week total</Text>
+                  <Text className="text-blue-100 text-xs font-semibold">
+                    THIS WEEK
+                  </Text>
+                  <div className="text-lg sm:text-xl font-bold mt-1">
+                    {formatCurrency(stats.totalThisWeek)}
+                  </div>
+                  <Text className="text-blue-200 text-xs mt-1">
+                    Current week total
+                  </Text>
                 </div>
                 <div className="p-2 bg-white bg-opacity-20 rounded-lg ml-2">
                   <Calendar size={18} />
@@ -1172,8 +1388,12 @@ totalAttendance: attendance, // Only main service attendance
             <Card className="h-full border-0 rounded-xl shadow-md bg-gradient-to-br from-green-500 to-green-600 text-white hover:shadow-lg transition-shadow">
               <div className="flex items-center justify-between">
                 <div className="flex-1">
-                  <Text className="text-green-100 text-xs font-semibold">THIS MONTH</Text>
-                  <div className="text-lg sm:text-xl font-bold mt-1">{formatCurrency(stats.totalThisMonth)}</div>
+                  <Text className="text-green-100 text-xs font-semibold">
+                    THIS MONTH
+                  </Text>
+                  <div className="text-lg sm:text-xl font-bold mt-1">
+                    {formatCurrency(stats.totalThisMonth)}
+                  </div>
                   <div className="flex items-center gap-1 mt-1">
                     {stats.growthPercentage >= 0 ? (
                       <TrendingUp size={12} className="text-green-300" />
@@ -1197,10 +1417,20 @@ totalAttendance: attendance, // Only main service attendance
             <Card className="h-full border-0 rounded-xl shadow-md bg-gradient-to-br from-purple-500 to-purple-600 text-white hover:shadow-lg transition-shadow">
               <div className="flex items-center justify-between">
                 <div className="flex-1">
-                  <Text className="text-purple-100 text-xs font-semibold">YEAR TO DATE</Text>
-                  <div className="text-lg sm:text-xl font-bold mt-1">{formatCurrency(stats.totalThisYear)}</div>
+                  <Text className="text-purple-100 text-xs font-semibold">
+                    YEAR TO DATE
+                  </Text>
+                  <div className="text-lg sm:text-xl font-bold mt-1">
+                    {formatCurrency(stats.totalThisYear)}
+                  </div>
                   <Text className="text-purple-200 text-xs mt-1">
-                    {allSundayMonthlyData.filter((d) => d.records && d.records.length > 0).length + allMidweekMonthlyData.filter((d) => d.records && d.records.length > 0).length} months
+                    {allSundayMonthlyData.filter(
+                      (d) => d.records && d.records.length > 0
+                    ).length +
+                      allMidweekMonthlyData.filter(
+                        (d) => d.records && d.records.length > 0
+                      ).length}{" "}
+                    months
                   </Text>
                 </div>
                 <div className="p-2 bg-white bg-opacity-20 rounded-lg ml-2">
@@ -1214,9 +1444,15 @@ totalAttendance: attendance, // Only main service attendance
             <Card className="h-full border-0 rounded-xl shadow-md bg-gradient-to-br from-orange-500 to-orange-600 text-white hover:shadow-lg transition-shadow">
               <div className="flex items-center justify-between">
                 <div className="flex-1">
-                  <Text className="text-orange-100 text-xs font-semibold">ATTENDANCE</Text>
-                  <div className="text-lg sm:text-xl font-bold mt-1">{stats.totalAttendance.toLocaleString()}</div>
-                  <Text className="text-orange-200 text-xs mt-1">Total attendance</Text>
+                  <Text className="text-orange-100 text-xs font-semibold">
+                    ATTENDANCE
+                  </Text>
+                  <div className="text-lg sm:text-xl font-bold mt-1">
+                    {stats.totalAttendance.toLocaleString()}
+                  </div>
+                  <Text className="text-orange-200 text-xs mt-1">
+                    Total attendance
+                  </Text>
                 </div>
                 <div className="p-2 bg-white bg-opacity-20 rounded-lg ml-2">
                   <Users size={18} />
@@ -1232,13 +1468,23 @@ totalAttendance: attendance, // Only main service attendance
         <Col xs={24} lg={12}>
           <Card
             className="border-0 rounded-xl shadow-md h-full"
-            title={<div className="flex items-center gap-2"><BarChart3 size={16} />Financial Breakdown</div>}
-            extra={<Tag color="blue">{formatCurrency(stats.totalThisMonth)}</Tag>}
+            title={
+              <div className="flex items-center gap-2">
+                <BarChart3 size={16} />
+                Financial Breakdown
+              </div>
+            }
+            extra={
+              <Tag color="blue">{formatCurrency(stats.totalThisMonth)}</Tag>
+            }
             bodyStyle={{ padding: "12px" }}
           >
             <div className="h-64">
               {stats.totalThisMonth > 0 ? (
-                <Bar data={barData} options={{ maintainAspectRatio: false, responsive: true }} />
+                <Bar
+                  data={barData}
+                  options={{ maintainAspectRatio: false, responsive: true }}
+                />
               ) : (
                 <Empty description="No data" />
               )}
@@ -1249,13 +1495,23 @@ totalAttendance: attendance, // Only main service attendance
         <Col xs={24} lg={12}>
           <Card
             className="border-0 rounded-xl shadow-md h-full"
-            title={<div className="flex items-center gap-2"><PieChart size={16} />Offerings Distribution</div>}
-            extra={<Tag color="green">{formatCurrency(stats.totalAllOfferings)}</Tag>}
+            title={
+              <div className="flex items-center gap-2">
+                <PieChart size={16} />
+                Offerings Distribution
+              </div>
+            }
+            extra={
+              <Tag color="green">{formatCurrency(stats.totalAllOfferings)}</Tag>
+            }
             bodyStyle={{ padding: "12px" }}
           >
             <div className="h-64">
               {stats.totalAllOfferings > 0 ? (
-                <Pie data={pieData} options={{ maintainAspectRatio: false, responsive: true }} />
+                <Pie
+                  data={pieData}
+                  options={{ maintainAspectRatio: false, responsive: true }}
+                />
               ) : (
                 <Empty description="No offerings" />
               )}
@@ -1264,90 +1520,21 @@ totalAttendance: attendance, // Only main service attendance
         </Col>
       </Row>
 
-      {/* Table */}
-      <Card
-        className="border-0 rounded-xl shadow-md mb-6"
-        title={
-          <div className="flex items-center gap-2">
-            <Calendar size={16} />
-            <span>
-              {activeServiceType === "sunday" ? "Sunday Service Reports" :
-               activeServiceType === "midweek" ? "Midweek Service Reports" :
-               "Combined Service Reports"}
-            </span>
-            <Tag color="blue">{tableConfig.dataSource.length} records</Tag>
-          </div>
-        }
-        extra={
-          <Button
-            type="primary"
-            icon={<Download size={14} />}
-            onClick={handleExportToExcel}
-            size="small"
-          >
-            Export
-          </Button>
-        }
-      >
-        <Table
-          dataSource={tableConfig.dataSource}
-          columns={tableConfig.columns}
-          pagination={{ pageSize: 10 }}
-          rowKey={tableConfig.rowKey}
-          scroll={{ x: "max-content" }}
-          loading={loading}
+      {/* AI Report Generator */}
+      <div className="mb-6">
+        <AIReportGenerator
+          assembly={assembly}
+          reports={[...allSundayMonthlyData, ...allMidweekMonthlyData]}
+          dateRange={[dateRange[0].toDate(), dateRange[1].toDate()]}
         />
-      </Card>
+      </div>
 
-      {/* Summary */}
-      <Card
-        className="border-0 rounded-xl shadow-md"
-        title="Financial Summary"
-        extra={
-          <div className="flex items-center gap-2">
-            <Text strong>{dateRange[0].format("MMMM YYYY")}</Text>
-            <Tag color={activeServiceType === "sunday" ? "blue" : activeServiceType === "midweek" ? "orange" : "purple"}>
-              {activeServiceType.toUpperCase()}
-            </Tag>
-          </div>
-        }
-      >
-        <Row gutter={16}>
-          <Col xs={24} lg={12}>
-            <div className="space-y-3">
-              <div className="flex justify-between p-3 bg-gray-50 rounded-lg">
-                <Text strong>Grand Total:</Text>
-                <Text strong className="text-blue-600">{formatCurrency(stats.totalThisMonth)}</Text>
-              </div>
-              <div className="flex justify-between p-3 bg-gray-50 rounded-lg">
-                <Text strong>Weekly Average:</Text>
-                <Text strong className="text-green-600">{formatCurrency(stats.averageWeekly)}</Text>
-              </div>
-              <div className="flex justify-between p-3 bg-gray-50 rounded-lg">
-                <Text strong>Year to Date:</Text>
-                <Text strong className="text-purple-600">{formatCurrency(stats.totalThisYear)}</Text>
-              </div>
-              <div className="flex justify-between p-3 bg-gray-50 rounded-lg">
-                <Text strong>Total Attendance:</Text>
-                <Text strong className="text-orange-600">{stats.totalAttendance.toLocaleString()}</Text>
-              </div>
-            </div>
-          </Col>
-          <Col xs={24} lg={12}>
-            <div className="flex flex-col gap-2">
-              <Button type="primary" icon={<Download size={14} />} onClick={handleExportToExcel}>
-                Download Full Report
-              </Button>
-              <Button icon={<Mail size={14} />} onClick={handleEmailReport}>
-                Email Report
-              </Button>
-              <Button type="dashed" icon={<Plus size={14} />} onClick={handleAddReport}>
-                Add New Report
-              </Button>
-            </div>
-          </Col>
-        </Row>
-      </Card>
+      {/* Service Report Table */}
+      <ServiceReportTable
+        reports={[...allSundayMonthlyData, ...allMidweekMonthlyData]}
+        loading={loading}
+        onExport={handleExportToExcel}
+      />
     </MainLayout>
   );
 }
