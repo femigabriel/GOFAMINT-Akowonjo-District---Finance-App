@@ -1653,7 +1653,7 @@ const renderCompactRecordsTable = (report: ExtendedReport) => {
       )}
 
       {/* Filters for Desktop */}
-      {!isMobile && (
+      {/* {!isMobile && (
         <Card className="mb-4 border-0 shadow-sm">
           <div className="flex flex-col md:flex-row gap-3 items-center">
             <div className="flex-1">
@@ -1704,7 +1704,7 @@ const renderCompactRecordsTable = (report: ExtendedReport) => {
             </div>
           </div>
         </Card>
-      )}
+      )} */}
 
       {/* Main Table */}
       <Card className="border-0 shadow-sm overflow-hidden" ref={tableRef}>
