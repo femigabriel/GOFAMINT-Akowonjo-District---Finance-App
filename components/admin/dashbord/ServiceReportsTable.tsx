@@ -66,6 +66,8 @@ import jsPDF from "jspdf";
 import autoTable from "jspdf-autotable";
 import { saveAs } from "file-saver";
 import { generateAIFinancialReport } from "@/utils/ai-report-generator";
+import DetailedChurchReport from "./DetailedChurchReport";
+import ChurchReport from "./Dashboard";
 
 const { Text, Title, Paragraph } = Typography;
 const { RangePicker } = DatePicker;
@@ -1330,147 +1332,150 @@ export default function ServiceReportsTable() {
   };
 
   // Helper function for compact table in expandable rows
-const renderCompactRecordsTable = (report: ExtendedReport) => {
-  switch (report.serviceType) {
-    case "sunday":
-      const sundayReport = report as SundayReport;
-      return (
-        <Table<SundayRecord>
-          columns={[
-            { title: "Week", dataIndex: "week", key: "week", width: 80 },
-            {
-              title: "Date",
-              dataIndex: "date",
-              key: "date",
-              width: 100,
-              render: (date: string) => dayjs(date).format("DD/MM/YY"),
-            },
-            {
-              title: "Attend",
-              dataIndex: "totalAttendance",
-              key: "totalAttendance",
-              width: 80,
-            },
-            {
-              title: "Total",
-              dataIndex: "total",
-              key: "total",
-              width: 100,
-              render: (value: number) => (
-                <span className="font-semibold text-green-600">
-                  ₦{value.toLocaleString()}
-                </span>
-              ),
-            },
-          ]}
-          dataSource={sundayReport.records}
-          pagination={false}
-          size="small"
-          rowKey="id"
-          className="compact-table"
-          scroll={{ x: 400 }}
-        />
-      );
+  const renderCompactRecordsTable = (report: ExtendedReport) => {
+    switch (report.serviceType) {
+      case "sunday":
+        const sundayReport = report as SundayReport;
+        return (
+          <Table<SundayRecord>
+            columns={[
+              { title: "Week", dataIndex: "week", key: "week", width: 80 },
+              {
+                title: "Date",
+                dataIndex: "date",
+                key: "date",
+                width: 100,
+                render: (date: string) => dayjs(date).format("DD/MM/YY"),
+              },
+              {
+                title: "Attend",
+                dataIndex: "totalAttendance",
+                key: "totalAttendance",
+                width: 80,
+              },
+              {
+                title: "Total",
+                dataIndex: "total",
+                key: "total",
+                width: 100,
+                render: (value: number) => (
+                  <span className="font-semibold text-green-600">
+                    ₦{value.toLocaleString()}
+                  </span>
+                ),
+              },
+            ]}
+            dataSource={sundayReport.records}
+            pagination={false}
+            size="small"
+            rowKey="id"
+            className="compact-table"
+            scroll={{ x: 400 }}
+          />
+        );
 
-    case "midweek":
-      const midweekReport = report as MidweekReport;
-      return (
-        <Table<MidweekRecord>
-          columns={[
-            {
-              title: "Day",
-              dataIndex: "day",
-              key: "day",
-              width: 80,
-              render: (day: string) =>
-                day.charAt(0).toUpperCase() + day.slice(1),
-            },
-            {
-              title: "Date",
-              dataIndex: "date",
-              key: "date",
-              width: 100,
-              render: (date: string) => dayjs(date).format("DD/MM/YY"),
-            },
-            {
-              title: "Attend",
-              dataIndex: "attendance",
-              key: "attendance",
-              width: 80,
-            },
-            {
-              title: "Total",
-              dataIndex: "total",
-              key: "total",
-              width: 100,
-              render: (value: number) => (
-                <span className="font-semibold text-green-600">
-                  ₦{value.toLocaleString()}
-                </span>
-              ),
-            },
-          ]}
-          dataSource={midweekReport.records}
-          pagination={false}
-          size="small"
-          rowKey="id"
-          className="compact-table"
-          scroll={{ x: 400 }}
-        />
-      );
+      case "midweek":
+        const midweekReport = report as MidweekReport;
+        return (
+          <Table<MidweekRecord>
+            columns={[
+              {
+                title: "Day",
+                dataIndex: "day",
+                key: "day",
+                width: 80,
+                render: (day: string) =>
+                  day.charAt(0).toUpperCase() + day.slice(1),
+              },
+              {
+                title: "Date",
+                dataIndex: "date",
+                key: "date",
+                width: 100,
+                render: (date: string) => dayjs(date).format("DD/MM/YY"),
+              },
+              {
+                title: "Attend",
+                dataIndex: "attendance",
+                key: "attendance",
+                width: 80,
+              },
+              {
+                title: "Total",
+                dataIndex: "total",
+                key: "total",
+                width: 100,
+                render: (value: number) => (
+                  <span className="font-semibold text-green-600">
+                    ₦{value.toLocaleString()}
+                  </span>
+                ),
+              },
+            ]}
+            dataSource={midweekReport.records}
+            pagination={false}
+            size="small"
+            rowKey="id"
+            className="compact-table"
+            scroll={{ x: 400 }}
+          />
+        );
 
-    case "special":
-      const specialReport = report as SpecialReport;
-      return (
-        <Table<SpecialRecord>
-          columns={[
-            {
-              title: "Service",
-              dataIndex: "serviceName",
-              key: "serviceName",
-              width: 150,
-            },
-            {
-              title: "Date",
-              dataIndex: "date",
-              key: "date",
-              width: 100,
-              render: (date: string) => dayjs(date).format("DD/MM/YY"),
-            },
-            {
-              title: "Attend",
-              dataIndex: "attendance",
-              key: "attendance",
-              width: 80,
-            },
-            {
-              title: "Offering",
-              dataIndex: "offering",
-              key: "offering",
-              width: 100,
-              render: (value: number) => (
-                <span className="font-semibold text-green-600">
-                  ₦{value.toLocaleString()}
-                </span>
-              ),
-            },
-          ]}
-          dataSource={specialReport.records}
-          pagination={false}
-          size="small"
-          rowKey="id"
-          className="compact-table"
-          scroll={{ x: 450 }}
-        />
-      );
+      case "special":
+        const specialReport = report as SpecialReport;
+        return (
+          <Table<SpecialRecord>
+            columns={[
+              {
+                title: "Service",
+                dataIndex: "serviceName",
+                key: "serviceName",
+                width: 150,
+              },
+              {
+                title: "Date",
+                dataIndex: "date",
+                key: "date",
+                width: 100,
+                render: (date: string) => dayjs(date).format("DD/MM/YY"),
+              },
+              {
+                title: "Attend",
+                dataIndex: "attendance",
+                key: "attendance",
+                width: 80,
+              },
+              {
+                title: "Offering",
+                dataIndex: "offering",
+                key: "offering",
+                width: 100,
+                render: (value: number) => (
+                  <span className="font-semibold text-green-600">
+                    ₦{value.toLocaleString()}
+                  </span>
+                ),
+              },
+            ]}
+            dataSource={specialReport.records}
+            pagination={false}
+            size="small"
+            rowKey="id"
+            className="compact-table"
+            scroll={{ x: 450 }}
+          />
+        );
 
-    default:
-      return <div>No records available</div>;
-  }
-};
+      default:
+        return <div>No records available</div>;
+    }
+  };
 
   return (
     <div className="p-3 md:p-6 bg-gradient-to-b from-gray-50 to-white min-h-screen">
+      <div>
+        <ChurchReport />
+      </div>
       {/* Header */}
       <div className="mb-4 md:mb-6">
         <div className="flex flex-col gap-4">
@@ -1576,7 +1581,6 @@ const renderCompactRecordsTable = (report: ExtendedReport) => {
 
       {/* Stats Cards */}
       {renderStatsCards()}
-
 
       {/* Main Table */}
       <Card className="border-0 shadow-sm overflow-hidden" ref={tableRef}>
