@@ -207,7 +207,7 @@ export default function AdminComprehensiveAnalysis({
                 District Comprehensive Analysis
               </h2>
               <p className="text-sm text-gray-500">
-                GOFAMINT Akowonjo District, Region 28 • {location}
+                GOFAMINT Akowonjo District, Region 26 • {location}
               </p>
             </div>
           </div>

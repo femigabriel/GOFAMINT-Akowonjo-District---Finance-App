@@ -64,7 +64,7 @@ export async function POST(request: Request) {
       </head>
       <body>
         <div class="header">
-          <h1>THE GOSPEL FAITH MISSION INT'L, REGION 28L</h1>
+          <h1>THE GOSPEL FAITH MISSION INT'L, Region 26L</h1>
           <h2>Akownjo District ${assembly} Assembly</h2>
         <span>AI Analysis Report for ${assembly} Assembly</span>
 

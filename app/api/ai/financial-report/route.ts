@@ -641,7 +641,7 @@ export async function POST(request: NextRequest) {
         messages: [
           {
             role: "system",
-            content: `You are a financial analyst for GOFAMINT Akowonjo District, Region 28 in Lagos, Nigeria.`,
+            content: `You are a financial analyst for GOFAMINT Akowonjo District, Region 26 in Lagos, Nigeria.`,
           },
           {
             role: "user",

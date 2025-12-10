@@ -104,7 +104,7 @@ export async function POST(request: NextRequest) {
       messages: [
         {
           role: "system",
-          content: `You are a financial analyst for GOFAMINT Akowonjo District, Region 28. 
+          content: `You are a financial analyst for GOFAMINT Akowonjo District, Region 26. 
           Analyze the church service financial data and provide professional insights, 
           recommendations, and a comprehensive financial report with assembly-level analysis.`
         },
@@ -383,7 +383,7 @@ function generateFallbackReport(
       areas_for_improvement: lowAssemblies,
       detailed_analysis: `Assembly performance analysis shows ${topAssemblies[0] || 'top assembly'} leading in contributions. Areas needing improvement include ${lowAssemblies.join(', ') || 'various assemblies'}. Detailed breakdown:\n${assemblyDetails}`
     },
-    formatted_report: `GOFAMINT AKOWONJO DISTRICT - REGION 28
+    formatted_report: `GOFAMINT AKOWONJO DISTRICT - Region 26
 FINANCIAL ANALYSIS REPORT
 Period: ${month || 'All Months'} ${year || ''}
 Assembly: ${assembly || 'All Assemblies'}

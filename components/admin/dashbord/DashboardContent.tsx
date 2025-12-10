@@ -43,7 +43,6 @@ import { useState, useEffect } from "react";
 import { assemblies as ASSEMBLIES } from "@/lib/assemblies";
 import SundayServiceReportsTable from "./SundayServiceReportsTable";
 import ServiceReportsTable from "./ServiceReportsTable";
-import ChurchReport from "./Dashboard";
 
 const { Option } = Select;
 
@@ -716,9 +715,7 @@ export default function DashboardContent() {
               </div>
             </Col>
           </Row>
-            <div>
-        <ChurchReport />
-      </div>
+          
         </>
       )}
 
