@@ -406,7 +406,7 @@ export default function ChurchReport() {
           <Row justify="space-between" align="middle">
             <Col>
               <AntTitle level={3} style={{ margin: 0 }}>
-                <BankOutlined /> Church District Dashboard
+                <BankOutlined /> AI-powered Church Analysis
               </AntTitle>
               <Text type="secondary">
                 AI-powered insights and analytics for church growth

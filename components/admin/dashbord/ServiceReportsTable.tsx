@@ -1473,9 +1473,7 @@ export default function ServiceReportsTable() {
 
   return (
     <div className="p-3 md:p-6 bg-gradient-to-b from-gray-50 to-white min-h-screen">
-      <div>
-        <ChurchReport />
-      </div>
+      
       {/* Header */}
       <div className="mb-4 md:mb-6">
         <div className="flex flex-col gap-4">
@@ -1847,6 +1845,7 @@ export default function ServiceReportsTable() {
         onClose={() => setAiReportModalVisible(false)}
         onExport={exportAIReportAsPDF}
       />
+    
     </div>
   );
 }
