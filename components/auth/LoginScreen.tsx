@@ -176,7 +176,7 @@ export default function LoginPage() {
                 loading={loading}
                 className="w-full bg-primary hover:bg-primary/90 text-white font-semibold rounded-lg h-10 sm:h-12"
               >
-                Admin Sign In
+                Sign In
               </Button>
             </Form.Item>
           </Form>
