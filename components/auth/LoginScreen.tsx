@@ -1,44 +1,122 @@
-// app/login/page.tsx
 "use client";
 
 import { useState } from "react";
-import { Form, Select, Input, Button, message } from "antd";
+import { Form, Select, Input, Button, message, Tabs } from "antd";
 import { Lock, Church, UserCog } from "lucide-react";
 import Image from "next/image";
 import { assemblies } from "@/lib/assemblies";
-import { useAuth } from "@/context/AuthContext";
+import { useRouter } from "next/navigation";
 
 const { Option } = Select;
+const { TabPane } = Tabs;
 
 export default function LoginPage() {
   const [loading, setLoading] = useState(false);
-  const [isAdmin, setIsAdmin] = useState(false);
-  const { login } = useAuth();
+  const [form] = Form.useForm();
+  const router = useRouter();
 
-  const onAssemblyLogin = async (values: { assembly: string; password: string }) => {
+  // Update your handleAssemblyLogin function
+  const handleAssemblyLogin = async (values: any) => {
     setLoading(true);
-    await login(values.assembly, values.password);
-    setLoading(false);
-  };
 
-  const onAdminLogin = async (values: { email: string; password: string }) => {
-    setLoading(true);
     try {
-      if (
-        values.email === "admin@gofamintakowonjo_dst.com" &&
-        values.password === "password"
-      ) {
-        localStorage.setItem("admin", "true");
-        message.success("Admin login successful!");
-        window.location.href = "/admin/dashboard"; 
+      const response = await fetch("/api/login", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          loginType: "assembly",
+          ...values,
+        }),
+      });
+
+      const data = await response.json();
+
+      if (data.success) {
+        // Save token and user data to localStorage
+        localStorage.setItem("authToken", data.token);
+        localStorage.setItem("userData", JSON.stringify(data.userData));
+        localStorage.setItem("role", data.role);
+        localStorage.setItem("assembly", data.userData.assembly);
+
+        message.success(`Welcome, ${data.userData.assembly} Assembly!`);
+        router.push(data.redirect);
       } else {
-        message.error("Invalid admin credentials");
+        message.error(data.message || "Invalid assembly credentials");
       }
     } catch (error) {
+      console.error("Login error:", error);
       message.error("An error occurred. Please try again.");
+    } finally {
+      setLoading(false);
     }
-    setLoading(false);
   };
+
+  // Update your handleAdminLogin function
+  const handleAdminLogin = async (values: any) => {
+    setLoading(true);
+
+    try {
+      const response = await fetch("/api/login", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          loginType: "admin",
+          ...values,
+        }),
+      });
+
+      const data = await response.json();
+
+      if (data.success) {
+        // Save token and user data to localStorage
+        localStorage.setItem("authToken", data.token);
+        localStorage.setItem("userData", JSON.stringify(data.userData));
+        localStorage.setItem("role", data.role);
+        localStorage.setItem("admin", "true"); // For backward compatibility
+
+        message.success("Admin login successful!");
+        router.push(data.redirect);
+      } else {
+        message.error(data.message || "Invalid admin credentials");
+      }
+    } catch (error) {
+      console.error("Login error:", error);
+      message.error("An error occurred. Please try again.");
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  // Custom filter function for the Select component
+  // In your login page - Add this custom filter
+  const filterOption = (
+    input: string,
+    option?: { children?: React.ReactNode; value?: string | number }
+  ) => {
+    if (!option || !option.children) return false;
+
+    const childrenString = Array.isArray(option.children)
+      ? option.children.join("")
+      : String(option.children);
+
+    // Case-insensitive filtering
+    return childrenString.toLowerCase().includes(input.toLowerCase());
+  };
+
+  // Use it in your Select component
+  <Select
+    placeholder="Select your assembly"
+    size="large"
+    className="w-full"
+    showSearch
+    filterOption={filterOption}
+  >
+    {assemblies.map((assembly) => (
+      <Option key={assembly} value={assembly}>
+        {assembly}
+      </Option>
+    ))}
+  </Select>;
 
   return (
     <div className="h-screen w-screen flex items-center justify-center bg-gradient-to-br from-primary via-background to-secondary/20 p-4 sm:p-6 overflow-hidden">
@@ -61,150 +139,163 @@ export default function LoginPage() {
             Akowonjo District
           </p>
           <p className="text-gray-400 text-xs sm:text-sm mt-1">
-            {isAdmin
-              ? "Admin access for finance management"
-              : "Secure access for assembly finance management"}
+            Secure finance management system
           </p>
         </div>
 
-        {!isAdmin ? (
-          <Form
-            name="assembly-login"
-            layout="vertical"
-            onFinish={onAssemblyLogin}
-            className="space-y-4"
-          >
-            <Form.Item
-              label={
-                <span className="flex items-center gap-2 text-primary font-semibold">
-                  <Church className="w-4 h-4 sm:w-5 sm:h-5" />
-                  Assembly
-                </span>
-              }
-              name="assembly"
-              rules={[{ required: true, message: "Please select your assembly" }]}
-            >
-            <Select
-  placeholder="Select your assembly"
-  size="large"
-  className="w-full"
-  showSearch
-  optionFilterProp="children"
-  aria-label="Select your assembly"
-  classNames={{
-    popup: {
-      root: "rounded-lg", 
-    },
-  }}
->
-  {assemblies.map((assembly) => (
-    <Option key={assembly} value={assembly}>
-      {assembly}
-    </Option>
-  ))}
-</Select>
-
-            </Form.Item>
-
-            <Form.Item
-              label={
-                <span className="flex items-center gap-2 text-primary font-semibold">
-                  <Lock className="w-4 h-4 sm:w-5 sm:h-5" />
-                  Password
-                </span>
-              }
-              name="password"
-              rules={[{ required: true, message: "Please enter the password" }]}
-            >
-              <Input.Password
-                size="large"
-                placeholder="Enter password"
-                className="rounded-lg"
-              />
-            </Form.Item>
-
-            <Form.Item>
-              <Button
-                type="primary"
-                htmlType="submit"
-                size="large"
-                loading={loading}
-                className="w-full bg-primary hover:bg-primary/90 text-white font-semibold rounded-lg h-10 sm:h-12"
-              >
-                Sign In
-              </Button>
-            </Form.Item>
-          </Form>
-        ) : (
-          <Form
-            name="admin-login"
-            layout="vertical"
-            onFinish={onAdminLogin}
-            className="space-y-4"
-          >
-            <Form.Item
-              label={
-                <span className="flex items-center gap-2 text-primary font-semibold">
-                  <UserCog className="w-4 h-4 sm:w-5 sm:h-5" />
-                  Admin Email
-                </span>
-              }
-              name="email"
-              rules={[{ required: true, message: "Please enter your email" }]}
-            >
-              <Input size="large" placeholder="Enter admin email" />
-            </Form.Item>
-
-            <Form.Item
-              label={
-                <span className="flex items-center gap-2 text-primary font-semibold">
-                  <Lock className="w-4 h-4 sm:w-5 sm:h-5" />
-                  Password
-                </span>
-              }
-              name="password"
-              rules={[{ required: true, message: "Please enter your password" }]}
-            >
-              <Input.Password size="large" placeholder="Enter password" />
-            </Form.Item>
-
-            <Form.Item>
-              <Button
-                type="primary"
-                htmlType="submit"
-                size="large"
-                loading={loading}
-                className="w-full bg-primary hover:bg-primary/90 text-white font-semibold rounded-lg h-10 sm:h-12"
-              >
-                Sign In
-              </Button>
-            </Form.Item>
-          </Form>
-        )}
-
-        <div className="text-center mt-4 sm:mt-6">
-          {!isAdmin ? (
-            <p className="text-gray-500 text-xs sm:text-sm">
-              Are you an admin?{" "}
-              <button
-                onClick={() => setIsAdmin(true)}
-                className="text-primary font-semibold hover:underline"
-              >
-                Login here
-              </button>
-            </p>
-          ) : (
-            <p className="text-gray-500 text-xs sm:text-sm">
-              Back to{" "}
-              <button
-                onClick={() => setIsAdmin(false)}
-                className="text-primary font-semibold hover:underline"
-              >
+        <Tabs
+          defaultActiveKey="assembly"
+          centered
+          className="w-full"
+          size="large"
+          tabBarStyle={{ marginBottom: "24px" }}
+        >
+          <TabPane
+            tab={
+              <span className="flex items-center gap-2">
+                <Church className="w-4 h-4" />
                 Assembly Login
-              </button>
-            </p>
-          )}
-        </div>
+              </span>
+            }
+            key="assembly"
+          >
+            <Form
+              form={form}
+              name="assembly-login-form"
+              layout="vertical"
+              onFinish={handleAssemblyLogin}
+              className="space-y-4"
+            >
+              <Form.Item
+                label={
+                  <span className="flex items-center gap-2 text-primary font-semibold">
+                    <Church className="w-4 h-4 sm:w-5 sm:h-5" />
+                    Assembly
+                  </span>
+                }
+                name="assembly"
+                rules={[
+                  { required: true, message: "Please select your assembly" },
+                ]}
+              >
+                <Select
+                  placeholder="Select your assembly"
+                  size="large"
+                  className="w-full"
+                  showSearch
+                  filterOption={filterOption}
+                  popupClassName="rounded-lg"
+                >
+                  {assemblies.map((assembly) => (
+                    <Option key={assembly} value={assembly}>
+                      {assembly}
+                    </Option>
+                  ))}
+                </Select>
+              </Form.Item>
+
+              <Form.Item
+                label={
+                  <span className="flex items-center gap-2 text-primary font-semibold">
+                    <Lock className="w-4 h-4 sm:w-5 sm:h-5" />
+                    Password
+                  </span>
+                }
+                name="password"
+                rules={[
+                  { required: true, message: "Please enter the password" },
+                ]}
+              >
+                <Input.Password
+                  size="large"
+                  placeholder="Enter assembly password"
+                  className="rounded-lg"
+                />
+              </Form.Item>
+
+              <Form.Item>
+                <Button
+                  type="primary"
+                  htmlType="submit"
+                  size="large"
+                  loading={loading}
+                  className="w-full bg-primary hover:bg-primary/90 text-white font-semibold rounded-lg h-10 sm:h-12"
+                >
+                  Assembly Sign In
+                </Button>
+              </Form.Item>
+            </Form>
+          </TabPane>
+
+          <TabPane
+            tab={
+              <span className="flex items-center gap-2">
+                <UserCog className="w-4 h-4" />
+                Admin Login
+              </span>
+            }
+            key="admin"
+          >
+            <Form
+              name="admin-login-form"
+              layout="vertical"
+              onFinish={handleAdminLogin}
+              className="space-y-4"
+            >
+              <Form.Item
+                label={
+                  <span className="flex items-center gap-2 text-primary font-semibold">
+                    <UserCog className="w-4 h-4 sm:w-5 sm:h-5" />
+                    Admin Email
+                  </span>
+                }
+                name="email"
+                rules={[
+                  { required: true, message: "Please enter your email" },
+                  { type: "email", message: "Please enter a valid email" },
+                ]}
+              >
+                <Input
+                  size="large"
+                  placeholder="Enter admin email"
+                  type="email"
+                  className="rounded-lg"
+                />
+              </Form.Item>
+
+              <Form.Item
+                label={
+                  <span className="flex items-center gap-2 text-primary font-semibold">
+                    <Lock className="w-4 h-4 sm:w-5 sm:h-5" />
+                    Password
+                  </span>
+                }
+                name="password"
+                rules={[
+                  { required: true, message: "Please enter your password" },
+                ]}
+              >
+                <Input.Password
+                  size="large"
+                  placeholder="Enter admin password"
+                  className="rounded-lg"
+                />
+              </Form.Item>
+
+              <Form.Item>
+                <Button
+                  type="primary"
+                  htmlType="submit"
+                  size="large"
+                  loading={loading}
+                  className="w-full bg-primary hover:bg-primary/90 text-white font-semibold rounded-lg h-10 sm:h-12"
+                >
+                  Admin Sign In
+                </Button>
+              </Form.Item>
+            </Form>
+          </TabPane>
+        </Tabs>
       </div>
     </div>
   );

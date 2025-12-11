@@ -48,14 +48,73 @@ export default function AdminLayout({ children }: AdminLayoutProps) {
 
   // 🔐 Check admin authentication
   const checkAdminAuth = () => {
-    const isAdmin = localStorage.getItem("admin") === "true";
-    if (!isAdmin) {
+    const token = localStorage.getItem("authToken");
+    const userDataStr = localStorage.getItem("userData");
+
+    if (!token || !userDataStr) {
       message.warning("Access denied. Please log in as admin.");
       router.replace("/login");
       return false;
     }
-    return true;
+
+    try {
+      const userData = JSON.parse(userDataStr);
+      if (userData.role !== "admin") {
+        message.warning("Access denied. Admin privileges required.");
+        router.replace("/login");
+        return false;
+      }
+
+      // Also set localStorage admin flag for backward compatibility
+      if (localStorage.getItem("admin") !== "true") {
+        localStorage.setItem("admin", "true");
+      }
+
+      return true;
+    } catch {
+      message.warning("Access denied. Invalid session.");
+      router.replace("/login");
+      return false;
+    }
   };
+
+  // Update your useEffect:
+  useEffect(() => {
+    const validateAuth = async () => {
+      const isAuthenticated = await checkAdminAuth();
+
+      if (!isAuthenticated) {
+        message.warning("Access denied. Please log in as admin.");
+        router.replace("/login");
+        return;
+      }
+
+      // Mark page as loaded after authentication check
+      setPageLoaded(true);
+      setIsLoading(false);
+    };
+
+    validateAuth();
+  }, [router]);
+
+  // Update your useEffect:
+  useEffect(() => {
+    const validateAuth = async () => {
+      const isAuthenticated = await checkAdminAuth();
+
+      if (!isAuthenticated) {
+        message.warning("Access denied. Please log in as admin.");
+        router.replace("/login");
+        return;
+      }
+
+      // Mark page as loaded after authentication check
+      setPageLoaded(true);
+      setIsLoading(false);
+    };
+
+    validateAuth();
+  }, [router]);
 
   useEffect(() => {
     // Simulate initial page load

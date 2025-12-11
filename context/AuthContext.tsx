@@ -1,15 +1,15 @@
-// lib/AuthContext.tsx
+// lib/AuthContext.tsx - Updated
 "use client";
 
 import { createContext, useContext, useState, useEffect, ReactNode } from "react";
 import { useRouter } from "next/navigation";
 import { message } from "antd";
-import { assemblies } from "@/lib/assemblies";
 
 interface AuthContextType {
   assembly: string | null;
   isAuthenticated: boolean;
-  loading: boolean; // Add loading state
+  loading: boolean;
+  userData: any | null;
   login: (assembly: string, password: string) => Promise<void>;
   logout: () => void;
 }
@@ -18,68 +18,104 @@ const AuthContext = createContext<AuthContextType | undefined>(undefined);
 
 export function AuthProvider({ children }: { children: ReactNode }) {
   const [assembly, setAssembly] = useState<string | null>(null);
+  const [userData, setUserData] = useState<any | null>(null);
   const [isAuthenticated, setIsAuthenticated] = useState(false);
-  const [loading, setLoading] = useState(true); // Initialize as true
+  const [loading, setLoading] = useState(true);
   const router = useRouter();
 
-  // Check for stored assembly on mount
+  // Check for stored auth on mount
   useEffect(() => {
-    const storedAssembly = localStorage.getItem("assembly");
-    if (storedAssembly && assemblies.includes(storedAssembly)) {
-      setAssembly(storedAssembly);
-      setIsAuthenticated(true);
-    } else {
-      localStorage.removeItem("assembly"); // Clear invalid assembly
-    }
-    setLoading(false); // Set loading to false after checking
+    const checkAuth = () => {
+      try {
+        const token = localStorage.getItem("authToken");
+        const storedUserData = localStorage.getItem("userData");
+        const storedAssembly = localStorage.getItem("assembly");
+        
+        if (token && storedUserData) {
+          const parsedData = JSON.parse(storedUserData);
+          setUserData(parsedData);
+          
+          if (parsedData.role === 'assembly' && storedAssembly) {
+            setAssembly(storedAssembly);
+          }
+          
+          setIsAuthenticated(true);
+        }
+      } catch (error) {
+        console.error("Auth check failed:", error);
+        logout();
+      } finally {
+        setLoading(false);
+      }
+    };
+
+    checkAuth();
   }, []);
 
   const login = async (assembly: string, password: string) => {
-  try {
-    setLoading(true);
-    const response = await fetch("/api/login", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ assembly, password }),
-    });
-    const data = await response.json();
-    if (response.ok && data.success) {
-      localStorage.setItem("assembly", assembly);
-      setAssembly(assembly);
-      setIsAuthenticated(true);
-      message.success(`Welcome, ${assembly} Assembly`);
-      router.push("/dashboard");
-    } else {
-      message.error(data.error || "Invalid assembly or password");
+    try {
+      setLoading(true);
+      const response = await fetch("/api/login", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ 
+          loginType: "assembly", 
+          assembly, 
+          password 
+        }),
+      });
+      
+      const data = await response.json();
+      
+      if (response.ok && data.success) {
+        // Save to localStorage
+        localStorage.setItem("authToken", data.token);
+        localStorage.setItem("userData", JSON.stringify(data.userData));
+        localStorage.setItem("role", data.role);
+        localStorage.setItem("assembly", data.userData.assembly);
+        
+        setAssembly(assembly);
+        setUserData(data.userData);
+        setIsAuthenticated(true);
+        
+        message.success(`Welcome, ${assembly} Assembly!`);
+        router.push(data.redirect || "/assembly/dashboard");
+      } else {
+        message.error(data.message || "Invalid assembly or password");
+      }
+    } catch {
+      message.error("An error occurred. Please try again.");
+    } finally {
+      setLoading(false);
     }
-  } catch {
-    message.error("An error occurred. Please try again.");
-  } finally {
-    setLoading(false);
-  }
-};
-
+  };
 
   const logout = () => {
+    // Clear all localStorage items
+    localStorage.removeItem("authToken");
+    localStorage.removeItem("userData");
+    localStorage.removeItem("role");
     localStorage.removeItem("assembly");
-    localStorage.removeItem("admin"); // Clear admin as well
+    localStorage.removeItem("admin");
+    
     setAssembly(null);
+    setUserData(null);
     setIsAuthenticated(false);
+    
     message.success("Logged out successfully");
     router.push("/login");
   };
 
   return (
-    <AuthContext.Provider value={{ assembly, isAuthenticated, loading, login, logout }}>
+    <AuthContext.Provider value={{ 
+      assembly, 
+      isAuthenticated, 
+      loading, 
+      userData,
+      login, 
+      logout 
+    }}>
       {children}
     </AuthContext.Provider>
   );
-}
-
-export function useAuth() {
-  const context = useContext(AuthContext);
-  if (!context) {
-    throw new Error("useAuth must be used within an AuthProvider");
-  }
-  return context;
 }
