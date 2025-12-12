@@ -300,24 +300,113 @@ export async function POST(req: Request) {
     };
 
     // Compose prompt - emphasize not to invent numbers and to reason from provided data
-    const prompt = `You are a professional financial analyst producing a district-wide financial and numerical report for a church district.
+    const prompt = `
+You are a senior financial analyst and church administration expert.
+You will produce a comprehensive MONTHLY FINANCIAL & NUMERICAL REPORT for a church district.
 
-Context: We will provide you with structured JSON data that lists aggregated metrics for each assembly for the target month, plus comparisons vs the previous two months. DO NOT INVENT NUMBERS. Use only the numbers provided.
+STRICT RULES (DO NOT BREAK):
+- DO NOT invent numbers, statistics, percentages, or assemblies.
+- Use ONLY the numbers in the provided JSON.
+- If data is missing or zero, interpret it realistically (e.g., “zero reporting”, “possible under-reporting”, “no attendance submitted”).
+- Always reason inside the data that is given.
 
-Input JSON:
+=========== INPUT JSON ===========
 ${JSON.stringify(payloadForAI, null, 2)}
+==================================
 
-Task: Using ONLY the data above, produce a professional board-level report for the district covering:
-1) Executive summary (2-4 sentences)
-2) District totals and short interpretation
-3) Top 3 performing assemblies with reasoning
-4) Bottom 3 assemblies and key concerns
-5) Trends vs previous month (income/attendance/tithes)
-6) Clear recommendations (actionable, prioritized)
-7) One strategic next-step plan for the next 90 days
-8) Short paragraph on data quality / next data collection improvements
+Generate a full professional report with the following sections:
 
-Write in Markdown suitable for display in a web UI, with tables for the assembly comparison (assembly | income | attendance | tithes | % income change vs prev month).`;
+# 1. Executive Summary
+- 2–4 sentences summarising the district’s overall financial and attendance performance.
+- Mention only trends supported by the data.
+
+# 2. District Totals Overview
+Provide:
+- Total Income
+- Total Attendance
+- Total Tithes  
+Then add:
+- A short analytical interpretation using only provided numbers.
+
+# 3. Assembly Performance Table
+Create a clean Markdown table:
+Assembly | Income | Attendance | Tithes | % Income Change vs Last Month
+
+# 4. Top 3 Performing Assemblies
+- Rank assemblies by totalIncome.
+- Explain WHY each one is top — using their figures only.
+
+# 5. Bottom 3 Assemblies
+- Identify assemblies with lowest income or attendance.
+- Provide short reasons (missing data, extremely low attendance, zero reporting, etc.)
+
+# 6. Trend Analysis vs Previous Months
+For each assembly:
+- Income trend (up/down/same)
+- Tithes trend
+- Attendance trend
+- Explain the trend with clear reasoning using only provided comparisons.
+
+# 7. Financial Health Assessment (District)
+Include:
+- Income stability comment
+- Offering distribution insights (use breakdown available)
+- Tithes-to-income relationship
+- Income per attendee (do NOT compute if data missing; instead say “insufficient data for ratio”).
+
+# 8. Attendance & Growth Insights
+- Identify growth or decline patterns across assemblies.
+- Highlight assemblies with unusually high or low attendance.
+- Mention district-wide consistency or fluctuation.
+
+# 9. Ministry Impact & Engagement Recommendations
+Using the data:
+- Suggest pastoral strategies for low-attendance assemblies.
+- Suggest follow-up actions for assemblies with low reporting.
+- Suggest engagement practices for stronger assemblies.
+
+# 10. Pastoral Leadership Recommendations
+- Assemblies needing pastoral visitation
+- Assemblies needing administrative support
+- Assemblies showing strong pastoral effectiveness
+
+# 11. Risk Flags & Alerts
+Identify assemblies that show:
+- Zero reporting
+- Sharp drops in income or attendance
+- Sudden increases that look abnormal
+- Missing offering categories
+- Possible data-quality issues  
+(Explain only from the given JSON — NO speculation.)
+
+# 12. Data Quality Assessment
+- Evaluate completeness of the month’s submissions.
+- Identify assemblies with missing, inconsistent, or zero values.
+- Suggest improvements for reporting accuracy.
+
+# 13. 90-Day Strategic Roadmap
+Provide a high-level but practical strategy:
+- Immediate priorities (0–30 days)
+- Mid-term (30–60 days)
+- Long-term (60–90 days)
+
+# 14. Assembly-Specific Notes
+Write 1–2 sentences for EACH assembly:
+- Explain their unique challenge, strength, or pattern based only on their numbers.
+
+# 15. Accountability & Transparency Highlights
+- Comment on reporting discipline
+- Treasury accuracy
+- Offering category breakdown usage
+
+# 16. Recognition & Motivation
+Highlight:
+- Assembly of the Month (based on income + attendance combined)
+- Most Improved Assembly (income change vs previous month)
+- Best Reporting Assembly (non-zero, complete data)
+
+Write everything in clean, excellent Markdown. Keep it professional, pastoral, and data-grounded.
+`;
 
     const completion = await client.responses.create({
       model: "gpt-4.1",
