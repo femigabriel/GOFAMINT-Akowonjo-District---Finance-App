@@ -240,3 +240,40 @@ li {
     font-size: 16px;
   }
 }
+/* Add to your global.css or styles */
+.report-markdown table {
+  width: 100%;
+  border-collapse: collapse;
+  margin: 1rem 0;
+}
+
+.report-markdown th,
+.report-markdown td {
+  border: 1px solid #e5e7eb;
+  padding: 0.5rem 1rem;
+  text-align: left;
+}
+
+.report-markdown th {
+  background-color: #f9fafb;
+  font-weight: 600;
+}
+
+.report-markdown tr:nth-child(even) {
+  background-color: #f9fafb;
+}
+
+.report-markdown h1 {
+  margin-top: 2rem !important;
+  margin-bottom: 1rem !important;
+}
+
+.report-markdown h2 {
+  margin-top: 1.5rem !important;
+  margin-bottom: 0.75rem !important;
+}
+
+.report-markdown h3 {
+  margin-top: 1rem !important;
+  margin-bottom: 0.5rem !important;
+}

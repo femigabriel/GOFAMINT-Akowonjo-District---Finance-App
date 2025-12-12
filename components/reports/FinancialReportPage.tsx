@@ -15,12 +15,16 @@ import {
   Typography,
   Tag,
   Space,
+  Collapse,
+  Progress,
 } from "antd";
 import type { ColumnsType } from "antd/es/table";
 import dayjs from "dayjs";
 import html2pdf from "html2pdf.js";
+import ReactMarkdown from "react-markdown";
 
 const { Title, Text, Paragraph } = Typography;
+const { Panel } = Collapse;
 
 type ComparisonRow = {
   assembly: string;
@@ -58,6 +62,64 @@ type Html2PdfOptions = {
     format: string;
     orientation: "portrait" | "landscape";
   };
+};
+
+// Custom Markdown components for better styling
+const markdownComponents = {
+  h1: ({ children }: any) => (
+    <Title level={1} className="!mt-6 !mb-4 text-blue-800 border-b pb-2">
+      {children}
+    </Title>
+  ),
+  h2: ({ children }: any) => (
+    <Title level={2} className="!mt-5 !mb-3 text-blue-700">
+      {children}
+    </Title>
+  ),
+  h3: ({ children }: any) => (
+    <Title level={3} className="!mt-4 !mb-2 text-gray-800">
+      {children}
+    </Title>
+  ),
+  p: ({ children }: any) => (
+    <Paragraph className="text-gray-700 mb-3 leading-relaxed">
+      {children}
+    </Paragraph>
+  ),
+  table: ({ children }: any) => (
+    <div className="overflow-x-auto my-4">
+      <table className="min-w-full border-collapse border border-gray-300">
+        {children}
+      </table>
+    </div>
+  ),
+  thead: ({ children }: any) => (
+    <thead className="bg-gray-50">{children}</thead>
+  ),
+  tbody: ({ children }: any) => (
+    <tbody className="divide-y divide-gray-200">{children}</tbody>
+  ),
+  tr: ({ children }: any) => <tr className="hover:bg-gray-50">{children}</tr>,
+  th: ({ children }: any) => (
+    <th className="border border-gray-300 px-4 py-2 text-left font-semibold text-gray-700">
+      {children}
+    </th>
+  ),
+  td: ({ children }: any) => (
+    <td className="border border-gray-300 px-4 py-2 text-gray-600">
+      {children}
+    </td>
+  ),
+  strong: ({ children }: any) => (
+    <strong className="text-gray-900 font-semibold">{children}</strong>
+  ),
+  ul: ({ children }: any) => (
+    <ul className="list-disc pl-5 mb-4 space-y-1">{children}</ul>
+  ),
+  ol: ({ children }: any) => (
+    <ol className="list-decimal pl-5 mb-4 space-y-1">{children}</ol>
+  ),
+  li: ({ children }: any) => <li className="text-gray-700">{children}</li>,
 };
 
 export default function FinancialReportPage() {
@@ -198,21 +260,24 @@ export default function FinancialReportPage() {
     churchHeader.className = "church-header";
     churchHeader.style.cssText = `
       text-align: center;
-      margin-bottom: 20px;
-      padding-bottom: 10px;
-      border-bottom: 2px solid #1890ff;
+      margin-bottom: 30px;
+      padding-bottom: 15px;
+      border-bottom: 3px solid #1d39c4;
     `;
 
     churchHeader.innerHTML = `
-      <h1 style="margin: 0; color: #1d39c4; font-size: 24px; font-weight: bold;">
+      <h1 style="margin: 0; color: #1d39c4; font-size: 28px; font-weight: bold; font-family: 'Times New Roman', serif;">
         The Gospel Faith Mission Int'l
       </h1>
-      <h2 style="margin: 5px 0; color: #595959; font-size: 18px; font-weight: 600;">
+      <h2 style="margin: 8px 0; color: #595959; font-size: 20px; font-weight: 600; font-family: Arial, sans-serif;">
         Region 6, AKowonjo District
       </h2>
-      <h3 style="margin: 10px 0; color: #8c8c8c; font-size: 16px; font-weight: 500;">
+      <h3 style="margin: 12px 0; color: #8c8c8c; font-size: 18px; font-weight: 500; font-family: Arial, sans-serif;">
         Financial Report for ${value?.format("MMMM YYYY") || ""}
       </h3>
+      <div style="margin-top: 15px; color: #666; font-size: 14px;">
+        Generated on ${dayjs().format("DD MMMM YYYY")}
+      </div>
     `;
 
     // Clone the report content
@@ -241,6 +306,15 @@ export default function FinancialReportPage() {
       .slice(0, 3);
   }
 
+  function getBottomPerformers() {
+    const activeAssemblies = comparisons.filter(
+      (c) => c.current.totalIncome > 0
+    );
+    return [...activeAssemblies]
+      .sort((a, b) => a.current.totalIncome - b.current.totalIncome)
+      .slice(0, 3);
+  }
+
   function getInactiveAssemblies() {
     return comparisons.filter((c) => c.current.totalIncome === 0);
   }
@@ -251,7 +325,7 @@ export default function FinancialReportPage() {
         {/* Church Header */}
         <Card className="mb-6 border-0 shadow-lg bg-gradient-to-r from-blue-50 to-blue-100">
           <div className="text-center">
-            <h1 className="!mb-0 text-[#1d39c4] text-2xl md:text-3xl font-bold">
+            <h1 className="!mb-0 text-[#1d39c4] text-2xl md:text-3xl font-bold font-serif">
               The Gospel Faith Mission Int'l
             </h1>
             <h3 className="!mb-0 text-gray-700 text-base md:text-lg mt-2">
@@ -272,7 +346,7 @@ export default function FinancialReportPage() {
                   District Financial Report
                 </Title>
                 <Text type="secondary" className="text-base">
-                  Generate comprehensive AI analysis for the entire district
+                  AI-Powered Financial Analysis & Insights
                 </Text>
               </div>
             </Col>
@@ -322,223 +396,197 @@ export default function FinancialReportPage() {
 
         {/* Main Content */}
         <div ref={reportRef}>
-          {/* Report Header for PDF */}
-          <div className="pdf-only" style={{ display: "none" }}>
-            <div className="church-header-pdf">
-              <h1>The Gospel Faith Mission Int'l</h1>
-              <h2>Region 6, AKowonjo District</h2>
-              <h3>Financial Report for {value?.format("MMMM YYYY") || ""}</h3>
-            </div>
-          </div>
-
-          {/* Executive Summary Card */}
+          {/* Quick Stats Overview */}
           {districtTotals && (
-            <Card className="mb-6 border-0 shadow-lg" id="executive-summary">
+            <Card className="mb-6 border-0 shadow-lg bg-gradient-to-r from-blue-50 to-indigo-50">
               <div className="text-center mb-6">
                 <Title level={3} className="!mb-2 text-gray-800">
-                  Executive Summary
+                  Quick Stats - {value?.format("MMMM YYYY")}
                 </Title>
-                <Text strong className="text-lg text-blue-600">
-                  {value?.format("MMMM YYYY")}
-                </Text>
               </div>
 
-              <Row gutter={[16, 16]} className="mb-6">
+              <Row gutter={[16, 16]} className="mb-4">
                 <Col xs={24} md={8}>
-                  <Card className="border-0 bg-gradient-to-r from-blue-50 to-blue-100">
+                  <Card className="border-0 bg-white shadow-sm">
                     <Statistic
                       title="Total Income"
                       value={districtTotals.totalIncome}
                       prefix="₦"
-                      valueStyle={{ color: "#1890ff", fontWeight: "bold" }}
+                      valueStyle={{
+                        color: "#1890ff",
+                        fontWeight: "bold",
+                        fontSize: "24px",
+                      }}
                       formatter={(value) => value.toLocaleString()}
                     />
                   </Card>
                 </Col>
                 <Col xs={24} md={8}>
-                  <Card className="border-0 bg-gradient-to-r from-green-50 to-green-100">
+                  <Card className="border-0 bg-white shadow-sm">
                     <Statistic
                       title="Total Attendance"
                       value={districtTotals.totalAttendance}
-                      valueStyle={{ color: "#52c41a", fontWeight: "bold" }}
+                      valueStyle={{
+                        color: "#52c41a",
+                        fontWeight: "bold",
+                        fontSize: "24px",
+                      }}
                       formatter={(value) => value.toLocaleString()}
                     />
                   </Card>
                 </Col>
                 <Col xs={24} md={8}>
-                  <Card className="border-0 bg-gradient-to-r from-purple-50 to-purple-100">
+                  <Card className="border-0 bg-white shadow-sm">
                     <Statistic
                       title="Total Tithes"
                       value={districtTotals.totalTithes}
                       prefix="₦"
-                      valueStyle={{ color: "#722ed1", fontWeight: "bold" }}
+                      valueStyle={{
+                        color: "#722ed1",
+                        fontWeight: "bold",
+                        fontSize: "24px",
+                      }}
                       formatter={(value) => value.toLocaleString()}
                     />
                   </Card>
                 </Col>
               </Row>
 
-              {/* Top Performers */}
-              <div className="mb-6">
-                <Title level={4} className="!mb-4">
-                  Top Performing Assemblies
-                </Title>
-                <Row gutter={[16, 16]}>
-                  {getTopPerformers().map((assembly, index) => (
-                    <Col xs={24} md={8} key={assembly.assembly}>
-                      <Card
-                        className="border-0 shadow-md hover:shadow-lg transition-shadow duration-300"
-                        style={{
-                          borderLeft: `4px solid ${
-                            index === 0
-                              ? "#faad14"
-                              : index === 1
-                              ? "#d9d9d9"
-                              : "#ffd666"
-                          }`,
-                        }}
-                      >
-                        <div className="flex justify-between items-start mb-3">
-                          <div>
-                            <div className="flex items-center gap-2 mb-2">
-                              <div
-                                className={`w-6 h-6 flex items-center justify-center rounded-full ${
-                                  index === 0
-                                    ? "bg-yellow-100 text-yellow-600"
-                                    : index === 1
-                                    ? "bg-gray-100 text-gray-600"
-                                    : "bg-orange-100 text-orange-600"
-                                }`}
-                              >
-                                {index + 1}
-                              </div>
-                              <Title level={5} className="!mb-0">
-                                {assembly.assembly}
-                              </Title>
-                            </div>
-                            <Tag color="green" className="mb-2">
-                              +{assembly.change.incomeVsPrev1}% Growth
-                            </Tag>
-                          </div>
-                        </div>
-                        <div className="space-y-2">
-                          <div className="flex justify-between">
-                            <Text type="secondary">Income</Text>
-                            <Text strong className="text-green-700">
-                              ₦{assembly.current.totalIncome.toLocaleString()}
-                            </Text>
-                          </div>
-                          <div className="flex justify-between">
-                            <Text type="secondary">Attendance</Text>
-                            <Text strong>
-                              {assembly.current.totalAttendance.toLocaleString()}
-                            </Text>
-                          </div>
-                          <div className="flex justify-between">
-                            <Text type="secondary">Tithes</Text>
-                            <Text strong>
-                              ₦{assembly.current.totalTithes.toLocaleString()}
-                            </Text>
-                          </div>
-                        </div>
-                      </Card>
-                    </Col>
-                  ))}
-                </Row>
-              </div>
-
-              {/* Inactive Assemblies */}
-              {getInactiveAssemblies().length > 0 && (
-                <div className="mb-6">
-                  <Title level={4} className="!mb-4">
-                    Assemblies Requiring Attention
-                  </Title>
-                  <div className="space-y-3">
-                    {getInactiveAssemblies().map((assembly) => (
-                      <Card
+              <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mt-6">
+                <div>
+                  <Text strong className="block mb-2 text-gray-700">
+                    Top Performing Assemblies
+                  </Text>
+                  <div className="space-y-2">
+                    {getTopPerformers().map((assembly, index) => (
+                      <div
                         key={assembly.assembly}
-                        className="border-0 bg-red-50"
+                        className="flex items-center justify-between bg-white p-3 rounded-lg shadow-sm"
                       >
-                        <div className="flex justify-between items-center">
-                          <div>
-                            <div className="flex items-center gap-2">
-                              <Text strong className="text-red-600">
-                                {assembly.assembly}
-                              </Text>
-                              <Tag color="red">Inactive</Tag>
-                            </div>
-                            <Text type="secondary">
-                              No activity reported for this month
-                            </Text>
+                        <div className="flex items-center gap-2">
+                          <div
+                            className={`w-6 h-6 flex items-center justify-center rounded-full ${
+                              index === 0
+                                ? "bg-yellow-100 text-yellow-600"
+                                : index === 1
+                                ? "bg-gray-100 text-gray-600"
+                                : "bg-orange-100 text-orange-600"
+                            }`}
+                          >
+                            {index + 1}
                           </div>
-                          <div className="text-right">
-                            <Text type="secondary">3 consecutive months</Text>
-                            <div className="text-red-600 font-medium">
-                              Immediate action required
-                            </div>
-                          </div>
+                          <Text strong>{assembly.assembly}</Text>
                         </div>
-                      </Card>
+                        <Text strong className="text-green-700">
+                          ₦{assembly.current.totalIncome.toLocaleString()}
+                        </Text>
+                      </div>
                     ))}
                   </div>
                 </div>
-              )}
 
-              {/* Key Insights */}
-              <div className="mt-8 p-6 bg-gradient-to-r from-gray-50 to-blue-50 rounded-xl">
-                <Title level={4} className="!mb-4">
-                  Key Insights
-                </Title>
-                <Row gutter={[16, 16]}>
-                  <Col xs={24} md={12}>
-                    <Paragraph className="text-gray-700">
-                      <strong>Positive Trend:</strong> District performance
-                      rebounded sharply after two months of inactivity, showing
-                      strong post-lull recovery across most assemblies.
-                    </Paragraph>
-                  </Col>
-                  <Col xs={24} md={12}>
-                    <Paragraph className="text-gray-700">
-                      <strong>Areas for Improvement:</strong> Persistent
-                      non-reporting from some assemblies indicates potential
-                      engagement or operational issues that require targeted
-                      intervention.
-                    </Paragraph>
-                  </Col>
-                </Row>
+                <div>
+                  <Text strong className="block mb-2 text-gray-700">
+                    Inactive Assemblies
+                  </Text>
+                  <div className="space-y-2">
+                    {getInactiveAssemblies().map((assembly) => (
+                      <div
+                        key={assembly.assembly}
+                        className="flex items-center justify-between bg-red-50 p-3 rounded-lg shadow-sm"
+                      >
+                        <div className="flex items-center gap-2">
+                          <div className="w-6 h-6 flex items-center justify-center rounded-full bg-red-100 text-red-600">
+                            ⚠️
+                          </div>
+                          <Text strong className="text-red-600">
+                            {assembly.assembly}
+                          </Text>
+                        </div>
+                        <Tag color="red">No Data</Tag>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+
+                <div>
+                  <Text strong className="block mb-2 text-gray-700">
+                    Active Assemblies
+                  </Text>
+                  <div className="bg-white p-4 rounded-lg shadow-sm text-center">
+                    <Title level={2} className="!mb-2 text-blue-600">
+                      {
+                        comparisons.filter((c) => c.current.totalIncome > 0)
+                          .length
+                      }
+                    </Title>
+                    <Text type="secondary">
+                      out of {comparisons.length} total
+                    </Text>
+                    <div className="mt-2">
+                      <Progress
+                        percent={Math.round(
+                          (comparisons.filter((c) => c.current.totalIncome > 0)
+                            .length /
+                            comparisons.length) *
+                            100
+                        )}
+                        strokeColor="#52c41a"
+                        size="small"
+                      />
+                    </div>
+                  </div>
+                </div>
               </div>
             </Card>
           )}
 
-          {/* Detailed Comparisons */}
-          {comparisons.length > 0 && (
-            <Card className="mb-6 border-0 shadow-lg" id="detailed-comparisons">
+          {/* AI Analysis Report */}
+          {reportMd && (
+            <Card className="mb-6 border-0 shadow-lg" id="ai-analysis">
               <div className="flex justify-between items-center mb-6">
                 <div>
-                  <Title level={3} className="!mb-2">
-                    Assembly Performance Details
+                  <Title level={3} className="!mb-2 text-gray-800">
+                    AI Analysis Report
                   </Title>
                   <Text type="secondary">
-                    Detailed comparison of all assemblies with percentage
-                    changes
+                    Comprehensive AI-generated insights and recommendations
+                  </Text>
+                </div>
+                <div className="flex items-center gap-2">
+                  <Tag color="blue">AI Generated</Tag>
+                  <Tag color="green">
+                    {comparisons.length} Assemblies Analyzed
+                  </Tag>
+                </div>
+              </div>
+
+              <div className="bg-white rounded-lg p-6 border border-gray-200">
+                <ReactMarkdown components={markdownComponents}>
+                  {reportMd}
+                </ReactMarkdown>
+              </div>
+            </Card>
+          )}
+
+          {/* Assembly Performance Details */}
+          {comparisons.length > 0 && (
+            <Card className="mb-6 border-0 shadow-lg" id="assembly-performance">
+              <div className="flex justify-between items-center mb-6">
+                <div>
+                  <Title level={3} className="!mb-2 text-gray-800">
+                    Assembly Performance Dashboard
+                  </Title>
+                  <Text type="secondary">
+                    Detailed metrics and comparisons for all assemblies
                   </Text>
                 </div>
                 <div className="text-right">
-                  <Text strong>Active Assemblies: </Text>
-                  <Tag color="blue">
-                    {
-                      comparisons.filter((c) => c.current.totalIncome > 0)
-                        .length
-                    }
-                  </Tag>
-                  <Text strong className="ml-4">
-                    Inactive:{" "}
+                  <Text strong className="mr-4">
+                    Total Income:{" "}
                   </Text>
-                  <Tag color="red">
-                    {
-                      comparisons.filter((c) => c.current.totalIncome === 0)
-                        .length
-                    }
+                  <Tag color="blue" className="text-lg">
+                    ₦{districtTotals?.totalIncome?.toLocaleString() || "0"}
                   </Tag>
                 </div>
               </div>
@@ -555,97 +603,185 @@ export default function FinancialReportPage() {
                   rowClassName={(record) =>
                     record.current.totalIncome === 0 ? "bg-red-50" : ""
                   }
+                  onRow={(record) => ({
+                    onClick: () => {
+                      // You could add click functionality here
+                    },
+                  })}
                 />
               </div>
             </Card>
           )}
 
-          {/* Raw Data Summary */}
+          {/* Detailed Breakdown */}
           {rawAggregated.length > 0 && (
-            <Card className="border-0 shadow-lg" id="raw-data">
-              <Title level={3} className="!mb-4">
-                Detailed Breakdown by Assembly
+            <Card className="mb-6 border-0 shadow-lg" id="detailed-breakdown">
+              <Title level={3} className="!mb-6 text-gray-800">
+                Detailed Assembly Breakdown
               </Title>
-              <div className="space-y-6">
+
+              <Collapse
+                ghost
+                expandIconPosition="right"
+                className="assembly-breakdown-collapse"
+              >
                 {rawAggregated.map((assembly) => {
                   const offerings = assembly.offeringsBreakdown || {};
                   const hasOfferings = Object.keys(offerings).length > 0;
+                  const isInactive = assembly.totalIncome === 0;
 
                   return (
-                    <Card
+                    <Panel
                       key={assembly.assembly}
-                      className={`border-l-4 ${
-                        assembly.totalIncome === 0
-                          ? "border-red-300"
-                          : "border-green-300"
-                      }`}
-                    >
-                      <div className="flex justify-between items-start mb-4">
-                        <div>
-                          <Title level={5} className="!mb-1">
-                            {assembly.assembly}
-                          </Title>
-                          <div className="flex gap-3 flex-wrap">
-                            <Tag
-                              color={assembly.totalIncome > 0 ? "green" : "red"}
-                            >
-                              Income: ₦{assembly.totalIncome.toLocaleString()}
-                            </Tag>
-                            <Tag
-                              color={
-                                assembly.totalAttendance > 0
-                                  ? "blue"
-                                  : "default"
-                              }
-                            >
-                              Attendance: {assembly.totalAttendance}
-                            </Tag>
-                            <Tag color="purple">
-                              Tithes: ₦{assembly.totalTithes.toLocaleString()}
-                            </Tag>
+                      header={
+                        <div className="flex justify-between items-center w-full">
+                          <div className="flex items-center gap-3">
+                            <div
+                              className={`w-3 h-3 rounded-full ${
+                                isInactive ? "bg-red-500" : "bg-green-500"
+                              }`}
+                            />
+                            <Title level={5} className="!mb-0">
+                              {assembly.assembly}
+                            </Title>
+                            {isInactive && <Tag color="red">Inactive</Tag>}
+                          </div>
+                          <div className="flex gap-4">
+                            <div className="text-right">
+                              <Text strong className="block">
+                                Income
+                              </Text>
+                              <Text
+                                className={
+                                  isInactive ? "text-red-500" : "text-green-700"
+                                }
+                              >
+                                ₦{assembly.totalIncome.toLocaleString()}
+                              </Text>
+                            </div>
+                            <div className="text-right">
+                              <Text strong className="block">
+                                Attendance
+                              </Text>
+                              <Text>{assembly.totalAttendance}</Text>
+                            </div>
                           </div>
                         </div>
-                        <div className="text-right">
-                          <Text type="secondary">
-                            {assembly.totalRecords} record(s)
-                          </Text>
-                        </div>
-                      </div>
+                      }
+                    >
+                      <div className="p-4 bg-gray-50 rounded-lg">
+                        <Row gutter={[16, 16]}>
+                          <Col xs={24} md={8}>
+                            <Card size="small" className="text-center">
+                              <Text type="secondary" className="block">
+                                Total Records
+                              </Text>
+                              <Title level={4} className="!my-2">
+                                {assembly.totalRecords}
+                              </Title>
+                            </Card>
+                          </Col>
+                          <Col xs={24} md={8}>
+                            <Card size="small" className="text-center">
+                              <Text type="secondary" className="block">
+                                Total Tithes
+                              </Text>
+                              <Title level={4} className="!my-2">
+                                ₦{assembly.totalTithes.toLocaleString()}
+                              </Title>
+                            </Card>
+                          </Col>
+                          <Col xs={24} md={8}>
+                            <Card size="small" className="text-center">
+                              <Text type="secondary" className="block">
+                                Average Per Record
+                              </Text>
+                              <Title level={4} className="!my-2">
+                                ₦
+                                {assembly.totalRecords > 0
+                                  ? Math.round(
+                                      assembly.totalIncome /
+                                        assembly.totalRecords
+                                    ).toLocaleString()
+                                  : "0"}
+                              </Title>
+                            </Card>
+                          </Col>
+                        </Row>
 
-                      {hasOfferings && (
-                        <div>
-                          <Text strong className="block mb-2">
-                            Offerings Breakdown:
-                          </Text>
-                          <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
-                            {Object.entries(offerings).map(
-                              ([key, value]: [string, unknown]) => {
-                                const numValue = Number(value);
-                                return (
-                                  numValue > 0 && (
+                        {hasOfferings && (
+                          <>
+                            <Text strong className="block mt-6 mb-3">
+                              Offerings Breakdown
+                            </Text>
+                            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-3">
+                              {Object.entries(offerings).map(
+                                ([key, value]: [string, unknown]) => {
+                                  const numValue = Number(value);
+                                  if (numValue === 0) return null;
+
+                                  const categoryNames: Record<string, string> =
+                                    {
+                                      tithes: "Tithes",
+                                      offerings: "Regular Offerings",
+                                      specialOfferings: "Special Offerings",
+                                      pastorsWarfare: "Pastors Welfare",
+                                      thanksgiving: "Thanksgiving",
+                                      etf: "ETF",
+                                      districtSupport: "District Support",
+                                    };
+
+                                  return (
                                     <Card
                                       key={key}
                                       size="small"
-                                      className="text-center"
+                                      className="text-center hover:shadow-md transition-shadow"
                                     >
-                                      <div className="text-xs text-gray-500 capitalize">
-                                        {key.replace(/([A-Z])/g, " $1").trim()}
+                                      <div className="text-xs text-gray-500 font-medium">
+                                        {categoryNames[key] ||
+                                          key.replace(/([A-Z])/g, " $1").trim()}
                                       </div>
-                                      <div className="font-bold">
+                                      <div className="font-bold text-lg mt-1">
                                         ₦{numValue.toLocaleString()}
                                       </div>
+                                      <div className="text-xs text-gray-400 mt-1">
+                                        {(
+                                          (numValue / assembly.totalIncome) *
+                                          100
+                                        ).toFixed(1)}
+                                        % of total
+                                      </div>
                                     </Card>
-                                  )
-                                );
-                              }
-                            )}
+                                  );
+                                }
+                              )}
+                            </div>
+                          </>
+                        )}
+
+                        {!hasOfferings && !isInactive && (
+                          <div className="text-center py-4 text-gray-500">
+                            No detailed offerings breakdown available
                           </div>
-                        </div>
-                      )}
-                    </Card>
+                        )}
+
+                        {isInactive && (
+                          <div className="text-center py-6 bg-red-50 rounded-lg mt-4">
+                            <div className="text-red-600 font-medium mb-2">
+                              ⚠️ No Activity Reported
+                            </div>
+                            <Text type="secondary" className="text-sm">
+                              This assembly has reported no income, attendance,
+                              or tithes for this period. Requires pastoral
+                              follow-up.
+                            </Text>
+                          </div>
+                        )}
+                      </div>
+                    </Panel>
                   );
                 })}
-              </div>
+              </Collapse>
             </Card>
           )}
         </div>
@@ -656,10 +792,10 @@ export default function FinancialReportPage() {
             <Card className="text-center p-8">
               <Spin size="large" />
               <Title level={4} className="!mt-4 !mb-2">
-                Generating Report
+                Generating AI Report
               </Title>
               <Text type="secondary">
-                Analyzing data and creating insights...
+                Analyzing data with AI and creating comprehensive insights...
               </Text>
             </Card>
           </div>
@@ -670,11 +806,11 @@ export default function FinancialReportPage() {
           <Card className="text-center py-16 border-0 shadow-lg">
             <div className="text-5xl mb-6">📊</div>
             <Title level={3} className="!mb-4">
-              No Report Generated Yet
+              Ready to Generate Report
             </Title>
             <Paragraph type="secondary" className="text-lg mb-8">
               Select a month and click "Generate Report" to create a
-              comprehensive financial analysis for your district.
+              comprehensive AI-powered financial analysis for your district.
             </Paragraph>
             <div className="flex justify-center gap-4 flex-wrap">
               <DatePicker
@@ -685,7 +821,7 @@ export default function FinancialReportPage() {
                 allowClear={false}
               />
               <Button type="primary" size="large" onClick={generate}>
-                Generate Your First Report
+                Generate AI Report
               </Button>
             </div>
           </Card>
