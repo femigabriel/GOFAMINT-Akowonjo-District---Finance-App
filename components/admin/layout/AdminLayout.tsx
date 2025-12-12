@@ -120,7 +120,7 @@ export default function AdminLayout({ children }: AdminLayoutProps) {
     // Simulate initial page load
     const timer = setTimeout(() => {
       setIsLoading(false);
-    }, 800); // Reduced from 1000ms to 800ms for better UX
+    }, 800); 
 
     return () => clearTimeout(timer);
   }, []);
@@ -168,11 +168,11 @@ export default function AdminLayout({ children }: AdminLayoutProps) {
       icon: <Church size={20} />,
       label: "Assemblies",
     },
-    {
-      key: "/admin/members",
-      icon: <Users size={20} />,
-      label: "Members",
-    },
+    // {
+    //   key: "/admin/members",
+    //   icon: <Users size={20} />,
+    //   label: "Members",
+    // },
     {
       key: "/admin/reports",
       icon: <DollarSign size={20} />,
