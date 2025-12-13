@@ -4,7 +4,7 @@ export const assemblies = [
   "Overcomers", 
   "Beulah",
   "Jubilee",
-  "Success",  // Capital S
+  "Success",  
   "Restoration",
   "Liberty",
   "RayPower",

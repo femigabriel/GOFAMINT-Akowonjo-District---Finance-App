@@ -22,6 +22,7 @@ import {
   Avatar,
   Badge,
   Alert,
+  Divider,
 } from "antd";
 import type { ColumnsType } from "antd/es/table";
 import dayjs from "dayjs";
@@ -46,29 +47,42 @@ import {
   ArrowUpOutlined,
   ArrowDownOutlined,
   MinusOutlined,
+  EyeOutlined,
+  InfoCircleOutlined,
+  BarChartOutlined as BarChart,
 } from "@ant-design/icons";
 
 const { Title, Text, Paragraph } = Typography;
 const { Panel } = Collapse;
 
+// Updated type to include new attendance metrics
 type ComparisonRow = {
   assembly: string;
   current: {
     totalIncome: number;
     totalAttendance: number;
+    totalAttendanceRaw: number;
+    totalAttendanceDB: number;
+    estimatedTotalOverlap: number;
+    attendanceCorrectionPct: number;
+    attendanceType: string;
     totalTithes: number;
+    totalRecords: number;
+    incomePerAttendee: number;
+    tithesPerAttendee: number;
+    serviceBreakdown: any;
   };
   prev1: {
     month?: string | null;
     totalIncome: number;
-    totalAttendance: number;
     totalTithes: number;
+    totalAttendance: number;
   };
   prev2: {
     month?: string | null;
     totalIncome: number;
-    totalAttendance: number;
     totalTithes: number;
+    totalAttendance: number;
   };
   change: {
     incomeVsPrev1: number;
@@ -96,26 +110,26 @@ export default function FinancialReportPage() {
     }
   }, []);
 
-  // Calculate per attendee metrics
+  // Calculate per attendee metrics - use corrected attendance
   const perAttendeeMetrics = districtTotals
     ? {
         incomePerAttendee: Math.round(
-          districtTotals.totalIncome / districtTotals.totalAttendance
+          districtTotals.totalIncome / (districtTotals.totalAttendance || 1)
         ),
         tithesPerAttendee: Math.round(
-          districtTotals.totalTithes / districtTotals.totalAttendance
+          districtTotals.totalTithes / (districtTotals.totalAttendance || 1)
         ),
       }
     : null;
 
-  // Enhanced columns with better formatting
+  // Main table columns - updated with attendance metrics
   const columns: ColumnsType<any> = [
     {
       title: "Assembly",
       dataIndex: "assembly",
       key: "assembly",
       fixed: "left",
-      width: 120,
+      width: 130,
       render: (text, record) => (
         <div className="flex flex-col">
           <div className="font-semibold">{text}</div>
@@ -148,7 +162,7 @@ export default function FinancialReportPage() {
       title: "Income (₦)",
       dataIndex: ["current", "totalIncome"],
       key: "income",
-      width: 130,
+      width: 140,
       render: (v: number, record) => (
         <div className="flex flex-col">
           <div
@@ -169,13 +183,73 @@ export default function FinancialReportPage() {
     },
     {
       title: "Attendance",
-      dataIndex: ["current", "totalAttendance"],
       key: "attendance",
-      width: 100,
-      render: (v: number) => (
-        <div className="flex items-center gap-1">
-          <TeamOutlined className="text-blue-500" />
-          <span className="font-medium">{v.toLocaleString()}</span>
+      width: 180,
+      render: (_, record) => {
+        const corrected = record.current.totalAttendance || 0;
+        const raw = record.current.totalAttendanceRaw || 0;
+        const db = record.current.totalAttendanceDB || 0;
+        const correctionPct = record.current.attendanceCorrectionPct || 0;
+        const isCorrected =
+          record.current.attendanceType === "estimated" ||
+          record.current.attendanceType === "actual";
+
+        return (
+          <div className="flex flex-col space-y-1">
+            <div className="flex items-center gap-1">
+              <TeamOutlined className="text-blue-500" />
+              <Tooltip
+                title={`Corrected/Unique: ${corrected} (not double-counted)`}
+              >
+                <span className="font-medium text-blue-700">
+                  {corrected.toLocaleString()}
+                </span>
+              </Tooltip>
+            </div>
+            <div className="text-xs space-y-0.5">
+              <div className="text-gray-500">
+                <EyeOutlined className="mr-1" />
+                Raw: {raw.toLocaleString()}
+              </div>
+              {correctionPct > 0 && (
+                <div className="text-red-500">
+                  <InfoCircleOutlined className="mr-1" />-{correctionPct}%
+                  overlap
+                </div>
+              )}
+            </div>
+          </div>
+        );
+      },
+      sorter: (a, b) => a.current.totalAttendance - b.current.totalAttendance,
+    },
+    {
+      title: (
+        <Tooltip title="Corrected attendance (avoiding double-counting)">
+          <span>
+            Unique Attendees <InfoCircleOutlined className="ml-1" />
+          </span>
+        </Tooltip>
+      ),
+      dataIndex: ["current", "totalAttendance"],
+      key: "uniqueAttendance",
+      width: 120,
+      render: (v: number, record) => (
+        <div className="flex items-center">
+          <div
+            className={`font-semibold ${
+              v === 0 ? "text-gray-400" : "text-blue-700"
+            }`}
+          >
+            {v.toLocaleString()}
+          </div>
+          {record.current.attendanceType === "estimated" && v > 0 && (
+            <Tooltip title="Estimated (not actual count)">
+              <Tag color="orange" className="ml-1">
+                est.
+              </Tag>
+            </Tooltip>
+          )}
         </div>
       ),
       sorter: (a, b) => a.current.totalAttendance - b.current.totalAttendance,
@@ -193,39 +267,19 @@ export default function FinancialReportPage() {
     {
       title: "Income/Attendee",
       key: "incomePerAttendee",
-      width: 130,
+      width: 140,
       render: (_, record) => {
-        if (
-          record.current.totalIncome === 0 ||
-          record.current.totalAttendance === 0
-        )
-          return "-";
-        const perPerson = Math.round(
-          record.current.totalIncome / record.current.totalAttendance
-        );
+        const income = record.current.totalIncome || 0;
+        const attendance = record.current.totalAttendance || 0;
+        if (income === 0 || attendance === 0)
+          return <span className="text-gray-400">-</span>;
+        const perPerson = Math.round(income / attendance);
         return (
-          <div className="font-medium text-gray-700">
-            ₦{perPerson.toLocaleString()}
-          </div>
-        );
-      },
-    },
-    {
-      title: "Tithes/Attendee",
-      key: "tithesPerAttendee",
-      width: 130,
-      render: (_, record) => {
-        if (
-          record.current.totalTithes === 0 ||
-          record.current.totalAttendance === 0
-        )
-          return "-";
-        const perPerson = Math.round(
-          record.current.totalTithes / record.current.totalAttendance
-        );
-        return (
-          <div className="font-medium text-gray-700">
-            ₦{perPerson.toLocaleString()}
+          <div className="flex flex-col">
+            <div className="font-medium text-gray-700">
+              ₦{perPerson.toLocaleString()}
+            </div>
+            <div className="text-xs text-gray-500">Corrected</div>
           </div>
         );
       },
@@ -265,6 +319,127 @@ export default function FinancialReportPage() {
         );
       },
       sorter: (a, b) => a.change.incomeVsPrev1 - b.change.incomeVsPrev1,
+    },
+  ];
+
+  // Attendance breakdown columns
+  const attendanceColumns: ColumnsType<any> = [
+    {
+      title: "Assembly",
+      dataIndex: "assembly",
+      key: "assembly",
+      fixed: "left",
+      width: 120,
+      render: (text) => <div className="font-semibold">{text}</div>,
+    },
+    {
+      title: (
+        <Tooltip title="Corrected unique attendance (no double-counting)">
+          <span>
+            Unique <InfoCircleOutlined />
+          </span>
+        </Tooltip>
+      ),
+      dataIndex: "totalAttendance",
+      key: "unique",
+      width: 100,
+      render: (v: number, record) => (
+        <div className="flex items-center">
+          <div
+            className={`font-semibold ${
+              v === 0 ? "text-gray-400" : "text-green-600"
+            }`}
+          >
+            {v.toLocaleString()}
+          </div>
+          {record.attendanceType === "estimated" && v > 0 && (
+            <Tag color="orange" className="ml-1">
+              est.
+            </Tag>
+          )}
+        </div>
+      ),
+    },
+    {
+      title: (
+        <Tooltip title="Raw sum (attendance + sbsAttendance)">
+          <span>
+            Raw <InfoCircleOutlined />
+          </span>
+        </Tooltip>
+      ),
+      dataIndex: "totalAttendanceRaw",
+      key: "raw",
+      width: 100,
+      render: (v: number) => (
+        <div
+          className={`font-medium ${
+            v === 0 ? "text-gray-400" : "text-blue-600"
+          }`}
+        >
+          {v.toLocaleString()}
+        </div>
+      ),
+    },
+    {
+      title: "DB Value",
+      dataIndex: "totalAttendanceDB",
+      key: "db",
+      width: 100,
+      render: (v: number) => (
+        <div
+          className={`font-medium ${
+            v === 0 ? "text-gray-400" : "text-purple-600"
+          }`}
+        >
+          {v.toLocaleString()}
+        </div>
+      ),
+    },
+    {
+      title: (
+        <Tooltip title="Estimated people attending both SBS and service">
+          <span>
+            Overlap <InfoCircleOutlined />
+          </span>
+        </Tooltip>
+      ),
+      dataIndex: "estimatedTotalOverlap",
+      key: "overlap",
+      width: 100,
+      render: (v: number) => (
+        <div
+          className={`font-medium ${
+            v === 0 ? "text-gray-400" : "text-red-500"
+          }`}
+        >
+          {v.toLocaleString()}
+        </div>
+      ),
+    },
+    {
+      title: "% Correction",
+      dataIndex: "attendanceCorrectionPct",
+      key: "correction",
+      width: 100,
+      render: (v: number) => (
+        <div className="flex items-center">
+          <Tag color={v > 0 ? "red" : "green"} className="font-medium">
+            {v > 0 ? `-${v}%` : "0%"}
+          </Tag>
+        </div>
+      ),
+    },
+    {
+      title: "Type",
+      dataIndex: "attendanceType",
+      key: "type",
+      width: 100,
+      render: (v: string) => (
+        <Tag color={v === "actual" ? "green" : "orange"} className="capitalize">
+          {v || "estimated"}
+        </Tag>
+      ),
     },
   ];
 
@@ -308,57 +483,57 @@ export default function FinancialReportPage() {
   }
 
   async function downloadPdf() {
-  if (!reportRef.current || typeof window === "undefined") {
-    message.error("Nothing to download");
-    return;
+    if (!reportRef.current || typeof window === "undefined") {
+      message.error("Nothing to download");
+      return;
+    }
+
+    try {
+      const html2pdf = (await import("html2pdf.js")).default;
+
+      const churchHeader = document.createElement("div");
+      churchHeader.className = "church-header";
+      churchHeader.style.cssText = `
+        text-align: center;
+        margin-bottom: 30px;
+        padding-bottom: 15px;
+        border-bottom: 3px solid #1d39c4;
+      `;
+
+      churchHeader.innerHTML = `
+        <h1 style="margin: 0; color: #1d39c4; font-size: 28px; font-weight: bold; font-family: 'Times New Roman', serif;">
+          The Gospel Faith Mission Int'l
+        </h1>
+        <h2 style="margin: 8px 0; color: #595959; font-size: 20px; font-weight: 600; font-family: Arial, sans-serif;">
+          Region 26, AKowonjo District
+        </h2>
+        <h3 style="margin: 12px 0; color: #8c8c8c; font-size: 18px; font-weight: 500; font-family: Arial, sans-serif;">
+          Financial Report for ${value?.format("MMMM YYYY") || ""}
+        </h3>
+        <div style="margin-top: 15px; color: #666; font-size: 14px;">
+          Generated on ${dayjs().format("DD MMMM YYYY")}
+        </div>
+      `;
+
+      const content = reportRef.current.cloneNode(true) as HTMLElement;
+      content.insertBefore(churchHeader, content.firstChild);
+
+      const opt = {
+        margin: 0.5,
+        filename: `Financial-Report-${
+          value?.format("MMMM-YYYY") || "report"
+        }.pdf`,
+        image: { type: "jpeg" as const, quality: 0.98 },
+        html2canvas: { scale: 2 },
+        jsPDF: { unit: "in", format: "a4", orientation: "portrait" as const },
+      };
+
+      html2pdf().set(opt).from(content).save();
+    } catch (error) {
+      console.error("Failed to generate PDF:", error);
+      message.error("Failed to generate PDF. Please try again.");
+    }
   }
-
-  try {
-    // Dynamically import html2pdf only in the browser
-    const html2pdf = (await import("html2pdf.js")).default;
-    
-    const churchHeader = document.createElement("div");
-    churchHeader.className = "church-header";
-    churchHeader.style.cssText = `
-      text-align: center;
-      margin-bottom: 30px;
-      padding-bottom: 15px;
-      border-bottom: 3px solid #1d39c4;
-    `;
-
-    churchHeader.innerHTML = `
-      <h1 style="margin: 0; color: #1d39c4; font-size: 28px; font-weight: bold; font-family: 'Times New Roman', serif;">
-        The Gospel Faith Mission Int'l
-      </h1>
-      <h2 style="margin: 8px 0; color: #595959; font-size: 20px; font-weight: 600; font-family: Arial, sans-serif;">
-        Region 26, AKowonjo District
-      </h2>
-      <h3 style="margin: 12px 0; color: #8c8c8c; font-size: 18px; font-weight: 500; font-family: Arial, sans-serif;">
-        Financial Report for ${value?.format("MMMM YYYY") || ""}
-      </h3>
-      <div style="margin-top: 15px; color: #666; font-size: 14px;">
-        Generated on ${dayjs().format("DD MMMM YYYY")}
-      </div>
-    `;
-
-    const content = reportRef.current.cloneNode(true) as HTMLElement;
-    content.insertBefore(churchHeader, content.firstChild);
-
-    const opt = {
-      margin: 0.5,
-      filename: `Financial-Report-${value?.format("MMMM-YYYY") || "report"}.pdf`,
-      image: { type: "jpeg" as const, quality: 0.98 },
-      html2canvas: { scale: 2 },
-      jsPDF: { unit: "in", format: "a4", orientation: "portrait" as const },
-    };
-
-    html2pdf().set(opt).from(content).save();
-    
-  } catch (error) {
-    console.error("Failed to generate PDF:", error);
-    message.error("Failed to generate PDF. Please try again.");
-  }
-}
 
   function getTopPerformers() {
     return [...comparisons]
@@ -502,12 +677,10 @@ export default function FinancialReportPage() {
     (a) => Object.keys(a.offeringsBreakdown || {}).length > 0
   );
 
-  // Calculate percentages for offering breakdown
-  function getOfferingPercentage(assembly: any, category: string) {
-    const value = assembly.offeringsBreakdown?.[category] || 0;
-    const total = assembly.totalIncome || 1;
-    return Math.round((value / total) * 100);
-  }
+  // Get assemblies with attendance data
+  const assembliesWithAttendance = rawAggregated.filter(
+    (a) => a.totalAttendance > 0
+  );
 
   // Render the enhanced report sections
   const renderEnhancedSections = () => {
@@ -525,27 +698,46 @@ export default function FinancialReportPage() {
               <h3 className="!mb-3 text-xl font-bold text-gray-800">
                 Executive Summary - {value?.format("MMMM YYYY")}
               </h3>
-              <Paragraph className="text-gray-700 text-sm leading-relaxed mb-6">
+              <Paragraph className="text-gray-700 text-sm leading-relaxed mb-4">
                 In {value?.format("MMMM YYYY")}, the district's combined
-                financial performance reflected a significant increase compared
-                to previous months. While the majority of income came from a few
-                high-performing assemblies, several assemblies continued to
-                report zero activity, highlighting the need for administrative
-                follow-up.
+                financial performance shows{" "}
+                {districtTotals.totalIncome ? "strong" : "moderate"} results.
+                Using <strong>corrected attendance figures</strong> (avoiding
+                double-counting), we have a more accurate picture of ministry
+                reach.
               </Paragraph>
 
               <Alert
-                message="Key Insight"
-                description="Overall district-wide engagement and giving patterns show a promising recovery after previous inactive periods."
+                message="Attendance Correction Applied"
+                description={
+                  <div>
+                    <p>
+                      Old method: {districtTotals.totalAttendanceRaw}{" "}
+                      (double-counted)
+                    </p>
+                    <p>
+                      New method: {districtTotals.totalAttendance} (corrected
+                      unique)
+                    </p>
+                    <p>
+                      Correction:{" "}
+                      <strong>
+                        -{districtTotals.attendanceCorrectionPct || 0}%
+                      </strong>{" "}
+                      ({districtTotals.attendanceCorrection || 0} fewer
+                      duplicates)
+                    </p>
+                  </div>
+                }
                 type="info"
                 showIcon
-                className="mb-6"
+                className="mb-4"
               />
             </div>
           </div>
         </Card>
 
-        {/* 2. District Totals Overview */}
+        {/* 2. District Totals Overview with Attendance Correction */}
         <Card className="mb-6 border-0 shadow-lg bg-gradient-to-r from-blue-50 to-indigo-50">
           <div className="flex items-start gap-3 mb-6">
             <div className="p-3 bg-indigo-100 rounded-xl">
@@ -556,7 +748,7 @@ export default function FinancialReportPage() {
                 District Totals Overview
               </Title>
               <Text type="secondary" className="text-base">
-                Comprehensive financial and attendance metrics
+                Using corrected attendance to avoid double-counting
               </Text>
             </div>
           </div>
@@ -579,16 +771,21 @@ export default function FinancialReportPage() {
             </Col>
             <Col xs={24} md={6}>
               <Card className="border-0 bg-white shadow-md hover:shadow-lg transition-shadow">
-                <Statistic
-                  title="Total Attendance"
-                  value={districtTotals.totalAttendance}
-                  valueStyle={{
-                    color: "#52c41a",
-                    fontWeight: "bold",
-                    fontSize: "24px",
-                  }}
-                  formatter={(value) => value.toLocaleString()}
-                />
+                <div className="mb-2">
+                  <Tooltip title="Corrected unique attendance (not double-counted)">
+                    <Text strong className="text-gray-700">
+                      Attendance (Corrected)
+                    </Text>
+                  </Tooltip>
+                </div>
+                <div className="text-2xl font-bold text-green-600">
+                  {districtTotals.totalAttendance?.toLocaleString() || "0"}
+                </div>
+                <div className="text-xs text-gray-500 mt-1">
+                  Raw:{" "}
+                  {districtTotals.totalAttendanceRaw?.toLocaleString() || "0"}{" "}
+                  (-{districtTotals.attendanceCorrectionPct || 0}%)
+                </div>
               </Card>
             </Col>
             <Col xs={24} md={6}>
@@ -617,15 +814,31 @@ export default function FinancialReportPage() {
                       <Text>Income/Attendee:</Text>
                       <Text strong className="text-blue-600">
                         ₦
-                        {perAttendeeMetrics?.incomePerAttendee.toLocaleString()}
+                        {perAttendeeMetrics?.incomePerAttendee.toLocaleString() ||
+                          "0"}
                       </Text>
                     </div>
                     <div className="flex justify-between items-center">
                       <Text>Tithes/Attendee:</Text>
                       <Text strong className="text-purple-600">
                         ₦
-                        {perAttendeeMetrics?.tithesPerAttendee.toLocaleString()}
+                        {perAttendeeMetrics?.tithesPerAttendee.toLocaleString() ||
+                          "0"}
                       </Text>
+                    </div>
+                    <div className="flex justify-between items-center">
+                      <Text>Data Type:</Text>
+                      <Tag
+                        color={
+                          districtTotals.assembliesWithActualData > 0
+                            ? "green"
+                            : "orange"
+                        }
+                      >
+                        {districtTotals.assembliesWithActualData > 0
+                          ? "Actual"
+                          : "Estimated"}
+                      </Tag>
                     </div>
                   </div>
                 </div>
@@ -633,45 +846,149 @@ export default function FinancialReportPage() {
             </Col>
           </Row>
 
-          <div className="bg-white p-6 rounded-lg border border-gray-200">
-            <Title level={4} className="!mb-4">
-              Interpretation
+          {/* Attendance Correction Summary */}
+          <div className="bg-white p-6 rounded-lg border border-gray-200 mb-6">
+            <Title level={4} className="!mb-4 flex items-center gap-2">
+              <InfoCircleOutlined /> Attendance Correction Summary
             </Title>
-            <Paragraph className="text-gray-700">
-              Most income is concentrated among a few assemblies. Average
-              per-attendee income is strong, but missing data from inactive
-              assemblies affects a complete picture. The district shows positive
-              momentum after previous inactive periods.
-            </Paragraph>
-
-            <div className="mt-4 grid grid-cols-1 md:grid-cols-3 gap-4">
-              <div className="text-center p-4 bg-green-50 rounded-lg">
-                <div className="text-2xl font-bold text-green-700 mb-2">
-                  {comparisons.filter((c) => c.current.totalIncome > 0).length}
+            <Row gutter={[16, 16]}>
+              <Col span={12}>
+                <div className="p-4 bg-blue-50 rounded-lg">
+                  <div className="text-2xl font-bold text-blue-700 mb-2">
+                    {districtTotals.estimatedTotalOverlap?.toLocaleString() ||
+                      "0"}
+                  </div>
+                  <div className="text-gray-600">
+                    Estimated People Attending Both
+                  </div>
+                  <div className="text-sm text-gray-500 mt-1">
+                    (SBS + Main Service)
+                  </div>
                 </div>
-                <div className="text-gray-600">Active Assemblies</div>
-              </div>
-              <div className="text-center p-4 bg-yellow-50 rounded-lg">
-                <div className="text-2xl font-bold text-yellow-700 mb-2">
-                  {
-                    getTopPerformers().filter(
-                      (a) => a.change.incomeVsPrev1 === 100
-                    ).length
-                  }
+              </Col>
+              <Col span={12}>
+                <div className="p-4 bg-green-50 rounded-lg">
+                  <div className="text-2xl font-bold text-green-700 mb-2">
+                    {districtTotals.totalAttendance?.toLocaleString() || "0"}
+                  </div>
+                  <div className="text-gray-600">Actual Unique People</div>
+                  <div className="text-sm text-gray-500 mt-1">
+                    (Corrected count)
+                  </div>
                 </div>
-                <div className="text-gray-600">New Activity Assemblies</div>
-              </div>
-              <div className="text-center p-4 bg-red-50 rounded-lg">
-                <div className="text-2xl font-bold text-red-700 mb-2">
-                  {getInactiveAssemblies().length}
-                </div>
-                <div className="text-gray-600">Inactive Assemblies</div>
-              </div>
-            </div>
+              </Col>
+            </Row>
+            <Divider />
+            <Alert
+              message="Why this matters"
+              description="The same people often attend both Sunday School (SBS) and the main service. Previously, these individuals were counted twice. Now we use 'uniqueAttendance' which estimates actual unique attendees, giving a more accurate picture of ministry reach."
+              type="info"
+              showIcon
+            />
           </div>
         </Card>
 
-        {/* 3. Assembly Performance Table */}
+        {/* 3. Attendance Breakdown Table */}
+        <Card className="mb-6 border-0 shadow-lg" id="attendance-breakdown">
+          <div className="flex items-start gap-3 mb-6">
+            <div className="p-3 bg-green-100 rounded-xl">
+              <TeamOutlined className="text-green-600 text-2xl" />
+            </div>
+            <div>
+              <Title level={2} className="!mb-3 text-gray-800">
+                Attendance Breakdown
+              </Title>
+              <Text type="secondary" className="text-base">
+                Showing corrected vs raw attendance figures
+              </Text>
+            </div>
+          </div>
+
+          <Alert
+            message="Attendance Data Types"
+            description={
+              <div className="space-y-2">
+                <div>
+                  <Tag color="green">Actual</Tag> - Direct count of unique
+                  attendees (when "attendedBoth" is collected)
+                </div>
+                <div>
+                  <Tag color="orange">Estimated</Tag> - Calculated estimate (75%
+                  overlap between SBS and service)
+                </div>
+                <div>
+                  <strong>Correction %</strong> shows how much attendance was
+                  reduced to avoid double-counting
+                </div>
+              </div>
+            }
+            type="info"
+            showIcon
+            className="mb-6"
+          />
+
+          <div className="overflow-x-auto">
+            <Table
+              columns={attendanceColumns}
+              dataSource={assembliesWithAttendance}
+              rowKey="assembly"
+              pagination={false}
+              bordered
+              size="middle"
+              scroll={{ x: 800 }}
+              summary={() => (
+                <Table.Summary.Row className="bg-gray-50">
+                  <Table.Summary.Cell index={0}>
+                    <Text strong>District Totals</Text>
+                  </Table.Summary.Cell>
+                  <Table.Summary.Cell index={1}>
+                    <Text strong className="text-green-600">
+                      {districtTotals.totalAttendance?.toLocaleString() || "0"}
+                    </Text>
+                  </Table.Summary.Cell>
+                  <Table.Summary.Cell index={2}>
+                    <Text strong className="text-blue-600">
+                      {districtTotals.totalAttendanceRaw?.toLocaleString() ||
+                        "0"}
+                    </Text>
+                  </Table.Summary.Cell>
+                  <Table.Summary.Cell index={3}>
+                    <Text strong className="text-purple-600">
+                      {districtTotals.totalAttendanceDB?.toLocaleString() ||
+                        "0"}
+                    </Text>
+                  </Table.Summary.Cell>
+                  <Table.Summary.Cell index={4}>
+                    <Text strong className="text-red-500">
+                      {districtTotals.estimatedTotalOverlap?.toLocaleString() ||
+                        "0"}
+                    </Text>
+                  </Table.Summary.Cell>
+                  <Table.Summary.Cell index={5}>
+                    <Tag color="red" className="font-medium">
+                      -{districtTotals.attendanceCorrectionPct || 0}%
+                    </Tag>
+                  </Table.Summary.Cell>
+                  <Table.Summary.Cell index={6}>
+                    <Tag
+                      color={
+                        districtTotals.assembliesWithActualData > 0
+                          ? "green"
+                          : "orange"
+                      }
+                    >
+                      {districtTotals.assembliesWithActualData > 0
+                        ? "Mixed"
+                        : "All Estimated"}
+                    </Tag>
+                  </Table.Summary.Cell>
+                </Table.Summary.Row>
+              )}
+            />
+          </div>
+        </Card>
+
+        {/* 4. Assembly Performance Table (Main) */}
         <Card className="mb-6 border-0 shadow-lg" id="assembly-performance">
           <div className="flex items-start gap-3 mb-6">
             <div className="p-3 bg-purple-100 rounded-xl">
@@ -682,8 +999,7 @@ export default function FinancialReportPage() {
                 Assembly Performance Dashboard
               </Title>
               <Text type="secondary" className="text-base">
-                Detailed metrics across all assemblies with per-attendee
-                calculations
+                Using corrected attendance figures (not double-counted)
               </Text>
             </div>
           </div>
@@ -707,27 +1023,36 @@ export default function FinancialReportPage() {
                   </Table.Summary.Cell>
                   <Table.Summary.Cell index={1}>
                     <Text strong>
-                      ₦{districtTotals.totalIncome.toLocaleString()}
+                      ₦{districtTotals.totalIncome?.toLocaleString() || "0"}
                     </Text>
                   </Table.Summary.Cell>
                   <Table.Summary.Cell index={2}>
-                    <Text strong>
-                      {districtTotals.totalAttendance.toLocaleString()}
-                    </Text>
+                    <Tooltip
+                      title={`Unique: ${
+                        districtTotals.totalAttendance || 0
+                      }, Raw: ${districtTotals.totalAttendanceRaw || 0}`}
+                    >
+                      <Text strong>
+                        {districtTotals.totalAttendance?.toLocaleString() ||
+                          "0"}
+                      </Text>
+                    </Tooltip>
                   </Table.Summary.Cell>
                   <Table.Summary.Cell index={3}>
                     <Text strong>
-                      ₦{districtTotals.totalTithes.toLocaleString()}
+                      {districtTotals.totalAttendance?.toLocaleString() || "0"}
                     </Text>
                   </Table.Summary.Cell>
                   <Table.Summary.Cell index={4}>
                     <Text strong>
-                      ₦{perAttendeeMetrics?.incomePerAttendee.toLocaleString()}
+                      ₦{districtTotals.totalTithes?.toLocaleString() || "0"}
                     </Text>
                   </Table.Summary.Cell>
                   <Table.Summary.Cell index={5}>
                     <Text strong>
-                      ₦{perAttendeeMetrics?.tithesPerAttendee.toLocaleString()}
+                      ₦
+                      {perAttendeeMetrics?.incomePerAttendee.toLocaleString() ||
+                        "0"}
                     </Text>
                   </Table.Summary.Cell>
                   <Table.Summary.Cell index={6}>
@@ -738,8 +1063,8 @@ export default function FinancialReportPage() {
                             c.current.totalIncome > 0 &&
                             c.change.incomeVsPrev1 === 100
                         ).length /
-                          comparisons.filter((c) => c.current.totalIncome > 0)
-                            .length) *
+                          (comparisons.filter((c) => c.current.totalIncome > 0)
+                            .length || 1)) *
                           100
                       )}
                       % New Activity
@@ -751,7 +1076,7 @@ export default function FinancialReportPage() {
           </div>
         </Card>
 
-        {/* 4. Special Offerings Breakdown */}
+        {/* 5. Special Offerings Breakdown */}
         <Card className="mb-6 border-0 shadow-lg" id="offerings-breakdown">
           <div className="flex items-start gap-3 mb-6">
             <div className="p-3 bg-green-100 rounded-xl">
@@ -786,67 +1111,9 @@ export default function FinancialReportPage() {
               scroll={{ x: 1000 }}
             />
           </div>
-
-          <div className="mt-6 grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
-            {["tithes", "offerings", "specialOfferings", "pastorsWarfare"].map(
-              (category) => {
-                const total = assembliesWithOfferings.reduce(
-                  (sum, assembly) =>
-                    sum + (assembly.offeringsBreakdown?.[category] || 0),
-                  0
-                );
-                const percentage = Math.round(
-                  (total / districtTotals.totalIncome) * 100
-                );
-
-                const categoryNames: Record<
-                  string,
-                  { name: string; color: string }
-                > = {
-                  tithes: {
-                    name: "Tithes",
-                    color: "bg-purple-100 text-purple-800",
-                  },
-                  offerings: {
-                    name: "Regular Offerings",
-                    color: "bg-blue-100 text-blue-800",
-                  },
-                  specialOfferings: {
-                    name: "Special Offerings",
-                    color: "bg-green-100 text-green-800",
-                  },
-                  pastorsWarfare: {
-                    name: "Pastors Welfare",
-                    color: "bg-orange-100 text-orange-800",
-                  },
-                };
-
-                return (
-                  <Card key={category} size="small" className="text-center">
-                    <div
-                      className={`inline-block px-3 py-1 rounded-full text-sm font-medium mb-2 ${categoryNames[category]?.color}`}
-                    >
-                      {categoryNames[category]?.name}
-                    </div>
-                    <div className="text-2xl font-bold mb-1">
-                      ₦{total.toLocaleString()}
-                    </div>
-                    <div className="text-sm text-gray-600">
-                      {percentage}% of total income
-                    </div>
-                    <Progress
-                      percent={percentage}
-                      size="small"
-                      className="mt-2"
-                    />
-                  </Card>
-                );
-              }
-            )}
-          </div>
         </Card>
 
-        {/* 5. Top & Bottom Performers Side by Side */}
+        {/* 6. Top & Bottom Performers */}
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 mb-6">
           {/* Top 3 Performing Assemblies */}
           <Card className="border-0 shadow-lg">
@@ -859,7 +1126,7 @@ export default function FinancialReportPage() {
                   Top 3 Performing Assemblies
                 </Title>
                 <Text type="secondary">
-                  Leading with outstanding performance
+                  Based on corrected attendance and income
                 </Text>
               </div>
             </div>
@@ -893,18 +1160,27 @@ export default function FinancialReportPage() {
                         <Title level={4} className="!mb-1">
                           {assembly.assembly}
                         </Title>
-                        <Tag
-                          color={
-                            assembly.change.incomeVsPrev1 === 100
-                              ? "green"
-                              : "blue"
-                          }
-                          icon={<RiseOutlined />}
-                        >
-                          {assembly.change.incomeVsPrev1 === 100
-                            ? "New Activity"
-                            : `+${assembly.change.incomeVsPrev1}%`}
-                        </Tag>
+                        <div className="flex items-center gap-2">
+                          <Tag
+                            color={
+                              assembly.change.incomeVsPrev1 === 100
+                                ? "green"
+                                : "blue"
+                            }
+                            icon={<RiseOutlined />}
+                          >
+                            {assembly.change.incomeVsPrev1 === 100
+                              ? "New Activity"
+                              : `+${assembly.change.incomeVsPrev1}%`}
+                          </Tag>
+                          <Tooltip
+                            title={`Attendance: ${assembly.current.totalAttendance} (corrected)`}
+                          >
+                            <Tag color="blue">
+                              {assembly.current.totalAttendance} unique
+                            </Tag>
+                          </Tooltip>
+                        </div>
                       </div>
                     </div>
                   </div>
@@ -917,10 +1193,17 @@ export default function FinancialReportPage() {
                       </div>
                     </div>
                     <div className="text-center">
-                      <div className="text-sm text-gray-500">Attendance</div>
+                      <div className="text-sm text-gray-500">
+                        Unique Attendees
+                      </div>
                       <div className="text-lg font-bold text-blue-700">
                         {assembly.current.totalAttendance}
                       </div>
+                      {assembly.current.attendanceCorrectionPct > 0 && (
+                        <div className="text-xs text-red-500">
+                          -{assembly.current.attendanceCorrectionPct}% overlap
+                        </div>
+                      )}
                     </div>
                     <div className="text-center">
                       <div className="text-sm text-gray-500">Tithes</div>
@@ -975,8 +1258,7 @@ export default function FinancialReportPage() {
                   </div>
                   <div className="mt-3 text-red-600">
                     <BulbOutlined className="mr-2" />
-                    No financial or attendance data reported—indicates zero
-                    reporting or possible under-reporting.
+                    No financial or attendance data reported.
                   </div>
                 </Card>
               ))}
@@ -995,12 +1277,21 @@ export default function FinancialReportPage() {
                         <Title level={4} className="!mb-1">
                           {assembly.assembly}
                         </Title>
-                        <Tag
-                          color="orange"
-                          icon={<ExclamationCircleOutlined />}
-                        >
-                          Low Performance
-                        </Tag>
+                        <div className="flex items-center gap-2">
+                          <Tag
+                            color="orange"
+                            icon={<ExclamationCircleOutlined />}
+                          >
+                            Low Performance
+                          </Tag>
+                          <Tooltip
+                            title={`Attendance: ${assembly.current.totalAttendance} (corrected)`}
+                          >
+                            <Tag color="blue"x>
+                              {assembly.current.totalAttendance} unique
+                            </Tag>
+                          </Tooltip>
+                        </div>
                       </div>
                     </div>
                     <div className="text-right">
@@ -1012,7 +1303,9 @@ export default function FinancialReportPage() {
                   </div>
                   <div className="mt-3 grid grid-cols-2 gap-2">
                     <div className="text-center bg-white p-2 rounded">
-                      <div className="text-sm text-gray-500">Attendance</div>
+                      <div className="text-sm text-gray-500">
+                        Unique Attendees
+                      </div>
                       <div className="font-semibold">
                         {assembly.current.totalAttendance}
                       </div>
@@ -1030,7 +1323,7 @@ export default function FinancialReportPage() {
           </Card>
         </div>
 
-        {/* 6. Trend Analysis */}
+        {/* 7. Trend Analysis */}
         <Card className="mb-6 border-0 shadow-lg">
           <div className="flex items-start gap-3 mb-6">
             <div className="p-3 bg-teal-100 rounded-xl">
@@ -1041,58 +1334,9 @@ export default function FinancialReportPage() {
                 Trend Analysis vs Previous Months
               </Title>
               <Text type="secondary" className="text-base">
-                Monthly comparison and growth patterns
+                Using corrected attendance figures for accurate comparison
               </Text>
             </div>
-          </div>
-
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4 mb-6">
-            {[
-              {
-                title: "New Activity",
-                count: comparisons.filter((c) => c.change.incomeVsPrev1 === 100)
-                  .length,
-                color: "green",
-              },
-              {
-                title: "No Activity",
-                count: comparisons.filter(
-                  (c) =>
-                    c.current.totalIncome === 0 && c.change.incomeVsPrev1 === 0
-                ).length,
-                color: "red",
-              },
-              {
-                title: "Positive Growth",
-                count: comparisons.filter(
-                  (c) => c.current.totalIncome > 0 && c.change.incomeVsPrev1 > 0
-                ).length,
-                color: "blue",
-              },
-              {
-                title: "Stable",
-                count: comparisons.filter(
-                  (c) =>
-                    c.current.totalIncome > 0 && c.change.incomeVsPrev1 === 0
-                ).length,
-                color: "gray",
-              },
-            ].map((item, index) => (
-              <Card key={index} className="text-center">
-                <div
-                  className={`text-3xl font-bold mb-2 text-${item.color}-600`}
-                >
-                  {item.count}
-                </div>
-                <div className="text-gray-600">{item.title}</div>
-                <Progress
-                  percent={Math.round((item.count / comparisons.length) * 100)}
-                  strokeColor={item.color}
-                  size="small"
-                  className="mt-2"
-                />
-              </Card>
-            ))}
           </div>
 
           <div className="space-y-3">
@@ -1123,24 +1367,28 @@ export default function FinancialReportPage() {
                           ? "No Activity"
                           : `Income: ₦${assembly.current.totalIncome.toLocaleString()}`}
                       </Tag>
-                      {assembly.prev1 && (
-                        <Tag color="default">
-                          Prev: ₦{assembly.prev1.totalIncome.toLocaleString()}
+                      <Tooltip
+                        title={`Corrected attendance: ${assembly.current.totalAttendance}`}
+                      >
+                        <Tag color="blue">
+                          {assembly.current.totalAttendance} unique
                         </Tag>
-                      )}
+                      </Tooltip>
                     </div>
                   </div>
                   <div className="text-right">
-                    <div className="text-sm text-gray-500">Net Change</div>
+                    <div className="text-sm text-gray-500">
+                      Attendance Trend
+                    </div>
                     <div
                       className={`font-bold ${
-                        assembly.change.incomeVsPrev1 >= 0
+                        assembly.change.attendanceVsPrev1 >= 0
                           ? "text-green-600"
                           : "text-red-600"
                       }`}
                     >
-                      {assembly.change.incomeVsPrev1 >= 0 ? "+" : ""}
-                      {assembly.change.incomeVsPrev1}%
+                      {assembly.change.attendanceVsPrev1 >= 0 ? "+" : ""}
+                      {assembly.change.attendanceVsPrev1}%
                     </div>
                   </div>
                 </div>
@@ -1148,217 +1396,9 @@ export default function FinancialReportPage() {
             ))}
           </div>
         </Card>
-
-        {/* 7. Recommendations & 90-Day Roadmap */}
-        <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 mb-6">
-          <Card className="border-0 shadow-lg">
-            <div className="flex items-start gap-3 mb-6">
-              <div className="p-3 bg-indigo-100 rounded-xl">
-                <CheckCircleOutlined className="text-indigo-600 text-2xl" />
-              </div>
-              <div>
-                <Title level={2} className="!mb-3 text-gray-800">
-                  Key Recommendations
-                </Title>
-                <Text type="secondary">
-                  Actionable strategies for improvement
-                </Text>
-              </div>
-            </div>
-
-            <div className="space-y-4">
-              <Alert
-                message="Immediate Action Required"
-                description="Visit PPS and Beulah to assess operational status and reporting barriers."
-                type="error"
-                showIcon
-              />
-
-              <Alert
-                message="Reporting Consistency"
-                description="Provide training and automated reminders for accurate monthly submissions."
-                type="warning"
-                showIcon
-              />
-
-              <Alert
-                message="Leverage Top Performers"
-                description="Success and RayPower to mentor other assemblies on stewardship and engagement."
-                type="info"
-                showIcon
-              />
-
-              <Alert
-                message="Data Verification"
-                description="Ensure sharp increases (0 → positive) are correct; rule out late batch submissions."
-                type="success"
-                showIcon
-              />
-            </div>
-          </Card>
-
-          <Card className="border-0 shadow-lg bg-gradient-to-r from-blue-50 to-blue-100">
-            <div className="flex items-start gap-3 mb-6">
-              <div className="p-3 bg-blue-100 rounded-xl">
-                <CalendarOutlined className="text-blue-600 text-2xl" />
-              </div>
-              <div>
-                <Title level={2} className="!mb-3 text-gray-800">
-                  90-Day Strategic Roadmap
-                </Title>
-                <Text type="secondary">Timeline for district improvement</Text>
-              </div>
-            </div>
-
-            <div className="space-y-4">
-              {[
-                {
-                  period: "0-30 Days",
-                  actions: [
-                    "Pastoral visits to non-reporting assemblies",
-                    "Data quality workshops",
-                    "Best practices documentation from top assemblies",
-                  ],
-                  color: "green",
-                },
-                {
-                  period: "30-60 Days",
-                  actions: [
-                    "Pair strong and weak assemblies for mentorship",
-                    "Digitize financial reporting processes",
-                    "Monthly review calls for accountability",
-                  ],
-                  color: "blue",
-                },
-                {
-                  period: "60-90 Days",
-                  actions: [
-                    "Track reporting consistency improvements",
-                    "Recognize and reward assemblies showing improvement",
-                    "Expand leadership training programs",
-                  ],
-                  color: "purple",
-                },
-              ].map((phase, index) => (
-                <Card key={index} size="small" className="mb-3">
-                  <div className="flex items-center justify-between mb-2">
-                    <div className="flex items-center gap-2">
-                      <div
-                        className={`w-6 h-6 flex items-center justify-center rounded-full bg-${phase.color}-100 text-${phase.color}-600`}
-                      >
-                        {index + 1}
-                      </div>
-                      <Text strong className="text-lg">
-                        {phase.period}
-                      </Text>
-                    </div>
-                    <Tag color={phase.color}>{phase.period}</Tag>
-                  </div>
-                  <ul className="list-disc pl-5 space-y-1">
-                    {phase.actions.map((action, i) => (
-                      <li key={i} className="text-gray-700">
-                        {action}
-                      </li>
-                    ))}
-                  </ul>
-                </Card>
-              ))}
-            </div>
-          </Card>
-        </div>
-
-        {/* 8. Recognition & Awards */}
-        <Card className="mb-6 border-0 shadow-lg bg-gradient-to-r from-yellow-50 to-orange-50">
-          <div className="flex items-start gap-3 mb-6">
-            <div className="p-3 bg-yellow-100 rounded-xl">
-              <StarOutlined className="text-yellow-600 text-2xl" />
-            </div>
-            <div>
-              <Title level={2} className="!mb-3 text-gray-800">
-                Recognition & Awards
-              </Title>
-              <Text type="secondary">Celebrating outstanding performance</Text>
-            </div>
-          </div>
-
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-            <Card className="border-0 bg-white shadow-xl text-center transform hover:-translate-y-1 transition-transform">
-              <div className="inline-block p-4 bg-yellow-100 rounded-full mb-4">
-                <TrophyOutlined className="text-yellow-600 text-4xl" />
-              </div>
-              <Title level={3} className="!mb-3">
-                Assembly of the Month
-              </Title>
-              <div className="text-2xl font-bold text-yellow-700 mb-2">
-                RayPower
-              </div>
-              <div className="text-gray-600 mb-4">
-                Highest combined income and strong attendance
-              </div>
-              <div className="space-y-2">
-                <div className="flex justify-between">
-                  <span>Income:</span>
-                  <span className="font-semibold">₦60,850</span>
-                </div>
-                <div className="flex justify-between">
-                  <span>Attendance:</span>
-                  <span className="font-semibold">110</span>
-                </div>
-              </div>
-            </Card>
-
-            <Card className="border-0 bg-white shadow-xl text-center transform hover:-translate-y-1 transition-transform">
-              <div className="inline-block p-4 bg-green-100 rounded-full mb-4">
-                <RiseOutlined className="text-green-600 text-4xl" />
-              </div>
-              <Title level={3} className="!mb-3">
-                Most Improved
-              </Title>
-              <div className="text-2xl font-bold text-green-700 mb-2">
-                All Reporting Assemblies
-              </div>
-              <div className="text-gray-600 mb-4">
-                100% improvement after non-reporting months
-              </div>
-              <div className="text-center">
-                <div className="text-4xl font-bold text-green-600 mb-2">6</div>
-                <div className="text-gray-600">
-                  Assemblies with new activity
-                </div>
-              </div>
-            </Card>
-
-            <Card className="border-0 bg-white shadow-xl text-center transform hover:-translate-y-1 transition-transform">
-              <div className="inline-block p-4 bg-blue-100 rounded-full mb-4">
-                <CheckCircleOutlined className="text-blue-600 text-4xl" />
-              </div>
-              <Title level={3} className="!mb-3">
-                Best Reporting
-              </Title>
-              <div className="text-2xl font-bold text-blue-700 mb-2">
-                RayPower
-              </div>
-              <div className="text-gray-600 mb-4">
-                Complete itemized breakdown and strong results
-              </div>
-              <div className="space-y-2">
-                <div className="flex justify-between">
-                  <span>Special Offerings:</span>
-                  <span className="font-semibold">₦40,000</span>
-                </div>
-                <div className="flex justify-between">
-                  <span>Total Records:</span>
-                  <span className="font-semibold">1</span>
-                </div>
-              </div>
-            </Card>
-          </div>
-        </Card>
       </>
     );
   };
-
-  // ... [rest of your component remains the same - header, generate function, etc.]
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-gray-50 to-gray-100 p-4 md:p-6">
@@ -1373,7 +1413,7 @@ export default function FinancialReportPage() {
               Region 26, AKowonjo District
             </h3>
             <p className="text-gray-600 text-sm md:text-base mt-1">
-              Financial Reporting System
+              Financial Reporting System with Corrected Attendance Metrics
             </p>
           </div>
         </Card>
@@ -1386,10 +1426,10 @@ export default function FinancialReportPage() {
                 <h1 className="!mb-2 text-xl font-bold text-gray-800">
                   Enhanced Financial Report
                 </h1>
-                <p className="text-sm">
-                  Board-ready analysis with per-attendee metrics and special
-                  offerings breakdown
-                </p>
+                {/* <p className="text-sm">
+                  Now with corrected attendance metrics (avoiding
+                  double-counting)
+                </p> */}
               </div>
             </Col>
 
@@ -1445,13 +1485,17 @@ export default function FinancialReportPage() {
             <Card className="text-center py-16 border-0 shadow-lg">
               <div className="text-5xl mb-6">📊</div>
               <Title level={3} className="!mb-4">
-                Ready to Generate Enhanced Report
+                Ready to Generate Enhanced AI Report
               </Title>
-              <Paragraph type="secondary" className="text-lg mb-8">
-                Select a month and click "Generate Enhanced Report" to create a
-                comprehensive board-ready analysis with per-attendee metrics and
-                special offerings breakdown.
-              </Paragraph>
+              {/* <Paragraph type="secondary" className="text-lg mb-6">
+                <Alert
+                  message="Important Notice"
+                  description="Reports now use corrected attendance figures to avoid double-counting. The same people often attend both Sunday School and main service, so we estimate unique attendees for accuracy."
+                  type="info"
+                  showIcon
+                  className="mb-4"
+                />
+              </Paragraph> */}
               <div className="flex justify-center gap-4 flex-wrap">
                 <DatePicker
                   picker="month"
@@ -1466,7 +1510,7 @@ export default function FinancialReportPage() {
                   onClick={generate}
                   icon={<BarChartOutlined />}
                 >
-                  Generate Enhanced Report
+                  Generate AI Report
                 </Button>
               </div>
             </Card>
@@ -1481,8 +1525,8 @@ export default function FinancialReportPage() {
                   Generating Enhanced Report
                 </Title>
                 <Text type="secondary">
-                  Creating comprehensive board-ready analysis with detailed
-                  metrics...
+                  Calculating corrected attendance metrics (avoiding
+                  double-counting)...
                 </Text>
               </Card>
             </div>

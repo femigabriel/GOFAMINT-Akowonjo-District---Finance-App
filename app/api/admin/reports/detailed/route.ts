@@ -146,18 +146,24 @@ export async function GET(request: Request) {
         baseReport.records = records.map((record: any) => {
           const attendance = record?.attendance || 0;
           const sbsAttendance = record?.sbsAttendance || 0;
-          const totalAttendance = record?.totalAttendance || (attendance + sbsAttendance);
           
-          // Calculate estimated overlap
-          const estimatedOverlap = Math.min(attendance, sbsAttendance) * 0.75;
-          const estimatedUnique = calculateUniqueAttendance(attendance, sbsAttendance);
+          // Calculate unique attendance (NOT double-counted)
+          const uniqueAttendance = getRecordUniqueAttendance(record);
+          
+          // Calculate estimated overlap if using estimation
+          const estimatedOverlap = record?.uniqueAttendance === undefined 
+            ? Math.min(attendance, sbsAttendance) * 0.75 
+            : attendance + sbsAttendance - uniqueAttendance;
           
           return {
             id: record?._id?.toString() || Math.random().toString(36).substr(2, 9),
             week: record?.week || '',
             date: record?.date || '',
+            
+            // INDIVIDUAL COUNTS - display these clearly
             attendance: attendance,
             sbsAttendance: sbsAttendance,
+            
             visitors: record?.visitors || 0,
             tithes: record?.tithes || 0,
             offerings: record?.offerings || 0,
@@ -172,15 +178,18 @@ export async function GET(request: Request) {
             districtSupport: record?.districtSupport || 0,
             total: record?.total || 0,
             
-            // Keep original totalAttendance for backward compatibility
-            totalAttendance: totalAttendance,
+            // UNIQUE attendance - this is the CORRECT total
+            uniqueAttendance: uniqueAttendance,
             
-            // New fields with accurate calculations
-            uniqueAttendance: getRecordUniqueAttendance(record),
+            // Old field for backward compatibility - set to UNIQUE, not sum
+            totalAttendance: uniqueAttendance,
+            
+            // Additional info for transparency
             estimatedOverlap: Math.round(estimatedOverlap),
+            attendanceType: record?.uniqueAttendance !== undefined ? 'actual' : 'estimated',
             
-            // Add a flag to indicate if this is estimated vs actual
-            attendanceType: record?.uniqueAttendance !== undefined ? 'actual' : 'estimated'
+            // Add explicit overlap count if available
+            attendedBoth: record?.attendedBoth || null
           };
         });
       } else if (currentServiceType === 'midweek') {
@@ -211,6 +220,7 @@ export async function GET(request: Request) {
     const midweekReports = formattedReports.filter(r => r.serviceType === 'midweek');
     const specialReports = formattedReports.filter(r => r.serviceType === 'special');
     
+    // Financial calculations (unchanged)
     const sundayIncome = sundayReports.reduce((acc, report) => 
       acc + report.records.reduce((sum: number, record: any) => sum + (record.total || 0), 0), 0);
     
@@ -225,7 +235,7 @@ export async function GET(request: Request) {
     
     const totalIncome = sundayIncome + midweekIncome + specialIncome;
     
-    // FIXED: Use UNIQUE attendance (not double-counted)
+    // CORRECTED ATTENDANCE CALCULATIONS - Use uniqueAttendance
     const sundayAttendance = sundayReports.reduce((acc, report) => 
       acc + report.records.reduce((sum: number, record: any) => 
         sum + (record.uniqueAttendance || getRecordUniqueAttendance(record)), 0), 0);
@@ -236,12 +246,13 @@ export async function GET(request: Request) {
     const specialAttendance = specialReports.reduce((acc, report) => 
       acc + report.records.reduce((sum: number, record: any) => sum + (record.attendance || 0), 0), 0);
     
+    // Total attendance = sum of unique counts
     const totalAttendance = sundayAttendance + midweekAttendance + specialAttendance;
     
-    // Also calculate the OLD way for comparison
+    // Calculate the OLD WRONG way for comparison/deprecation
     const sundayAttendanceOldWay = sundayReports.reduce((acc, report) => 
       acc + report.records.reduce((sum: number, record: any) => 
-        sum + (record.totalAttendance || ((record.attendance || 0) + (record.sbsAttendance || 0))), 0), 0);
+        sum + ((record.attendance || 0) + (record.sbsAttendance || 0)), 0), 0);
     
     return NextResponse.json({
       success: true,
@@ -261,17 +272,23 @@ export async function GET(request: Request) {
           specialIncome,
           sundayTithes,
           
-          // CORRECTED attendance numbers
+          // CORRECTED attendance numbers (NO double-counting)
           totalAttendance,
           sundayAttendance,
           midweekAttendance,
           specialAttendance,
           
-          // Keep old numbers for reference/deprecation
+          // Individual components for display clarity
+          sundayServiceOnly: sundayReports.reduce((acc, report) => 
+            acc + report.records.reduce((sum: number, record: any) => sum + (record.attendance || 0), 0), 0),
+          sbsOnly: sundayReports.reduce((acc, report) => 
+            acc + report.records.reduce((sum: number, record: any) => sum + (record.sbsAttendance || 0), 0), 0),
+          
+          // Deprecated/wrong numbers for comparison
           totalAttendanceOld: sundayAttendanceOldWay + midweekAttendance + specialAttendance,
           sundayAttendanceOld: sundayAttendanceOldWay,
           
-          // Add correction factor
+          // Correction metrics
           attendanceCorrection: sundayAttendanceOldWay - sundayAttendance,
           correctionPercentage: sundayAttendanceOldWay > 0 
             ? Math.round(((sundayAttendanceOldWay - sundayAttendance) / sundayAttendanceOldWay) * 100) 

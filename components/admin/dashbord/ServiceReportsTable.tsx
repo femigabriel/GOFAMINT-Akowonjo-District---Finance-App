@@ -68,6 +68,16 @@ import { saveAs } from "file-saver";
 import { generateAIFinancialReport } from "@/utils/ai-report-generator";
 import DetailedChurchReport from "./DetailedChurchReport";
 import ChurchReport from "./Dashboard";
+import {
+  BaseReport,
+  MidweekRecord,
+  MidweekReport,
+  ReportsResponse,
+  SpecialRecord,
+  SpecialReport,
+  SundayRecord,
+  SundayReport,
+} from "./serviceTable";
 
 const { Text, Title, Paragraph } = Typography;
 const { RangePicker } = DatePicker;
@@ -75,108 +85,7 @@ const { Option } = Select;
 const { useBreakpoint } = Grid;
 const { Group: RadioGroup, Button: RadioButton } = Radio;
 
-// ==================== INTERFACE DEFINITIONS ====================
-interface SundayRecord {
-  id: string;
-  week: string;
-  date: string;
-  attendance: number;
-  sbsAttendance: number;
-  visitors: number;
-  tithes: number;
-  offerings: number;
-  specialOfferings: number;
-  etf: number;
-  pastorsWarfare: number;
-  vigil: number;
-  thanksgiving: number;
-  retirees: number;
-  missionaries: number;
-  youthOfferings: number;
-  districtSupport: number;
-  total: number;
-  totalAttendance: number;
-}
-
-interface MidweekRecord {
-  id: string;
-  date: string;
-  day: "tuesday" | "thursday";
-  attendance: number;
-  offering: number;
-  total: number;
-}
-
-interface SpecialRecord {
-  id: string;
-  serviceName: string;
-  date: string;
-  attendance: number;
-  offering: number;
-  total: number;
-}
-
-interface BaseReport {
-  id: string;
-  assembly: string;
-  month: string;
-  submittedBy: string;
-  createdAt: string;
-  updatedAt: string;
-  serviceType: "sunday" | "midweek" | "special";
-  records: any[];
-  totalIncome: number;
-  totalAttendance: number;
-  averagePerRecord: number;
-}
-
-interface SundayReport extends BaseReport {
-  records: SundayRecord[];
-  weekCount: number;
-  tithesTotal: number;
-}
-
-interface MidweekReport extends BaseReport {
-  records: MidweekRecord[];
-  dayCount: number;
-}
-
-interface SpecialReport extends BaseReport {
-  records: SpecialRecord[];
-  eventCount: number;
-}
-
 type ExtendedReport = SundayReport | MidweekReport | SpecialReport;
-
-interface ReportsResponse {
-  success: boolean;
-  data: {
-    reports: any[];
-    pagination: {
-      page: number;
-      limit: number;
-      total: number;
-      pages: number;
-    };
-    summary: {
-      totalReports: number;
-      totalRecords: number;
-      totalAssemblies: number;
-      sundayReports: number;
-      midweekReports: number;
-      specialReports: number;
-      totalIncome: number;
-      sundayIncome: number;
-      midweekIncome: number;
-      specialIncome: number;
-      sundayTithes: number;
-      totalAttendance: number;
-      sundayAttendance: number;
-      midweekAttendance: number;
-      specialAttendance: number;
-    };
-  };
-}
 
 // ==================== AI REPORT MODAL COMPONENT ====================
 interface AIReportModalProps {
@@ -472,12 +381,14 @@ export default function ServiceReportsTable() {
   const fetchFilterOptions = async () => {
     try {
       const assembliesData = [
-        "Liberty",
+        "PPS",
+        "Overcomers",
+        "Beulah",
         "Jubilee",
+        "Success",
+        "Restoration",
+        "Liberty",
         "RayPower",
-        "Victory",
-        "Grace",
-        "Mercy",
       ];
       const monthsData = [
         "January",
@@ -525,7 +436,7 @@ export default function ServiceReportsTable() {
 
       const response = await fetch(`/api/admin/reports/detailed?${params}`);
       const result: ReportsResponse = await response.json();
-
+      console.log("detailed", result);
       if (result.success) {
         const extendedReports: ExtendedReport[] = result.data.reports.map(
           (report) => {
@@ -1047,22 +958,24 @@ export default function ServiceReportsTable() {
 
         return (
           <Tooltip title={statusText}>
-            <Badge
-              color={
-                statusColor === "error"
-                  ? "red"
-                  : statusColor === "warning"
-                  ? "orange"
-                  : "green"
-              }
-              text={
-                <span className="text-xs">
-                  {statusText === "Up to Date"
-                    ? "Current"
-                    : statusText.slice(0, 6)}
-                </span>
-              }
-            />
+            <span>
+              <Badge
+                color={
+                  statusColor === "error"
+                    ? "red"
+                    : statusColor === "warning"
+                    ? "orange"
+                    : "green"
+                }
+                text={
+                  <span className="text-xs">
+                    {statusText === "Up to Date"
+                      ? "Current"
+                      : statusText.slice(0, 6)}
+                  </span>
+                }
+              />
+            </span>
           </Tooltip>
         );
       },
@@ -1075,14 +988,17 @@ export default function ServiceReportsTable() {
       render: (_, record: ExtendedReport) => (
         <Space size="small">
           <Tooltip title="View Details">
-            <Button
-              type="text"
-              icon={<EyeOutlined />}
-              onClick={() => showReportDetails(record)}
-              size="small"
-              className="text-blue-600 hover:text-blue-800"
-            />
+            <span>
+              <Button
+                type="text"
+                icon={<EyeOutlined />}
+                onClick={() => showReportDetails(record)}
+                size="small"
+                className="text-blue-600 hover:text-blue-800"
+              />
+            </span>
           </Tooltip>
+
           <Tooltip title="Export PDF">
             <Button
               type="text"
@@ -1130,7 +1046,6 @@ export default function ServiceReportsTable() {
           <Card
             className="h-full border-0 shadow-sm hover:shadow-md transition-all duration-300"
             size="small"
-            bodyStyle={{ padding: isMobile ? 12 : 16 }}
           >
             <div className="flex items-center justify-between">
               <div>
@@ -1164,7 +1079,6 @@ export default function ServiceReportsTable() {
           <Card
             className="h-full border-0 shadow-sm hover:shadow-md transition-all duration-300"
             size="small"
-            bodyStyle={{ padding: isMobile ? 12 : 16 }}
           >
             <div className="flex items-center justify-between">
               <div>
@@ -1196,6 +1110,7 @@ export default function ServiceReportsTable() {
       onClick: exportAllReportsPDF,
     },
   ];
+  
   // Helper function to render records table based on report type
   const renderRecordsTable = (report: ExtendedReport) => {
     switch (report.serviceType) {
@@ -1473,7 +1388,6 @@ export default function ServiceReportsTable() {
 
   return (
     <div className="p-3 md:p-6 bg-gradient-to-b from-gray-50 to-white min-h-screen">
-      
       {/* Header */}
       <div className="mb-4 md:mb-6">
         <div className="flex flex-col gap-4">
@@ -1845,7 +1759,6 @@ export default function ServiceReportsTable() {
         onClose={() => setAiReportModalVisible(false)}
         onExport={exportAIReportAsPDF}
       />
-    
     </div>
   );
 }

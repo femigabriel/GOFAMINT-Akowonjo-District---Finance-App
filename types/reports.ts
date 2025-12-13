@@ -67,3 +67,5 @@ export interface DetailedReportResponse {
     summary: FinancialSummary;
   };
 }
+
+

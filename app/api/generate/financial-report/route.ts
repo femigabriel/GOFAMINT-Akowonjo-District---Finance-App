@@ -1,3 +1,4 @@
+// app/api/admin/reports/ai-generate/route.ts
 import { NextResponse } from "next/server";
 import OpenAI from "openai";
 import { assemblies } from "@/lib/assemblies";
@@ -8,11 +9,6 @@ const client = new OpenAI({
 
 // safe sum util
 const sum = (arr: number[]) => arr.reduce((a, b) => a + (b || 0), 0);
-
-// return YYYY-MM for convenience
-function monthKey(month: string, year: string) {
-  return `${month}-${year}`;
-}
 
 // compute previous n months (month name + year)
 function prevMonths(month: string, year: string, n = 2) {
@@ -68,10 +64,55 @@ async function fetchDetailed(origin: string, month: string, year: string) {
   return json;
 }
 
-// Aggregate a detailed endpoint response into per-assembly metrics
+// UPDATED: Calculate all three attendance metrics
+function getAttendanceMetrics(record: any) {
+  const attendance = record?.attendance || 0;
+  const sbsAttendance = record?.sbsAttendance || 0;
+
+  // 1. Raw sum (what was being incorrectly used before)
+  const rawSumAttendance = attendance + sbsAttendance;
+
+  // 2. Database totalAttendance (might be wrong in some records)
+  const dbTotalAttendance = record?.totalAttendance || 0;
+
+  // 3. Unique attendance (corrected - from API or calculated)
+  let uniqueAttendance = record?.uniqueAttendance;
+  let estimatedOverlap = record?.estimatedOverlap;
+  let attendanceType = record?.attendanceType || "estimated";
+
+  // If uniqueAttendance not provided, calculate it
+  if (uniqueAttendance === undefined || uniqueAttendance === null) {
+    // If we have both numbers, estimate
+    if (attendance > 0 && sbsAttendance > 0) {
+      estimatedOverlap = Math.min(attendance, sbsAttendance) * 0.75;
+      uniqueAttendance = Math.max(
+        Math.max(attendance, sbsAttendance),
+        Math.round(attendance + sbsAttendance - estimatedOverlap)
+      );
+    } else {
+      uniqueAttendance = rawSumAttendance;
+      estimatedOverlap = 0;
+    }
+  }
+
+  // Determine which totalAttendance to use
+  const totalAttendance =
+    dbTotalAttendance > 0 ? dbTotalAttendance : rawSumAttendance;
+
+  return {
+    rawSum: rawSumAttendance,
+    dbTotal: totalAttendance,
+    unique: uniqueAttendance,
+    estimatedOverlap: estimatedOverlap || 0,
+    attendanceType,
+    attendance,
+    sbsAttendance,
+  };
+}
+
+// UPDATED: Aggregate with all attendance metrics
 function aggregateDetailedResponse(detailedJson: any) {
   const reports = detailedJson?.data?.reports || [];
-  // Map assembly -> aggregated metrics
   const map: Record<string, any> = {};
 
   for (const r of reports) {
@@ -81,18 +122,37 @@ function aggregateDetailedResponse(detailedJson: any) {
         assembly,
         totalIncome: 0,
         totalTithes: 0,
-        totalAttendance: 0,
+        totalAttendance: 0, // CORRECTED: unique attendance
+        totalAttendanceRaw: 0, // Raw sum (attendance + sbsAttendance)
+        totalAttendanceDB: 0, // From database (might be wrong)
+        estimatedTotalOverlap: 0, // Sum of estimated overlaps
         totalRecords: 0,
         offeringsBreakdown: {},
+        attendanceType: "estimated", // 'actual' if all records have uniqueAttendance
+        serviceBreakdown: {
+          sunday: { records: 0, attendance: 0, uniqueAttendance: 0 },
+          midweek: { records: 0, attendance: 0 },
+          special: { records: 0, attendance: 0 },
+        },
       };
     }
 
     const recs = Array.isArray(r.records) ? r.records : [];
-
     map[assembly].totalRecords += recs.length;
 
+    // Track service types
+    const serviceType = r.serviceType || "sunday";
+    if (!map[assembly].serviceBreakdown[serviceType]) {
+      map[assembly].serviceBreakdown[serviceType] = {
+        records: 0,
+        attendance: 0,
+        uniqueAttendance: 0,
+      };
+    }
+    map[assembly].serviceBreakdown[serviceType].records += recs.length;
+
     for (const rec of recs) {
-      // Income: sum sensible fields (tithes, offerings, specialOfferings, pastorsWarfare, thanksgiving, offering, total)
+      // Income calculations
       const tithes = Number(rec.tithes || 0);
       const offerings = Number(rec.offerings || rec.offering || 0);
       const specialOfferings = Number(
@@ -106,7 +166,7 @@ function aggregateDetailedResponse(detailedJson: any) {
       const districtSupport = Number(rec.districtSupport || 0);
       const totalFromRecord = Number(rec.total || 0);
 
-      // Build an offeringsBreakdown aggregated object
+      // Build offerings breakdown
       const ob = map[assembly].offeringsBreakdown;
       ob.tithes = (ob.tithes || 0) + tithes;
       ob.offerings = (ob.offerings || 0) + offerings;
@@ -116,7 +176,7 @@ function aggregateDetailedResponse(detailedJson: any) {
       ob.etf = (ob.etf || 0) + etf;
       ob.districtSupport = (ob.districtSupport || 0) + districtSupport;
 
-      // prefer a robust income: if `total` is present, use it; else sum components
+      // Income contribution
       const incomeContribution =
         totalFromRecord ||
         tithes +
@@ -129,10 +189,31 @@ function aggregateDetailedResponse(detailedJson: any) {
 
       map[assembly].totalIncome += incomeContribution;
       map[assembly].totalTithes += tithes;
-      // totalAttendance may be present per record as totalAttendance else attendance
-      map[assembly].totalAttendance += Number(
-        rec.totalAttendance || rec.attendance || 0
-      );
+
+      // ATTENDANCE METRICS - All three versions
+      const metrics = getAttendanceMetrics(rec);
+
+      // For Sunday services: use unique attendance
+      if (serviceType === "sunday") {
+        map[assembly].totalAttendance += metrics.unique;
+        map[assembly].serviceBreakdown[serviceType].uniqueAttendance +=
+          metrics.unique;
+      } else {
+        // For midweek/special: just use attendance
+        map[assembly].totalAttendance += rec.attendance || 0;
+      }
+
+      // Track all metrics
+      map[assembly].totalAttendanceRaw += metrics.rawSum;
+      map[assembly].totalAttendanceDB += metrics.dbTotal;
+      map[assembly].estimatedTotalOverlap += metrics.estimatedOverlap;
+      map[assembly].serviceBreakdown[serviceType].attendance +=
+        rec.attendance || 0;
+
+      // Update attendance type if we have actual data
+      if (metrics.attendanceType === "actual") {
+        map[assembly].attendanceType = "actual";
+      }
     }
   }
 
@@ -141,15 +222,47 @@ function aggregateDetailedResponse(detailedJson: any) {
   for (const a of Array.isArray(assemblies) ? assemblies : []) {
     const name = String(a);
     if (map[name]) {
-      result.push(map[name]);
+      // Add correction percentage
+      const correctionPct =
+        map[name].totalAttendanceRaw > 0
+          ? ((map[name].totalAttendanceRaw - map[name].totalAttendance) /
+              map[name].totalAttendanceRaw) *
+            100
+          : 0;
+
+      result.push({
+        ...map[name],
+        attendanceCorrectionPct: Math.round(correctionPct),
+        // Per capita metrics
+        incomePerAttendee:
+          map[name].totalAttendance > 0
+            ? Math.round(map[name].totalIncome / map[name].totalAttendance)
+            : 0,
+        tithesPerAttendee:
+          map[name].totalAttendance > 0
+            ? Math.round(map[name].totalTithes / map[name].totalAttendance)
+            : 0,
+      });
     } else {
       result.push({
         assembly: name,
         totalIncome: 0,
         totalTithes: 0,
         totalAttendance: 0,
+        totalAttendanceRaw: 0,
+        totalAttendanceDB: 0,
+        estimatedTotalOverlap: 0,
         totalRecords: 0,
+        attendanceCorrectionPct: 0,
+        incomePerAttendee: 0,
+        tithesPerAttendee: 0,
         offeringsBreakdown: {},
+        attendanceType: "estimated",
+        serviceBreakdown: {
+          sunday: { records: 0, attendance: 0, uniqueAttendance: 0 },
+          midweek: { records: 0, attendance: 0 },
+          special: { records: 0, attendance: 0 },
+        },
       });
     }
   }
@@ -215,14 +328,24 @@ export async function POST(req: Request) {
             totalIncome: 0,
             totalTithes: 0,
             totalAttendance: 0,
+            totalAttendanceRaw: 0,
+            totalAttendanceDB: 0,
+            estimatedTotalOverlap: 0,
             totalRecords: 0,
+            attendanceCorrectionPct: 0,
             offeringsBreakdown: {},
+            attendanceType: "estimated",
+            serviceBreakdown: {
+              sunday: { records: 0, attendance: 0, uniqueAttendance: 0 },
+              midweek: { records: 0, attendance: 0 },
+              special: { records: 0, attendance: 0 },
+            },
           })),
         });
       }
     }
 
-    // Build comparison structure per assembly
+    // Build comparison structure per assembly with all metrics
     const comparisons: any[] = [];
 
     for (const a of assemblies) {
@@ -231,15 +354,31 @@ export async function POST(req: Request) {
         totalIncome: 0,
         totalTithes: 0,
         totalAttendance: 0,
+        totalAttendanceRaw: 0,
+        totalAttendanceDB: 0,
+        estimatedTotalOverlap: 0,
       };
 
-      // previous month immediately before main (previous[0])
+      // previous months
       const prev1Agg = prevAggregatedList[0]?.agg?.find(
         (x: any) => x.assembly === name
-      ) || { totalIncome: 0, totalTithes: 0, totalAttendance: 0 };
+      ) || {
+        totalIncome: 0,
+        totalTithes: 0,
+        totalAttendance: 0,
+        totalAttendanceRaw: 0,
+        totalAttendanceDB: 0,
+      };
+
       const prev2Agg = prevAggregatedList[1]?.agg?.find(
         (x: any) => x.assembly === name
-      ) || { totalIncome: 0, totalTithes: 0, totalAttendance: 0 };
+      ) || {
+        totalIncome: 0,
+        totalTithes: 0,
+        totalAttendance: 0,
+        totalAttendanceRaw: 0,
+        totalAttendanceDB: 0,
+      };
 
       comparisons.push({
         assembly: name,
@@ -247,6 +386,15 @@ export async function POST(req: Request) {
           totalIncome: current.totalIncome || 0,
           totalTithes: current.totalTithes || 0,
           totalAttendance: current.totalAttendance || 0,
+          totalAttendanceRaw: current.totalAttendanceRaw || 0,
+          totalAttendanceDB: current.totalAttendanceDB || 0,
+          estimatedTotalOverlap: current.estimatedTotalOverlap || 0,
+          attendanceCorrectionPct: current.attendanceCorrectionPct || 0,
+          incomePerAttendee: current.incomePerAttendee || 0,
+          tithesPerAttendee: current.tithesPerAttendee || 0,
+          totalRecords: current.totalRecords || 0,
+          attendanceType: current.attendanceType || "estimated",
+          serviceBreakdown: current.serviceBreakdown || {},
         },
         prev1: {
           month: previous[0]
@@ -281,34 +429,78 @@ export async function POST(req: Request) {
       });
     }
 
-    // Build district totals (current month)
+    // Build district totals with all metrics
     const districtTotals = {
       totalIncome: sum(mainAggregated.map((x: any) => x.totalIncome || 0)),
       totalAttendance: sum(
         mainAggregated.map((x: any) => x.totalAttendance || 0)
       ),
+      totalAttendanceRaw: sum(
+        mainAggregated.map((x: any) => x.totalAttendanceRaw || 0)
+      ),
+      totalAttendanceDB: sum(
+        mainAggregated.map((x: any) => x.totalAttendanceDB || 0)
+      ),
       totalTithes: sum(mainAggregated.map((x: any) => x.totalTithes || 0)),
+      estimatedTotalOverlap: sum(
+        mainAggregated.map((x: any) => x.estimatedTotalOverlap || 0)
+      ),
+      totalRecords: sum(mainAggregated.map((x: any) => x.totalRecords || 0)),
+      attendanceCorrection:
+        sum(mainAggregated.map((x: any) => x.totalAttendanceRaw || 0)) -
+        sum(mainAggregated.map((x: any) => x.totalAttendance || 0)),
+      attendanceCorrectionPct:
+        sum(mainAggregated.map((x: any) => x.totalAttendanceRaw || 0)) > 0
+          ? Math.round(
+              ((sum(mainAggregated.map((x: any) => x.totalAttendanceRaw || 0)) -
+                sum(mainAggregated.map((x: any) => x.totalAttendance || 0))) /
+                sum(
+                  mainAggregated.map((x: any) => x.totalAttendanceRaw || 0)
+                )) *
+                100
+            )
+          : 0,
+      incomePerAttendee:
+        sum(mainAggregated.map((x: any) => x.totalAttendance || 0)) > 0
+          ? Math.round(
+              sum(mainAggregated.map((x: any) => x.totalIncome || 0)) /
+                sum(mainAggregated.map((x: any) => x.totalAttendance || 0))
+            )
+          : 0,
+      assembliesWithActualData: mainAggregated.filter(
+        (x: any) => x.attendanceType === "actual"
+      ).length,
     };
 
-    // Prepare structured payload for AI (JSON + short human instructions)
+    // Prepare structured payload for AI - include all attendance metrics
     const payloadForAI = {
       month: `${month} ${year}`,
       assemblies: mainAggregated,
       comparisons,
       districtTotals,
       previousMonths: previous.map((p) => `${p.month} ${p.year}`),
+      attendanceMetricsNote:
+        "IMPORTANT: Attendance data uses corrected 'uniqueAttendance' to avoid double-counting. The same people often attend both Sunday School (SBS) and main service. 'totalAttendance' shows unique attendees, 'totalAttendanceRaw' shows the double-counted sum, and 'estimatedTotalOverlap' shows estimated duplicates.",
     };
 
-    // Compose prompt - emphasize not to invent numbers and to reason from provided data
+    // UPDATED prompt to explain attendance metrics
     const prompt = `
 You are a senior financial analyst and church administration expert.
 You will produce a comprehensive MONTHLY FINANCIAL & NUMERICAL REPORT for a church district.
 
+CRITICAL ATTENDANCE NOTE: The attendance data has been CORRECTED to avoid double-counting. 
+- Many people attend both Sunday School (SBS) and the main Sunday service
+- Previously, attendance was calculated as: attendance + sbsAttendance = total (DOUBLE-COUNTED)
+- Now we use 'uniqueAttendance' which estimates the actual number of unique people
+- Example: If 51 attend service and 32 attend SBS, with ~24 estimated overlap, unique attendance is ~59 (not 83)
+- The correction reduces reported attendance by 25-40% but is more accurate
+
 STRICT RULES (DO NOT BREAK):
 - DO NOT invent numbers, statistics, percentages, or assemblies.
 - Use ONLY the numbers in the provided JSON.
-- If data is missing or zero, interpret it realistically (e.g., “zero reporting”, “possible under-reporting”, “no attendance submitted”).
-- Always reason inside the data that is given.
+- For attendance analysis, ALWAYS use 'totalAttendance' (corrected unique attendance), not 'totalAttendanceRaw' (double-counted).
+- Mention the attendance correction in your analysis when relevant.
+- If data is missing or zero, interpret it realistically.
 
 =========== INPUT JSON ===========
 ${JSON.stringify(payloadForAI, null, 2)}
@@ -317,95 +509,82 @@ ${JSON.stringify(payloadForAI, null, 2)}
 Generate a full professional report with the following sections:
 
 # 1. Executive Summary
-- 2–4 sentences summarising the district’s overall financial and attendance performance.
-- Mention only trends supported by the data.
+- 2–4 sentences summarising the district's overall financial and attendance performance.
+- Mention the attendance correction if significant (e.g., "using corrected attendance figures to avoid double-counting").
+- Highlight only trends supported by the data.
 
 # 2. District Totals Overview
-Provide:
-- Total Income
-- Total Attendance
-- Total Tithes  
-Then add:
-- A short analytical interpretation using only provided numbers.
+Present CORRECTED figures:
+- Total Income: ${districtTotals.totalIncome}
+- Total Attendance (Corrected/Unique): ${districtTotals.totalAttendance} 
+- Total Attendance (Old method/Raw): ${districtTotals.totalAttendanceRaw}
+- Attendance Correction: ${districtTotals.attendanceCorrection} people (${
+      districtTotals.attendanceCorrectionPct
+    }% reduction)
+- Total Tithes: ${districtTotals.totalTithes}
+- Estimated Total Overlap: ${
+      districtTotals.estimatedTotalOverlap
+    } (people attending both services)
+- Income per Attendee: ${districtTotals.incomePerAttendee}
+
+Add 1-2 sentences interpreting these corrected numbers.
 
 # 3. Assembly Performance Table
-Create a clean Markdown table:
-Assembly | Income | Attendance | Tithes | % Income Change vs Last Month
+Create a clean Markdown table with CORRECTED attendance:
+| Assembly | Income | Attendance (Corrected) | Attendance (Raw/Old) | Correction % | Tithes | % Income Change |
+|----------|--------|------------------------|----------------------|--------------|--------|-----------------|
+${mainAggregated
+  .map(
+    (a) =>
+      `| ${a.assembly} | ${a.totalIncome} | ${a.totalAttendance} | ${
+        a.totalAttendanceRaw
+      } | ${a.attendanceCorrectionPct}% | ${a.totalTithes} | ${
+        comparisons
+          .find((c) => c.assembly === a.assembly)
+          ?.change?.incomeVsPrev1?.toFixed(1) || 0
+      }% |`
+  )
+  .join("\n")}
 
-# 4. Top 3 Performing Assemblies
-- Rank assemblies by totalIncome.
-- Explain WHY each one is top — using their figures only.
+# 4. Attendance Analysis Section
+For EACH assembly, analyze:
+- Unique attendance vs. double-counted attendance
+- Estimated overlap between SBS and service
+- Whether using actual or estimated data
+- Service breakdown (Sunday vs. Midweek attendance)
 
-# 5. Bottom 3 Assemblies
-- Identify assemblies with lowest income or attendance.
-- Provide short reasons (missing data, extremely low attendance, zero reporting, etc.)
+# 5. Top 3 Performing Assemblies (by corrected attendance)
+- Rank by 'totalAttendance' (corrected)
+- Explain their attendance patterns (SBS vs Service ratio)
+- Mention if their data is actual or estimated
 
-# 6. Trend Analysis vs Previous Months
-For each assembly:
-- Income trend (up/down/same)
-- Tithes trend
-- Attendance trend
-- Explain the trend with clear reasoning using only provided comparisons.
+# 6. Bottom 3 Assemblies 
+- Identify by lowest corrected attendance
+- Analyze their attendance overlap patterns
+- Note any data quality issues
 
-# 7. Financial Health Assessment (District)
-Include:
-- Income stability comment
-- Offering distribution insights (use breakdown available)
-- Tithes-to-income relationship
-- Income per attendee (do NOT compute if data missing; instead say “insufficient data for ratio”).
+# 7. Data Quality & Correction Assessment
+- How many assemblies have actual vs estimated attendance data?
+- Magnitude of attendance correction across assemblies
+- Recommendations for improving data collection (collect 'attendedBoth' count)
 
-# 8. Attendance & Growth Insights
-- Identify growth or decline patterns across assemblies.
-- Highlight assemblies with unusually high or low attendance.
-- Mention district-wide consistency or fluctuation.
+# 8. Financial Health with Corrected Attendance
+- Income per unique attendee (more accurate now)
+- Tithes per unique attendee
+- How correction affects per capita metrics
 
-# 9. Ministry Impact & Engagement Recommendations
-Using the data:
-- Suggest pastoral strategies for low-attendance assemblies.
-- Suggest follow-up actions for assemblies with low reporting.
-- Suggest engagement practices for stronger assemblies.
+# 9. Ministry Impact with Accurate Numbers
+- True reach of ministries (unique individuals)
+- SBS effectiveness analysis
+- Service engagement patterns
 
-# 10. Pastoral Leadership Recommendations
-- Assemblies needing pastoral visitation
-- Assemblies needing administrative support
-- Assemblies showing strong pastoral effectiveness
-
-# 11. Risk Flags & Alerts
-Identify assemblies that show:
-- Zero reporting
-- Sharp drops in income or attendance
-- Sudden increases that look abnormal
-- Missing offering categories
-- Possible data-quality issues  
-(Explain only from the given JSON — NO speculation.)
-
-# 12. Data Quality Assessment
-- Evaluate completeness of the month’s submissions.
-- Identify assemblies with missing, inconsistent, or zero values.
-- Suggest improvements for reporting accuracy.
-
-# 13. 90-Day Strategic Roadmap
-Provide a high-level but practical strategy:
-- Immediate priorities (0–30 days)
-- Mid-term (30–60 days)
-- Long-term (60–90 days)
-
-# 14. Assembly-Specific Notes
-Write 1–2 sentences for EACH assembly:
-- Explain their unique challenge, strength, or pattern based only on their numbers.
-
-# 15. Accountability & Transparency Highlights
-- Comment on reporting discipline
-- Treasury accuracy
-- Offering category breakdown usage
-
-# 16. Recognition & Motivation
-Highlight:
-- Assembly of the Month (based on income + attendance combined)
-- Most Improved Assembly (income change vs previous month)
-- Best Reporting Assembly (non-zero, complete data)
+# 10. Strategic Recommendations Based on Accurate Data
+- Focus on assemblies with low unique attendance
+- SBS engagement strategies
+- Data collection improvements
 
 Write everything in clean, excellent Markdown. Keep it professional, pastoral, and data-grounded.
+Always reference that you're using corrected attendance figures to avoid double-counting.
 `;
 
     const completion = await client.responses.create({
@@ -424,6 +603,8 @@ Write everything in clean, excellent Markdown. Keep it professional, pastoral, a
       comparisons,
       districtTotals,
       previousMonths: previous,
+      attendanceNote:
+        "Note: Attendance figures use 'uniqueAttendance' to avoid double-counting. The same people often attend both Sunday School and main service. Old method (totalAttendanceRaw) would double-count these individuals.",
     });
   } catch (err: any) {
     console.error("Generate report error:", err);
